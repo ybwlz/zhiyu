@@ -102,6 +102,7 @@ const versions = [
       improved: [
         { title: '统计卡居中微调', desc: '手机端统计卡整体左移 10px，视觉更居中。' },
         { title: '侧栏收起/展开平滑化', desc: '阅览室左右侧栏收起/展开不再跳变：grid 列宽改为显式尺寸并由 grid-template-columns 过渡驱动，收起为窄条、展开恢复 280px 全程平滑伸缩，与右侧大纲栏体验一致。' },
+        { title: '后端代码按功能拆分', desc: '单文件 app.py（约 3600 行）拆分为共享层（config/db/auth/utils/shared）+ routes/ 九个蓝图（auth/docs/notes/users/social/messages/ai/misc/annotations），入口与启动方式不变，接口行为经全链路回归保持一致。' },
       ],
       fixed: [
         { title: '修复 favicon 被裁切只剩左上角', desc: 'SVG 缺 width/height 导致浏览器按默认尺寸渲染取左上角；ico 路径坐标未按尺寸缩放导致线条画在画布外——均已修复，三端（favicon / ico / 导航栏）图形统一完整。' },
