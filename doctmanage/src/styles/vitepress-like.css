@@ -1,0 +1,90 @@
+:root {
+  /* Colors: White/Black */
+  --vp-c-white: #ffffff;
+  --vp-c-black: #000000;
+
+  /* Colors: Gray */
+  --vp-c-gray-1: #ddd;
+  --vp-c-gray-2: #e2e2e3;
+  --vp-c-gray-3: #ebebef;
+
+  /* Colors: Brand */
+  --vp-c-brand-1: #3eaf7c;
+  --vp-c-brand-2: #4abf8a;
+  --vp-c-brand-dark: #33a06f;
+
+  /* Backgrounds */
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-soft: #f9f9f9;
+  --vp-c-bg-alt: #f6f6f7;
+
+  /* Text */
+  --vp-c-text-1: #213547;
+  --vp-c-text-2: #3c3c43c7;
+  --vp-c-text-3: #3c3c438c;
+
+  /* Borders */
+  --vp-c-divider: #e2e2e3;
+  --vp-c-gutter: #e2e2e3;
+
+  /* Shadows */
+  --vp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --vp-shadow-2: 0 3px 12px rgba(0, 0, 0, 0.07), 0 1px 4px rgba(0, 0, 0, 0.07);
+  --vp-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.08);
+
+  /* Fonts */
+  --vp-font-family-base: "Chinese Quote", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+
+  /* Layout */
+  --vp-layout-max-width: 1152px;
+  --vp-layout-padding: 24px;
+  --vp-radius: 12px;
+}
+
+html.dark {
+  /* Backgrounds */
+  --vp-c-bg: #1b1b1f;
+  --vp-c-bg-soft: #202127;
+  --vp-c-bg-alt: #161618;
+
+  /* Text */
+  --vp-c-text-1: rgba(255, 255, 255, 0.87);
+  --vp-c-text-2: rgba(255, 255, 255, 0.60);
+  --vp-c-text-3: rgba(255, 255, 255, 0.38);
+
+  /* Borders */
+  --vp-c-divider: #2e2e32;
+  --vp-c-gutter: #2e2e32;
+
+  /* Shadows */
+  --vp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --vp-shadow-2: 0 3px 12px rgba(0, 0, 0, 0.07), 0 1px 4px rgba(0, 0, 0, 0.07);
+  --vp-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.08);
+  
+  /* Brand */
+  --vp-c-brand-1: #3eaf7c;
+  --vp-c-brand-2: #33a06f; 
+}
+
+/* Global Reset */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--vp-font-family-base);
+  background-color: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  transition: background-color 0.5s, color 0.5s;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.25s;
+}
+
+button {
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}

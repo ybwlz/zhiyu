@@ -1,0 +1,178 @@
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f6f6f7;
+  --text1: rgba(60, 60, 67, 1);
+  --text2: rgba(60, 60, 67, .75);
+  --border: rgba(60, 60, 67, .12);
+  --card-bg: #ffffff;
+
+  --btn-bg: #f6f6f7;
+  --btn-text: rgba(60, 60, 67, 1);
+  --btn-bg-hover: #ebebef;
+  --btn-border: rgba(60, 60, 67, .12);
+  --btn-border-hover: rgba(100, 108, 255, .35);
+  --btn-text-contrast: #ffffff;
+
+  --brand-1: #646cff;
+  --brand-2: #747bff;
+  --brand-3: #41d1ff;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  --radius: 12px;
+  --layout-max-width: 1152px;
+  --layout-padding: 32px;
+
+  --switch-track: var(--bg-soft);
+  --switch-track-border: var(--border);
+  --switch-thumb: var(--card-bg);
+  --switch-thumb-border: var(--border);
+  --switch-thumb-shadow: var(--shadow-1);
+  --switch-track-hover: var(--btn-bg-hover);
+
+  --overlay-bg: rgba(0, 0, 0, .45);
+
+  /* 渐变字体统一用高对比色（青→紫→粉），深浅主题下都清晰可见 */
+  --kb-grad: linear-gradient(120deg, #38bdf8 0%, #8b5cf6 50%, #ec4899 100%);
+}
+
+html.dark {
+  --bg: #0f1115;
+  --bg-soft: #16181d;
+  --text1: rgba(235, 235, 245, .86);
+  --text2: rgba(235, 235, 245, .6);
+  --border: rgba(235, 235, 245, .16);
+  --card-bg: #16181d;
+
+  --btn-bg: #32363f;
+  --btn-text: rgba(235, 235, 245, .86);
+  --btn-bg-hover: #3c424e;
+  --btn-border: rgba(235, 235, 245, .16);
+  --btn-border-hover: rgba(147, 157, 255, .35);
+  --btn-text-contrast: rgba(0,0,0,.92);
+
+  --brand-1: #a8b1ff;
+  --brand-2: #5c73ff;
+  --brand-3: #41d1ff;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.5);
+
+  --switch-track: var(--bg-soft);
+  --switch-track-border: var(--border);
+  --switch-thumb: var(--card-bg);
+  --switch-thumb-border: var(--border);
+  --switch-thumb-shadow: var(--shadow-1);
+  --switch-track-hover: var(--btn-bg-hover);
+
+  --overlay-bg: rgba(0, 0, 0, .65);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text1);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* ============================================================
+   个人知识库 · 多主题体系（全局生效）
+   主题通过 <html data-theme="starlight|sky|minimal"> 切换，
+   JS 侧同时维护 html.dark（深色主题下 Docs 等页面自动深色）。
+   选择器置于 html.dark 之后，同特异性下后者覆盖，保证优先级。
+   ============================================================ */
+
+/* ── 主题一：深空星际 Starlight（默认，深色） ────────────────── */
+html[data-theme="starlight"] {
+  --bg: #070b16;
+  --bg-soft: #0d1424;
+  --text1: rgba(233, 237, 247, .92);
+  --text2: rgba(158, 169, 199, .78);
+  --border: rgba(233, 237, 247, .12);
+  --card-bg: rgba(255, 255, 255, .045);
+
+  --btn-bg: rgba(255, 255, 255, .06);
+  --btn-text: rgba(233, 237, 247, .9);
+  --btn-bg-hover: rgba(255, 255, 255, .11);
+  --btn-border: rgba(233, 237, 247, .16);
+  --btn-border-hover: rgba(0, 198, 255, .55);
+  --btn-text-contrast: #ffffff;
+
+  --brand-1: #00c6ff;
+  --brand-2: #e305f7;
+  --brand-3: #41d1ff;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .5);
+
+  --switch-track: var(--bg-soft);
+  --switch-track-border: var(--border);
+  --switch-thumb: var(--card-bg);
+  --switch-thumb-border: var(--border);
+  --switch-thumb-shadow: var(--shadow-1);
+  --switch-track-hover: var(--btn-bg-hover);
+
+  --overlay-bg: rgba(0, 0, 0, .68);
+}
+
+/* ── 主题二：蓝天大气 Sky（浅色） ────────────────────────────── */
+html[data-theme="sky"] {
+  --bg: #e8f2fc;
+  --bg-soft: #f4f9fe;
+  --text1: rgba(28, 43, 58, .94);
+  --text2: rgba(63, 84, 108, .78);
+  --border: rgba(28, 43, 58, .12);
+  --card-bg: rgba(255, 255, 255, .78);
+
+  --btn-bg: rgba(255, 255, 255, .85);
+  --btn-text: rgba(28, 43, 58, .92);
+  --btn-bg-hover: #ffffff;
+  --btn-border: rgba(28, 43, 58, .16);
+  --btn-border-hover: rgba(14, 165, 233, .6);
+  --btn-text-contrast: #ffffff;
+
+  --brand-1: #0ea5e9;
+  --brand-2: #4f46e5;
+  --brand-3: #38bdf8;
+
+  --shadow-1: 0 1px 2px rgba(31, 45, 61, .05), 0 8px 24px rgba(31, 45, 61, .08);
+
+  --switch-track: var(--bg-soft);
+  --switch-track-border: var(--border);
+  --switch-thumb: var(--card-bg);
+  --switch-thumb-border: var(--border);
+  --switch-thumb-shadow: var(--shadow-1);
+  --switch-track-hover: var(--btn-bg-hover);
+
+  --overlay-bg: rgba(28, 43, 58, .42);
+}
+
+/* ── 主题三：纯色简约 Minimal（浅色） ────────────────────────── */
+html[data-theme="minimal"] {
+  --bg: #fafafa;
+  --bg-soft: #f1f1f2;
+  --text1: rgba(23, 24, 26, .92);
+  --text2: rgba(90, 94, 102, .78);
+  --border: rgba(0, 0, 0, .09);
+  --card-bg: #ffffff;
+
+  --btn-bg: #f1f1f2;
+  --btn-text: rgba(23, 24, 26, .9);
+  --btn-bg-hover: #e8e8ea;
+  --btn-border: rgba(0, 0, 0, .11);
+  --btn-border-hover: rgba(59, 130, 246, .45);
+  --btn-text-contrast: #ffffff;
+
+  --brand-1: #3b82f6;
+  --brand-2: #2563eb;
+  --brand-3: #60a5fa;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .04), 0 8px 24px rgba(0, 0, 0, .06);
+
+  --switch-track: var(--bg-soft);
+  --switch-track-border: var(--border);
+  --switch-thumb: var(--card-bg);
+  --switch-thumb-border: var(--border);
+  --switch-thumb-shadow: var(--shadow-1);
+  --switch-track-hover: var(--btn-bg-hover);
+
+  --overlay-bg: rgba(0, 0, 0, .4);
+}

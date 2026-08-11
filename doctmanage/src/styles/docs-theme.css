@@ -1,0 +1,734 @@
+:root {
+  /* Layout Dimensions */
+  --layout-max: 1440px; /* Max width for layout */
+  --doc-max: 880px;     /* Document reading width */
+  --left-w: 270px;      /* Sidebar width (User requested 270) */
+  --right-w: 260px;     /* Right Sidebar width */
+  --header-h: 56px;
+  
+  /* Colors - Light Theme (Default) */
+  --c-bg: #ffffff;
+  --c-bg-soft: #f9f9f9;
+  --c-brand: #3eaf7c;
+  --c-brand-light: #4abf8a;
+  --c-text-1: #2c3e50;
+  --c-text-2: #606266;
+  --c-border: #e2e2e3;
+  --c-divider: #eaecef;
+  
+  /* Sidebar & Code Colors */
+  --c-sidebar-bg: #f9f9f9; /* 浅色背景 */
+  --c-code-bg: #eef1f5;    /* 浅色代码块 - 加深一点对比 */
+  --c-code-text: #476582;
+  --c-brand-dim: rgba(62, 175, 124, 0.1);
+}
+
+html.dark {
+  --c-bg: #1b1b1f;
+  --c-bg-soft: #202127;
+  --c-text-1: #e2e2e3;
+  --c-text-2: #a8a8b3;
+  --c-border: #3c3c43;
+  --c-divider: #2e2e32;
+
+  --c-sidebar-bg: #202127;
+  --c-code-bg: #161618; /* 深色代码块 - 更深 */
+  --c-code-text: #abb2bf;
+  --c-brand-dim: rgba(62, 175, 124, 0.1);
+}
+
+/* 基础重置 */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* 背景交给 App 全局主题背景层，body 透明 */
+  background-color: transparent;
+  color: var(--c-text-1);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.25s;
+}
+
+/* ── 细无边框滚动条（全站统一） ───────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--c-text-2) 28%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--c-text-2) 28%, transparent);
+  border-radius: 8px;
+  border: none;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--c-text-2) 45%, transparent);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Element Plus 覆盖 */
+.el-drawer__body {
+  padding: 0 !important;
+}
+.el-drawer__header {
+  margin-bottom: 0 !important;
+  padding: 16px 20px !important;
+  border-bottom: 1px solid var(--c-border);
+}
+
+/* 正文卡片样式 */
+.doc-card {
+  background: var(--c-bg);
+  /* 只有在极宽屏或特定背景下才显示卡片效果，
+     或者如果背景是白色，这里可以是透明。
+     用户要求：圆角 12、细边框、背景白 */
+  border-radius: 12px;
+  border: 1px solid transparent; 
+}
+
+/* 移动端/平板遮罩层 */
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+
+/* Table Override */
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  display: table;
+  border-spacing: 0;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--c-border);
+  padding: 8px 10px;
+  text-align: left;
+}
+.markdown-body th {
+  background-color: var(--c-bg-soft);
+  font-weight: 600;
+}
+.markdown-body tr:nth-child(2n) {
+  background-color: var(--c-bg-soft);
+}
+.markdown-body em {
+  font-style: italic;
+  color: inherit;
+}
+
+/* Anchor Links */
+.markdown-body h1, 
+.markdown-body h2, 
+.markdown-body h3, 
+.markdown-body h4 { 
+  position: relative; 
+} 
+
+.markdown-body .header-anchor {
+  position: absolute;
+  left: -0.9em;
+  padding-right: 0.2em;
+  opacity: 0;
+  color: var(--brand-1); /* 品牌色锚点 */
+  text-decoration: none;
+  background: transparent !important;
+}
+
+.markdown-body h1:hover .header-anchor, 
+.markdown-body h2:hover .header-anchor, 
+.markdown-body h3:hover .header-anchor, 
+.markdown-body h4:hover .header-anchor { 
+  opacity: 1; 
+}
+
+/* Code Block Wrapper */
+.markdown-body .code-block-wrapper {
+  position: relative;
+  background: var(--c-code-bg);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border: 1px solid var(--c-border);
+  overflow: hidden;
+  transition: border-color 0.25s;
+}
+.markdown-body .code-block-wrapper:hover {
+  border-color: var(--c-border); /* Keep standard border on hover as requested */
+}
+
+.markdown-body .code-header {
+  /* Remove persistent header bar */
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 0; /* Don't take up space */
+  display: flex;
+  justify-content: flex-end;
+  padding: 0;
+  background: transparent;
+  border: none;
+  z-index: 10;
+  pointer-events: none; /* Let clicks pass through unless on children */
+}
+
+/* Language Label - Centered under the copy button area */
+.markdown-body .code-lang {
+  position: absolute;
+  top: 14px; /* Align vertically with copy button center approx */
+  right: 16px; /* Align horizontally */
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-2); /* More visible color */
+  opacity: 0.6;
+  z-index: 9;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  display: block;
+  text-align: right;
+  line-height: 1;
+}
+
+.markdown-body .code-block-wrapper:hover .code-lang {
+  opacity: 0;
+}
+
+/* Copy Button - Hover only, Top Right */
+.markdown-body .copy-code-btn {
+  position: absolute; /* Changed to absolute */
+  top: 8px;
+  right: 8px;
+  margin: 0; /* Remove margin */
+  pointer-events: auto;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  /* 背景交给 App 全局主题背景层，body 透明 */
+  background-color: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23606266' viewBox='0 0 24 24' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px;
+}
+.markdown-body .code-block-wrapper:hover .copy-code-btn {
+  opacity: 1;
+}
+.markdown-body .copy-code-btn:hover {
+  background-color: var(--c-bg-soft);
+  border-color: var(--c-brand);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%233eaf7c' viewBox='0 0 24 24' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'/%3E%3C/svg%3E");
+}
+.markdown-body .copy-code-btn.copied {
+  opacity: 1;
+  border-color: var(--c-brand);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%233eaf7c' viewBox='0 0 24 24' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M5 13l4 4L19 7'/%3E%3C/svg%3E");
+}
+
+.markdown-body pre { 
+  background: transparent !important; 
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 20px 24px !important; /* Increase padding */
+  overflow-x: auto;
+  position: relative;
+  z-index: 1;
+  line-height: 24px; /* Explicit px line height for alignment */
+}
+.markdown-body code {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.9em;
+  background: var(--c-code-bg);
+  color: var(--c-code-text);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+/* Line Numbers & Highlighting */
+.markdown-body .line-numbers-mode pre {
+  padding-left: 3.5rem !important;
+}
+.markdown-body .line-numbers-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3.5rem;
+  text-align: right;
+  padding: 20px 0;
+  color: var(--c-text-2);
+  border-right: 1px solid var(--c-border);
+  background-color: var(--c-bg-soft);
+  opacity: 0.5;
+  font-family: var(--font-family-mono, monospace);
+  font-size: 14px; /* Slightly smaller than code */
+  line-height: 24px; /* Match pre line-height */
+  user-select: none;
+  z-index: 2;
+  box-sizing: border-box;
+}
+.markdown-body .line-numbers-wrapper .line-number {
+  display: block;
+  padding-right: 8px;
+}
+
+.markdown-body .highlight-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 20px 0;
+  line-height: 24px;
+  user-select: none;
+  pointer-events: none;
+  z-index: 0;
+}
+.markdown-body .highlight-line {
+  display: block;
+  min-height: 24px; /* Match line-height */
+}
+
+/* Code Fonts */
+.markdown-body pre code, .markdown-body code {
+  font-family: "Fira Code", "Consolas", "Monaco", "Courier New", monospace;
+}
+
+/* Force normal style for comments in highlight.js */
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+  font-style: normal !important;
+}
+
+.markdown-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: 16px; /* Increased font size as requested */
+}
+
+/* Typography */
+.markdown-body {
+  line-height: 1.8;
+  font-size: 15px; /* Decreased base font size from 17px to 15px */
+  color: var(--c-text-1);
+}
+.markdown-body h1 { font-size: 2.0rem; margin-bottom: 32px; font-weight: 700; line-height: 1.3; }
+.markdown-body {
+  counter-reset: kb-section;
+}
+.markdown-body h2 {
+  font-size: 1.5rem;
+  margin-top: 48px;
+  margin-bottom: 24px;
+  line-height: 1.4;
+  padding-bottom: 12px;
+  border-bottom: none;
+  counter-increment: kb-section;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+/* 分区编号：渐变数字方块（参考 reasonix changelog 的 01/02/03 分区感） */
+.markdown-body h2::before {
+  content: counter(kb-section, decimal-leading-zero);
+  flex-shrink: 0;
+  font-size: 0.6em;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 5px 11px;
+  border-radius: 9px;
+  color: transparent;
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  border: 1px solid color-mix(in srgb, var(--brand-1) 35%, transparent);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--brand-1) 22%, transparent);
+}
+/* 渐变分隔线 */
+.markdown-body h2::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand-1) 55%, transparent), transparent 75%);
+}
+.markdown-body h3 { font-size: 1.25rem; margin-top: 32px; margin-bottom: 16px; line-height: 1.5; }
+.markdown-body p { margin-bottom: 1.2em; }
+.markdown-body ul, .markdown-body ol { padding-left: 24px; margin-bottom: 1.2em; }
+.markdown-body li { margin-bottom: 0.5em; }
+
+.markdown-body a {
+  color: #3498db; /* Blue links */
+  text-decoration: none;
+}
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body blockquote { 
+  border-left: 4px solid var(--c-brand); 
+  margin: 0; 
+  padding-left: 16px; 
+  color: var(--c-text-2); 
+  background: var(--c-bg-soft); 
+  padding-top: 8px; 
+  padding-bottom: 8px; 
+}
+
+/* Right Sidebar */
+.right-sidebar {
+  flex: 1; /* Dynamic Spacer */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Align content to left (next to doc) */
+  align-self: stretch; 
+}
+
+.right-sidebar-inner {
+  width: 100%; /* Fill available space */
+  min-width: 260px;
+  height: calc(100vh - 56px); 
+  position: sticky;
+  top: 0; 
+  padding: 80px 0 24px; 
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbar for outline */
+.right-sidebar-inner::-webkit-scrollbar,
+.outline-list::-webkit-scrollbar {
+  display: none;
+}
+
+.outline-content {
+  padding: 0 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* --- Responsive Logic --- */
+
+/* 
+   Breakpoint 1: Hide Right Sidebar when space is tight.
+   Threshold: 270 (Left) + 880 (Doc) + 260 (Right) + Margins ~= 1450px.
+   If < 1450px, we hide Right Sidebar (handled by v-if="showRightSidebar" in JS).
+   But we also need to adjust layout to prevent clipping Left Sidebar.
+*/
+
+/* 
+   Breakpoint 2: Switch from "Dynamic Spacers" to "Left Fixed + Center Fluid".
+   This avoids clipping the Left Sidebar when the "Spacer" shrinks below 270px.
+   Math: (Window - 880) / 2 < 270 => Window < 1420.
+   So below 1420px, we MUST switch layout mode.
+*/
+@media (max-width: 1420px) {
+  .main-wrapper {
+    justify-content: flex-start; /* Align left to prioritize Left Sidebar visibility */
+  }
+  
+  .left-sidebar {
+    /* Switch to Fixed Width */
+    flex: 0 0 270px;
+    align-items: stretch; /* Fill width */
+  }
+  
+  .left-sidebar-inner {
+    width: 100%;
+    min-width: 0;
+  }
+  
+  .content-wrapper {
+    /* Switch to Fluid Width */
+    flex: 1;
+    width: auto;
+    max-width: 1000px; /* Optional max-width for readability */
+  }
+  
+  /* Right Sidebar is likely hidden by JS here, but if not, it will squeeze content. 
+     JS should ensure showRightSidebar is false below ~1400px. */
+}
+
+/* Mobile adjustments handled by showLeftSidebar logic (< 960px) */
+
+/* Common Components */
+.site-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+  color: var(--c-text-1);
+}
+.nav-link-text:hover {
+  color: var(--c-brand);
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--c-text-1);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.icon-btn:hover {
+  background-color: var(--c-bg-soft);
+}
+
+/* Theme Button */
+.theme-btn {
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg-soft);
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+  transition: all .2s;
+}
+.theme-btn .thumb {
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .2s;
+}
+.theme-btn.on {
+  background: #333;
+  border-color: #333;
+}
+.theme-btn.on .thumb {
+  transform: translateX(18px);
+  background: #000;
+}
+.theme-btn.on .icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Sidebar Groups */
+.group {
+  border-bottom: 1px solid var(--c-border);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+}
+.group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.group-title {
+  padding: 8px 24px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--c-text-1);
+  width: 100%;
+  box-sizing: border-box;
+}
+.group-title:hover {
+  color: var(--c-brand);
+  background-color: transparent;
+}
+.group-items {
+  padding-bottom: 12px;
+  width: 100%;
+}
+.doc-link {
+  display: block;
+  padding: 8px 24px 8px 36px;
+  font-size: 14px;
+  color: var(--c-text-2);
+  cursor: pointer;
+  border-left: 4px solid transparent;
+  width: 100%;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+.doc-link:hover {
+  color: #1677ff;
+  background-color: #f0f9ff;
+}
+.doc-link.active {
+  color: #1677ff;
+  background-color: #e6f7ff;
+  border-left-color: transparent;
+}
+.caret {
+  width: 0; 
+  height: 0; 
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 5px solid var(--c-text-2); /* Point Right */
+  transition: transform 0.2s;
+}
+.caret.open {
+  transform: rotate(90deg); /* Point Down */
+}
+
+/* Outline Links */
+.outline-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+.outline-list {
+  position: relative;
+  border-left: 1px solid var(--c-border); /* Vertical Gray Line */
+  overflow-x: auto; /* Allow horizontal scroll */
+  padding-bottom: 4px;
+}
+.outline-link {
+  display: block;
+  padding: 4px 16px 4px 12px;
+  font-size: 13px;
+  color: var(--c-text-2);
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.8; /* Increased line-height */
+  border-left: 2px solid transparent; /* Active Indicator */
+  margin-left: -1px; /* Overlap the gray line */
+  
+  /* Allow Wrap */
+  white-space: normal;
+  word-break: break-word;
+  width: auto;
+  min-width: 100%;
+}
+.outline-link:hover, .outline-link.active {
+  color: var(--c-brand);
+  border-left-color: var(--c-brand);
+  background-color: transparent;
+}
+.outline-link.indent-3 {
+  padding-left: 28px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   个人知识库 · 多主题对文档页变量的覆盖（配合 theme.css）
+   置于 html.dark 之后，确保 data-theme 优先，全站配色统一
+   ═══════════════════════════════════════════════════════════ */
+
+html[data-theme="starlight"] {
+  --c-bg: #0b101d;
+  --c-bg-soft: #101729;
+  --c-brand: #38bdf8;
+  --c-brand-light: #7dd3fc;
+  --c-text-1: #e8ecf8;
+  --c-text-2: #9aa5c3;
+  --c-border: #232b3d;
+  --c-divider: #1c2434;
+  --c-sidebar-bg: #0e1524;
+  --c-code-bg: #131a2b;
+  --c-code-text: #a9b7d6;
+  --c-brand-dim: rgba(56, 189, 248, 0.1);
+}
+
+html[data-theme="sky"] {
+  --c-bg: #eef6fd;
+  --c-bg-soft: #f7fbfe;
+  --c-brand: #0ea5e9;
+  --c-brand-light: #38bdf8;
+  --c-text-1: #1f3a57;
+  --c-text-2: #5b7694;
+  --c-border: #d7e6f2;
+  --c-divider: #e3eef7;
+  --c-sidebar-bg: #f4f9fe;
+  --c-code-bg: #eef4fb;
+  --c-code-text: #2c5d8a;
+  --c-brand-dim: rgba(14, 165, 233, 0.1);
+}
+
+html[data-theme="minimal"] {
+  --c-bg: #fafafa;
+  --c-bg-soft: #f3f3f4;
+  --c-brand: #3b82f6;
+  --c-brand-light: #60a5fa;
+  --c-text-1: #1f242b;
+  --c-text-2: #5f6670;
+  --c-border: #e4e4e6;
+  --c-divider: #ececee;
+  --c-sidebar-bg: #f3f3f4;
+  --c-code-bg: #f0f1f2;
+  --c-code-text: #34495e;
+  --c-brand-dim: rgba(59, 130, 246, 0.1);
+}
+/* ═══════════ 打印友好（公式可打印、隐藏交互） ═══════════ */
+@media print {
+  body { background: #fff !important; }
+  .kb-navbar, .kb-footer, .ai-assistant, .bell-wrap, .theme-dropdown-wrap,
+  .toc-fab, .toc-panel, .action-bar, .comment-box, .author-card,
+  .ann-toolbar, .ann-pages, .outline-fab, .immersive-btn, .me-link,
+  .sidebar-mask, .left-sidebar-inner, .feed-list, .today-strip,
+  .hero-search, .hero-stats, .starfield-backdrop, .sky-backdrop, .minimal-backdrop {
+    display: none !important;
+  }
+  .docs-layout, .reader-page, .doc-page, .square-page { padding: 0 !important; }
+  .doc-card, .reader-card, .doc-content, .markdown-body {
+    background: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    color: #000 !important;
+  }
+  .markdown-body { max-width: 100% !important; }
+  a { color: #000 !important; text-decoration: none !important; }
+  mjx-container { color: #000 !important; }
+  pre, code { background: #f5f5f5 !important; color: #000 !important; }
+}
+/* ═══ 移动端公式防溢出 ═══ */
+.markdown-body { overflow-wrap: break-word; word-break: break-word; }
+.markdown-body mjx-container { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.markdown-body mjx-container[display="true"] { display: block; margin: 0.6em 0; overflow-x: auto; padding-bottom: 2px; }
+.markdown-body .katex-display { overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
+/* 代码块/表格窄屏滚动 */
+.markdown-body pre { max-width: 100%; overflow-x: auto; }
+.markdown-body table { display: block; overflow-x: auto; max-width: 100%; }
+/* ═══ 移动端公式防溢出 END ═══ */

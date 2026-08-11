@@ -1,0 +1,126 @@
+/* --- Custom Blocks (VitePress Style) --- */
+.markdown-body .custom-block {
+  border: none; /* No border as requested */
+  border-radius: 8px;
+  padding: 10px 16px 8px; /* Narrower padding */
+  line-height: 24px;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* Info: Grey background */
+.markdown-body .custom-block.info {
+  background-color: #f6f6f7;
+  color: #000; /* Black text */
+}
+.markdown-body .custom-block.info .custom-block-title {
+  color: #000;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Tip: Purple background (Solid color based on previous border) */
+.markdown-body .custom-block.tip {
+  background-color: rgba(147, 112, 219, 0.15); /* Stronger background */
+  color: #000; /* Black text */
+}
+.markdown-body .custom-block.tip .custom-block-title {
+  color: #000; /* Black title */
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Warning: Yellow background */
+.markdown-body .custom-block.warning {
+  background-color: rgba(255, 197, 23, 0.15);
+  color: #000;
+}
+.markdown-body .custom-block.warning .custom-block-title {
+  color: #000;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Danger: Red background */
+.markdown-body .custom-block.danger {
+  background-color: rgba(201, 75, 54, 0.15);
+  color: #000;
+}
+.markdown-body .custom-block.danger .custom-block-title {
+  color: #000;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Details: Grey background */
+.markdown-body .custom-block.details {
+  border: 1px solid var(--c-border); /* Details usually needs border to look like a box */
+  border-radius: 8px;
+  padding: 12px 16px;
+  background-color: #f6f6f7;
+  color: var(--c-text-1);
+}
+/* Override details if user wants NO border on ALL custom blocks, but details is collapsible */
+/* Let's keep border on details for structure, user likely meant the colored boxes */
+
+/* --- GitHub Alerts --- */
+/* Match the new style: No border-left, just background? 
+   User said "GitHub style alerts... same as custom containers".
+   So I should remove the left border and use background?
+   "They are rendered same as custom containers".
+*/
+.markdown-body .markdown-alert {
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  border: none; /* No border */
+  border-radius: 8px; /* Rounded */
+  color: #000; /* Black text */
+}
+.markdown-body .markdown-alert-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #000; /* Black title */
+}
+
+/* Note (Blue) */
+.markdown-body .markdown-alert-note { background-color: rgba(9, 105, 218, 0.15); }
+.markdown-body .markdown-alert-note .markdown-alert-title { color: #000; }
+
+/* Tip (Green) */
+.markdown-body .markdown-alert-tip { background-color: rgba(26, 127, 55, 0.15); }
+.markdown-body .markdown-alert-tip .markdown-alert-title { color: #000; }
+
+/* Important (Purple) */
+.markdown-body .markdown-alert-important { background-color: rgba(130, 80, 223, 0.15); }
+.markdown-body .markdown-alert-important .markdown-alert-title { color: #000; }
+
+/* Warning (Yellow) */
+.markdown-body .markdown-alert-warning { background-color: rgba(154, 103, 0, 0.15); }
+.markdown-body .markdown-alert-warning .markdown-alert-title { color: #000; }
+
+/* Caution (Red) */
+.markdown-body .markdown-alert-caution { background-color: rgba(207, 34, 46, 0.15); }
+.markdown-body .markdown-alert-caution .markdown-alert-title { color: #000; }
+
+/* Dark mode adjustments - Keep text readable */
+html.dark .markdown-body .custom-block.info { background-color: #202127; color: var(--c-text-1); }
+html.dark .markdown-body .custom-block.info .custom-block-title { color: var(--c-text-1); }
+
+html.dark .markdown-body .custom-block.tip { background-color: rgba(147, 112, 219, 0.2); color: var(--c-text-1); }
+html.dark .markdown-body .custom-block.tip .custom-block-title { color: var(--c-text-1); }
+
+html.dark .markdown-body .custom-block.warning { background-color: rgba(234, 179, 8, 0.2); color: var(--c-text-1); }
+html.dark .markdown-body .custom-block.warning .custom-block-title { color: var(--c-text-1); }
+
+html.dark .markdown-body .custom-block.danger { background-color: rgba(220, 38, 38, 0.2); color: var(--c-text-1); }
+html.dark .markdown-body .custom-block.danger .custom-block-title { color: var(--c-text-1); }
+
+/* Dark mode adjustments */
+html.dark .markdown-body .custom-block.info { background-color: #202127; border-color: rgba(235, 235, 245, .12); }
+html.dark .markdown-body .custom-block.tip { background-color: rgba(147, 112, 219, 0.1); border-color: rgba(147, 112, 219, 0.2); }
+html.dark .markdown-body .custom-block.warning { background-color: rgba(234, 179, 8, .1); border-color: rgba(234, 179, 8, .2); }
+html.dark .markdown-body .custom-block.danger { background-color: rgba(220, 38, 38, .1); border-color: rgba(220, 38, 38, .2); }
+html.dark .markdown-body .custom-block.details { background-color: #202127; }
+

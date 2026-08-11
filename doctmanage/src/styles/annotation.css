@@ -1,0 +1,132 @@
+/* 批注块（:::annotation 容器） */
+.ann-block {
+  display: inline-block;            /* 收起时是行内小徽章（对应文字右侧） */
+  vertical-align: middle;
+  margin: 0 5px;
+  border-radius: 8px;
+  user-select: none;
+}
+.ann-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 4px;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  color: var(--brand-1);
+  font-size: 12px; font-weight: 800;
+  cursor: pointer;
+  transition: all .15s;
+}
+.ann-badge:hover { transform: scale(1.12); }
+
+/* 展开态：内容框直接铺开，① 与删除都嵌在框内 */
+.ann-block.open {
+  display: block;
+  position: relative;
+  margin: 4px 0;            /* ① 已移入框内左上，不再需要左侧留位 */
+  padding: 8px 10px;
+  background: #eef0f3;
+  border: 1px solid rgba(0, 0, 0, .08);
+  border-radius: 6px;
+  overflow: hidden;            /* 框内手绘笔迹被框裁剪，不穿出 */
+  z-index: 6;                  /* 高于全页手绘画布(z5)：全页笔迹被批注框盖住 */
+}
+html[data-theme="starlight"] .ann-block.open { background: #2a3142; border-color: rgba(255, 255, 255, .08); }
+.ann-block.open .ann-badge {
+  position: absolute; top: 6px; left: 6px; right: auto;
+  z-index: 4;
+  background: var(--card-bg, #fff);
+  border: 1px solid rgba(0, 0, 0, .08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .14);
+}
+html[data-theme="starlight"] .ann-block.open .ann-badge {
+  background: #2a3142;
+  border-color: rgba(255, 255, 255, .08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+.ann-block.open .ann-foot {
+  position: absolute; bottom: 6px; right: 8px; top: auto; left: auto;
+  z-index: 3; margin: 0;
+}
+/* 批注框手绘「完成」按钮（激活时显示，框内顶部居中） */
+.ann-doodle-done {
+  position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+  z-index: 4; display: none;
+  border: 1px solid rgba(0, 0, 0, .18); background: rgba(255, 255, 255, .88);
+  color: #333; font-size: 11.5px; border-radius: 5px; padding: 2px 12px; cursor: pointer;
+}
+.ann-doodle-done.show { display: block; }
+.ann-block.open .ann-body {
+  display: block;
+  user-select: text;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text1);
+  margin-top: 2px;
+  min-height: 80px;            /* 批注框初始更开阔，不是只有两排 */
+  border: none;
+  outline: none;
+}
+.ann-block.open .ann-body[contenteditable]:focus { box-shadow: none; }
+.ann-block.open .ann-body:not(:empty) { min-height: 0; }
+/* 批注块内手绘画布（无边框） */
+.ann-canvas {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+  background: rgba(255, 255, 255, .4);
+  border: none;
+  outline: none;
+  margin-top: 6px;
+}
+html[data-theme="starlight"] .ann-canvas { background: rgba(0, 0, 0, .2); }
+/* 批注框内手绘层：canvas 垫底（z-index 1），文字 contenteditable 在上层（z-index 2），字和画共存一张纸 */
+.ann-doodle {
+  position: absolute;
+  top: 0; left: 0;
+  z-index: 1;           /* 垫底：文字 textarea（z-index 2）在笔迹之上 */
+  width: 100%;
+  height: auto;         /* 保持画布固有比例，不随批注框增高而拉伸——笔迹不变形，回车不触发重采样重绘 */
+  pointer-events: none;
+  border-radius: 5px;
+}
+.ann-doodle.active { pointer-events: auto; cursor: crosshair; height: 100%; }  /* 手绘激活时铺满整个批注框：全框可画、指针全框变形 */
+/* 手绘激活时，让上层文字让位（事件穿透到画布），鼠标才显示手绘标；完成绘制后自动恢复 */
+.ann-doodle.active ~ .ann-body { pointer-events: none; }
+.ann-block.open .ann-body {
+  position: relative;
+  z-index: 2;
+  background: transparent;   /* 让垫底笔迹透出来，字写在笔迹上 */
+  /* textarea 形态（新格式批注）：独立编辑控件，回车/删除/多行全在框内 */
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text1);
+  padding: 2px 0 2px 30px;   /* 左侧给 ① 徽章让位（① 在框内左上） */
+  min-height: 60px;
+}
+/* 批注框收起时隐藏手绘画布，避免笔迹溢出到框外 */
+.ann-block:not(.open) .ann-doodle { display: none; }
+.ann-block.open .ann-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+.ann-block.open .ann-del {
+  border: none; background: none; cursor: pointer;
+  font-size: 12px; color: var(--text2); padding: 3px 8px; border-radius: 6px;
+}
+.ann-block.open .ann-del:hover { color: #ef4444; background: color-mix(in srgb, #ef4444 10%, transparent); }
+.ann-body { display: none; }
+.ann-body[contenteditable]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text2); opacity: .6; font-size: 12.5px;
+  font-style: italic;
+}
+.ann-block.open .ann-body[contenteditable] { outline: none; }
+.ann-block.open .ann-body[contenteditable]:focus { border-radius: 6px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-1) 40%, transparent); }
+.ann-foot { display: none; }
