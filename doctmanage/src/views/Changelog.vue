@@ -84,9 +84,11 @@ const versions = [
         { title: '笔记广场移动端搜索同一排', desc: '搜索框与「刷新」按钮同行，搜索框弹性占满剩余宽度，不再换行。' },
         { title: '更新日志移动端档案交互', desc: '选中版本后档案面板自动收起；面板紧贴「📦 版本档案」按钮下方。' },
         { title: '首页科目图谱移动端横移不滚页', desc: '触摸左右滑动图谱时锁定页面上下滚动、图谱跟手；桌面下滑漫游保持不变。' },
+        { title: '后端代码按功能拆分', desc: '单文件 app.py（约 3600 行）拆分为共享层（config/db/auth/utils/shared）+ routes/ 九个蓝图（auth/docs/notes/users/social/messages/ai/misc/annotations），入口与启动方式不变，接口行为经全链路回归保持一致。' },
       ],
       fixed: [
         { title: '修复左侧栏展开/收起跳变与文字残影', desc: '左侧栏改为与右侧栏同构：内容 v-if 切换、sticky 内容 + 宽度过渡，展开不再上下跳动、收起不再残留文字残影。' },
+        { title: '修复平板端科目图谱与能力版图间距过大', desc: '平板宽度下科目图谱仍占用桌面版 280vh 滚动漫游空间，导致与下方能力版图之间隔出大片空白；平板断点改为普通区块，图谱与能力版图紧邻，桌面端下滑漫游不受影响。' },
       ],
     },
   },
@@ -101,12 +103,9 @@ const versions = [
       ],
       improved: [
         { title: '统计卡居中微调', desc: '手机端统计卡整体左移 10px，视觉更居中。' },
-        { title: '侧栏收起/展开平滑化', desc: '阅览室左右侧栏收起/展开不再跳变：grid 列宽改为显式尺寸并由 grid-template-columns 过渡驱动，收起为窄条、展开恢复 280px 全程平滑伸缩，与右侧大纲栏体验一致。' },
-        { title: '后端代码按功能拆分', desc: '单文件 app.py（约 3600 行）拆分为共享层（config/db/auth/utils/shared）+ routes/ 九个蓝图（auth/docs/notes/users/social/messages/ai/misc/annotations），入口与启动方式不变，接口行为经全链路回归保持一致。' },
       ],
       fixed: [
         { title: '修复 favicon 被裁切只剩左上角', desc: 'SVG 缺 width/height 导致浏览器按默认尺寸渲染取左上角；ico 路径坐标未按尺寸缩放导致线条画在画布外——均已修复，三端（favicon / ico / 导航栏）图形统一完整。' },
-        { title: '修复平板端科目图谱与能力版图间距过大', desc: '平板宽度下科目图谱仍占用桌面版 280vh 滚动漫游空间，导致与下方能力版图之间隔出大片空白；平板断点改为普通区块，图谱与能力版图紧邻，桌面端下滑漫游不受影响。' },
       ],
     },
   },
