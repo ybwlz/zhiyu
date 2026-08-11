@@ -1,7 +1,10 @@
 <template>
   <div class="settings-page">
     <h2 class="set-title">设置</h2>
-    <p class="set-sub">SETTINGS · 账户与偏好</p>
+    <div class="set-sub-row">
+      <p class="set-sub">SETTINGS · 账户与偏好</p>
+      <button class="page-back" @click="pageBack">← BACK</button>
+    </div>
 
     <!-- 账号信息卡 -->
     <div class="set-card acct-card">
@@ -155,6 +158,10 @@ export default {
     }
   },
   methods: {
+    pageBack() {
+      if (window.history.length > 1) this.$router.back()
+      else this.$router.push('/')
+    },
     fmtSeconds(s) {
       s = Number(s) || 0
       if (s < 60) return s + ' 秒'
@@ -252,13 +259,22 @@ export default {
 
 <style scoped>
 .settings-page { max-width: 640px; margin: 0 auto; padding: 84px 20px 60px; }
+.set-sub-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.page-back {
+  background: transparent; border: none;
+  color: var(--text2); font-size: 14px; font-weight: 700; letter-spacing: 2px;
+  padding: 12px 10px; line-height: 1.6;
+  cursor: pointer; transition: color .15s;
+}
+.page-back:hover { color: var(--brand-1); }
 .set-title {
   font-size: 26px; font-weight: 800; margin: 0 0 4px;
   background: linear-gradient(120deg, var(--brand-1), var(--brand-2));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.set-sub { font-size: 11.5px; letter-spacing: 4px; color: var(--text2); text-transform: uppercase; margin: 0 0 24px; }
+.set-sub { font-size: 11.5px; letter-spacing: 4px; color: var(--text2); text-transform: uppercase; margin: 0; }
 .set-card {
+  position: relative;
   background: var(--bg-soft); border: 1px solid var(--border);
   border-radius: 16px; padding: 22px 24px; margin-bottom: 18px;
   box-shadow: var(--shadow-1);
@@ -355,5 +371,6 @@ export default {
 @media (max-width: 560px) {
   .set-row { flex-wrap: wrap; }
   .set-row label { width: 100%; }
+  .modal { max-width: 86vw; padding: 18px 16px; }
 }
 </style>

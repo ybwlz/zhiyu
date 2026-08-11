@@ -33,6 +33,16 @@
 
   /* 渐变字体统一用高对比色（青→紫→粉），深浅主题下都清晰可见 */
   --kb-grad: linear-gradient(120deg, #38bdf8 0%, #8b5cf6 50%, #ec4899 100%);
+
+  /* 代码高亮配色（浅色主题：鲜艳深色系） */
+  --code-kw: #d73a49;
+  --code-str: #1a7f37;
+  --code-num: #a05f0c;
+  --code-com: #6e7781;
+  --code-tit: #6f42c1;
+  --code-typ: #0550ae;
+  --code-attr: #953800;
+  --code-meta: #57606a;
 }
 
 html.dark {
@@ -64,6 +74,16 @@ html.dark {
   --switch-track-hover: var(--btn-bg-hover);
 
   --overlay-bg: rgba(0, 0, 0, .65);
+
+  /* 代码高亮配色（深色：亮色系） */
+  --code-kw: #ff7b72;
+  --code-str: #7ee787;
+  --code-num: #79c0ff;
+  --code-com: #8b949e;
+  --code-tit: #d2a8ff;
+  --code-typ: #79c0ff;
+  --code-attr: #ffa657;
+  --code-meta: #8b949e;
 }
 
 body {
@@ -111,6 +131,16 @@ html[data-theme="starlight"] {
   --switch-track-hover: var(--btn-bg-hover);
 
   --overlay-bg: rgba(0, 0, 0, .68);
+
+  /* 代码高亮配色（星空：亮色系） */
+  --code-kw: #ff7b72;
+  --code-str: #7ee787;
+  --code-num: #79c0ff;
+  --code-com: #8b949e;
+  --code-tit: #d2a8ff;
+  --code-typ: #79c0ff;
+  --code-attr: #ffa657;
+  --code-meta: #8b949e;
 }
 
 /* ── 主题二：蓝天大气 Sky（浅色） ────────────────────────────── */
@@ -176,3 +206,5 @@ html[data-theme="minimal"] {
 
   --overlay-bg: rgba(0, 0, 0, .4);
 }
+/* 平板/触屏：点击按钮/链接时不闪浏览器默认高亮（保留各组件自定义 hover/active 反馈） */
+button, a, [role='button'] { -webkit-tap-highlight-color: transparent; }

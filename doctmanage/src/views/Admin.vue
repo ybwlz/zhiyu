@@ -1,9 +1,14 @@
 <template>
-  <div class="study-page" :class="{ collapsed: sideCollapsed }">
+  <div class="study-page" :class="{ collapsed: sideCollapsed, 'side-open': sideOpen }">
+    <!-- 移动端：打开/关闭侧边栏抽屉（同一按钮切换，样式一致） -->
+    <button class="sb-open" :data-tip="sideOpen ? '关闭书房' : '打开书房'" @click="sideOpen = !sideOpen">{{ sideOpen ? '✕' : '☰' }}</button>
+    <!-- 移动端：抽屉遮罩，点击关闭 -->
+    <div v-if="sideOpen" class="sb-mask" @click="sideOpen = false"></div>
     <!-- 左侧：我的笔记目录（多级） -->
     <aside class="study-side">
       <template v-if="!sideCollapsed">
         <div class="side-head">
+          <button class="sb-inline" data-tip="关闭书房" @click="sideOpen = false">✕</button>
           <span class="side-title">✧ 我的书房</span>
           <span class="side-count">{{ myNotes.length }} 篇</span>
           <button class="side-toggle" data-tip="收起左侧栏" @click="sideCollapsed = true">
@@ -20,7 +25,7 @@
               <span class="type-num">{{ g.items.length }}</span>
             </div>
             <div v-if="openTypes[g.type]" class="type-items">
-              <div v-for="n in g.items" :key="n.id" class="type-item" @click="openNote(n.id)">
+              <div v-for="n in g.items" :key="n.id" class="type-item" @click="openNote(n.public_id || n.id)" @contextmenu.prevent="openCtxMenu($event, n)">
                 <span class="ti-format">{{ n.format && n.format !== 'md' ? '📎' : '' }}</span>
                 <span class="ti-title">{{ n.title }}<span v-if="n.origin_id" class="from-square">来自广场</span></span>
               </div>
@@ -41,7 +46,6 @@
           <button class="act-btn primary" @click="newNote">✏️ 新建笔记</button>
           <button class="act-btn ai" @click="aiOpen = true">🤖 AI 构建</button>
           <button class="act-btn" @click="uploadOpen = true">📤 上传</button>
-          <button class="act-btn" @click="newDoodle">🖌 手绘</button>
         </div>
         <div class="top-links">
           <router-link to="/friends" class="link-btn">关注</router-link>
@@ -53,6 +57,11 @@
       <div class="main-head">
         <h2 class="main-title">我的书房</h2>
         <span class="main-sub">共 {{ myNotes.length }} 篇 · 点击进入阅读 / 编辑</span>
+        <div class="top-links head-links">
+          <router-link to="/friends" class="link-btn">关注</router-link>
+          <router-link to="/messages" class="link-btn">私信</router-link>
+          <router-link to="/mall" class="link-btn">商城</router-link>
+        </div>
       </div>
 
       <div v-if="!myNotes.length" class="main-empty">还没有笔记，点右上角开始创建</div>
@@ -62,7 +71,7 @@
           <span class="section-num">{{ g.items.length }} 篇</span>
         </div>
         <div class="note-grid">
-          <div v-for="n in g.items" :key="n.id" class="note-card" @click="openNote(n.id)">
+          <div v-for="n in g.items" :key="n.id" class="note-card" @click="openNote(n.public_id || n.id)" @contextmenu.prevent="openCtxMenu($event, n)">
             <div class="card-top">
               <span class="fmt-badge" :class="'fmt-' + (n.format || 'md')">{{ fmtLabel(n.format) }}</span>
               <span class="vis-badge" :class="{ pub: n.visibility === 'public' }">{{ n.visibility === 'public' ? '公开' : '私密' }}</span>
@@ -81,6 +90,25 @@
         </div>
       </div>
     </main>
+
+    <!-- 右键菜单：打开 / 编辑 / 删除（主题风格） -->
+    <div v-if="ctxMenu.show" class="ctx-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
+      <button class="ctx-item" @click="ctxOpen">📄 打开</button>
+      <button class="ctx-item" @click="ctxEdit">✏️ 编辑</button>
+      <button class="ctx-item danger" @click="askDelete(ctxMenu.doc)">🗑 删除</button>
+    </div>
+
+    <!-- 删除确认（主题风格弹窗） -->
+    <div v-if="delOpen" class="modal-mask" @click.self="delOpen = false">
+      <div class="modal-card">
+        <div class="modal-title">🗑 删除笔记</div>
+        <p class="modal-desc">确定删除《{{ delTarget?.title }}》吗？将同时清除它的草稿、版本、评论与批注，且<b>不可恢复</b>。</p>
+        <div class="modal-actions">
+          <button class="modal-btn ghost" @click="delOpen = false">取消</button>
+          <button class="modal-btn danger" :disabled="deleting" @click="confirmDelete">{{ deleting ? '删除中…' : '确认删除' }}</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 上传弹窗 -->
     <div v-if="uploadOpen" class="modal-mask" @click.self="uploadOpen = false">
@@ -150,6 +178,7 @@
 
 <script>
 import api from '@/utils/api.js'
+import { ElMessage } from 'element-plus'
 
 export default {
   name: 'AdminStudy',
@@ -164,7 +193,11 @@ export default {
       aiOpen: false, aiTopic: '', aiTitle: '', aiType: '数学', aiVis: 'private',
       aiDL: true, aiPrice: 0, aiPreview: false, aiGen: '', aiBusy: false, aiMode: 'draft',
       sideCollapsed: false,
+      sideOpen: false, // 移动端：侧边栏抽屉开合
       roomIds: new Set(),
+      // 右键菜单 + 删除确认（主题风格弹窗）
+      ctxMenu: { show: false, x: 0, y: 0, doc: null },
+      delOpen: false, delTarget: null, deleting: false,
     }
   },
   computed: {
@@ -183,6 +216,7 @@ export default {
     // 点击侧栏标签：高亮并滚动到主区域对应分区
     scrollToSection(type) {
       this.activeType = type
+      this.sideOpen = false // 移动端抽屉：点击目录后收起
       this.$nextTick(() => {
         const el = this.$el.querySelector('.study-section[data-type="' + type + '"]')
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -224,9 +258,8 @@ export default {
         const s = new Set(this.roomIds); s.add(n.id); this.roomIds = s
       }
     },
-    editNote(id) { this.$router.push('/edit/' + id) },
+    editNote(id) { this.$router.push('/edit/' + id + '?from=study') },
     newNote() { this.$router.push('/edit') },
-    newDoodle() { this.$router.push('/edit?doodle=1') },
     onPickFiles(e) { this.uploadFiles = Array.from(e.target.files || []); e.target.value = '' },
     async doUpload() {
       if (!this.uploadFiles.length) return
@@ -298,12 +331,62 @@ export default {
         this.aiGen = ''
         this.aiMode = 'draft'
         this.loadMyNotes()
-        this.$router.push('/edit/' + res.data.id)
+        this.$router.push('/edit/' + res.data.id + '?from=study')
       } catch (e) { /* 忽略 */ }
       this.aiBusy = false
     },
+    // ── 右键菜单（参照阅览室）：打开 / 编辑 / 删除 ──
+    openCtxMenu(e, doc) {
+      this.ctxMenu = { show: true, x: e.clientX, y: e.clientY, doc }
+    },
+    closeCtxMenu() { this.ctxMenu.show = false },
+    closeCtxMenuGlobal(e) {
+      if (e.target.closest('.ctx-menu') || e.target.closest('.note-card') || e.target.closest('.type-item')) return
+      this.ctxMenu.show = false
+    },
+    ctxEdit() {
+      const d = this.ctxMenu.doc
+      this.closeCtxMenu()
+      if (d) this.editNote(d.id)
+    },
+    ctxOpen() {
+      const d = this.ctxMenu.doc
+      this.closeCtxMenu()
+      if (d) this.openNote(d.public_id || d.id)
+    },
+    askDelete(doc) {
+      this.delTarget = doc
+      this.delOpen = true
+      this.closeCtxMenu()
+    },
+    async confirmDelete() {
+      if (!this.delTarget) return
+      this.deleting = true
+      try {
+        await api.delete('/docs/' + this.delTarget.id)
+        this.myNotes = this.myNotes.filter(n => n.id !== this.delTarget.id)
+        ElMessage.success('笔记已删除')
+      } catch (err) {
+        ElMessage.error('删除失败：' + ((err.response?.data?.error) || '网络异常'))
+      } finally {
+        this.deleting = false
+        this.delOpen = false
+        this.delTarget = null
+      }
+    },
   },
-  mounted() { this.loadMyNotes(); this.loadRoom() },
+  mounted() {
+    this.loadMyNotes()
+    this.loadRoom()
+    this.$nextTick(() => {
+      document.addEventListener('click', this.closeCtxMenuGlobal)
+      window.addEventListener('blur', this.closeCtxMenu)
+    })
+  },
+  beforeDestroy() {
+    document.removeEventListener('click', this.closeCtxMenuGlobal)
+    window.removeEventListener('blur', this.closeCtxMenu)
+  },
 }
 </script>
 
@@ -318,6 +401,12 @@ export default {
 }
 .side-toggle:hover { color: var(--brand-1); border-color: color-mix(in srgb, var(--brand-1) 45%, transparent); }
 .side-toggle svg { width: 16px; height: 16px; }
+/* 移动端抽屉遮罩（仅 ≤860px 显示），点击关闭 */
+.sb-mask {
+  display: none;
+  position: fixed; inset: 0; z-index: 115;
+  background: rgba(0, 0, 0, .35);
+}
 .study-side {
   width: 100%; min-width: 0;
   border-right: 1px solid var(--border);
@@ -374,9 +463,11 @@ export default {
 .top-links { display: flex; gap: 4px; }
 .link-btn { padding: 8px 16px; border-radius: 10px; cursor: pointer; color: var(--text2); text-decoration: none; font-size: 13.5px; transition: all .15s; }
 .link-btn:hover { color: var(--brand-1); background: color-mix(in srgb, var(--brand-1) 8%, transparent); }
-.main-head { margin-bottom: 18px; }
-.main-title { font-size: 22px; font-weight: 800; color: var(--text1); margin: 0 0 6px; }
+.main-head { margin-bottom: 18px; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; }
+.main-title { font-size: 22px; font-weight: 800; color: var(--text1); margin: 0 0 6px; flex: 1 1 100%; }
 .main-sub { font-size: 12.5px; color: var(--text2); }
+/* 标题右侧链接（关注/私信/商城）：仅移动端显示，桌面隐藏 */
+.head-links { display: none; }
 .main-empty { padding: 60px 0; text-align: center; color: var(--text2); }
 .study-section { margin-bottom: 34px; scroll-margin-top: 130px; }
 .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -411,6 +502,10 @@ export default {
 .card-room.in { color: var(--brand-1); border-color: color-mix(in srgb, var(--brand-1) 45%, transparent); background: color-mix(in srgb, var(--brand-1) 10%, transparent); }
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: center; justify-content: center; }
 .modal { width: 460px; max-width: 92vw; max-height: 86vh; overflow-y: auto; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 18px; padding: 26px 28px; }
+/* 移动端：弹窗收小 */
+@media (max-width: 560px) {
+  .modal { max-width: 86vw; padding: 18px 16px; border-radius: 14px; }
+}
 .modal.wide { width: 640px; }
 .modal h3 { margin: 0 0 8px; font-size: 17px; color: var(--text1); }
 .modal-tip { font-size: 12.5px; color: var(--text2); margin: 0 0 16px; line-height: 1.7; }
@@ -427,13 +522,93 @@ export default {
 .modal-btn { padding: 9px 22px; border-radius: 999px; cursor: pointer; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text2); font-size: 13.5px; }
 .modal-btn.primary { color: #fff; border-color: transparent; background: linear-gradient(120deg, var(--brand-1), var(--brand-2)); }
 .modal-btn.ghost:hover { color: var(--brand-1); }
+.modal-btn.danger { color: #fff; border-color: transparent; background: var(--danger, #e45); }
+.modal-btn.danger:hover { filter: brightness(1.08); }
+.modal-btn.danger:disabled { opacity: .5; cursor: not-allowed; }
+.modal-card {
+  width: 380px; max-width: 92vw; background: var(--bg-soft, #fff);
+  border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px;
+  box-shadow: var(--shadow-1); color: var(--text1);
+}
+.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.modal-desc { font-size: 13.5px; line-height: 1.8; color: var(--text2); margin: 0 0 4px; }
+.ctx-menu {
+  position: fixed; z-index: 300; min-width: 150px;
+  background: var(--bg-soft); border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px; box-shadow: var(--shadow-1);
+}
+.ctx-item {
+  display: block; width: 100%; text-align: left; padding: 8px 12px;
+  border: none; background: transparent; border-radius: 8px;
+  font-size: 13.5px; color: var(--text1); cursor: pointer;
+}
+.ctx-item:hover { background: var(--btn-bg); }
+.ctx-item.danger { color: var(--danger, #e45); }
+.ctx-item.danger:hover { background: color-mix(in srgb, var(--danger, #e45) 12%, transparent); }
 .ai-preview { border: 1px solid var(--border); border-radius: 12px; padding: 14px; max-height: 300px; overflow-y: auto; background: var(--btn-bg); }
 .ai-gen { margin: 0; white-space: pre-wrap; font-size: 12.5px; line-height: 1.7; color: var(--text1); font-family: inherit; }
+/* 移动端打开侧栏按钮（仅 ≤860px 显示） */
+.sb-open {
+  display: none;
+  position: fixed; left: 12px; top: 68px; z-index: 110;
+  width: 34px; height: 34px; border-radius: 10px;
+  align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--bg-soft);
+  color: var(--text2); font-size: 16px; cursor: pointer;
+  box-shadow: var(--shadow-1);
+}
+.sb-open:hover { color: var(--brand-1); }
+/* 抽屉内关闭按钮（复刻 ☰ 展开按钮样式，仅移动端抽屉打开时显示） */
+.sb-inline {
+  display: none;
+  width: 34px; height: 34px; border-radius: 10px;
+  align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--bg-soft);
+  color: var(--text2); font-size: 16px; cursor: pointer;
+  box-shadow: var(--shadow-1); flex-shrink: 0;
+}
+.sb-inline:hover { color: var(--brand-1); }
+
 @media (max-width: 860px) {
   .study-page { grid-template-columns: 1fr; }
   .study-page.collapsed { grid-template-columns: 1fr; }
-  .study-side { width: 100%; position: static; height: auto; max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
-  .side-toggle, .side-rail { display: none; }
+  /* 侧边栏变抽屉：默认滑出屏幕外，点 ☰ 打开（像 docs 的收起）；毛玻璃半透明 */
+  .study-side {
+    position: fixed; left: 0; top: 60px; bottom: 0; z-index: 120;
+    width: 260px; max-width: 82vw;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    border-right: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg-soft) 82%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    overflow-y: auto;
+  }
+  .study-page.side-open .study-side { transform: translateX(0); }
+  .side-toggle, .sb-rail { display: none; }
+  .sb-mask { display: block; }
+  /* ☰ 按钮垂直对齐「新建笔记」按钮（60 导航 + 24 内容留白 + 按钮中心） */
+  .sb-open { display: flex; top: 86px; }
+  /* 抽屉打开时：隐藏浮层按钮，改用标题行内的同款关闭按钮（并排不挡字） */
+  .study-page.side-open .sb-open { display: none; }
+  .study-page.side-open .sb-inline { display: inline-flex; }
+  /* 关注/私信/商城移到「我的书房」标题右侧；原 main-top 里的隐藏 */
+  .main-top .top-links { display: none; }
+  /* 移动端头部：两行 —— 左上标题，右上小字，右下三个链接 */
+  .main-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "title sub"
+      ".     links";
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 8px;
+  }
+  .main-title { grid-area: title; flex: none; margin: 0; }
+  .main-sub { grid-area: sub; justify-self: end; text-align: right; }
+  .head-links { display: flex; grid-area: links; justify-self: end; align-items: center; }
+  .head-links .link-btn { padding: 6px 12px; font-size: 12.5px; }
   .note-grid { grid-template-columns: 1fr; }
 }
 

@@ -21,7 +21,7 @@
       <div class="act-day" v-for="day in grouped" :key="day.label">
         <p class="day-label">{{ day.label }} <span class="day-count">{{ day.items.length }} 条</span></p>
         <div class="day-items">
-          <div class="act-item" v-for="r in day.items" :key="r.id" @click="goDoc(r.slug)">
+          <div class="act-item" v-for="r in day.items" :key="r.id" @click="goDoc(r.doc_public_id || r.slug)">
             <span class="act-type" :style="{ color: r.color, borderColor: r.color + '55', background: r.color + '14' }">{{ r.type }}</span>
             <span class="act-title">{{ r.title }}</span>
             <span class="act-action">更新</span>

@@ -48,21 +48,21 @@
         <!-- ═══════ 精选笔记轮播 ═══════ -->
         <SpotlightCarousel :docs="recentDocs" />
 
-        <!-- ═══════ 科目横移区（下滑横向漫游） ═══════ -->
+        <!-- ═══════ 科目横移区（桌面下滑漫游 / 移动端横向拖拽） ═══════ -->
         <section ref="subjectsWrapRef" class="kb-subjects">
           <div class="subjects-sticky">
             <div class="subjects-layout">
               <div class="subjects-copy">
                 <p class="section-kicker">SUBJECTS</p>
                 <h2 class="section-title">科目<span class="grad">图谱</span></h2>
-                <p class="section-desc">408 统考 · 数学 · 英语 · 政治。继续向下滚动，横向漫游你的知识版图。</p>
+                <p class="section-desc">408 统考 · 数学 · 英语 · 政治。左右拖动，横向漫游你的知识版图。</p>
                 <div class="subjects-progress">
                   <div class="progress-fill" :style="{ width: (subjectsProgress * 100) + '%' }"></div>
                 </div>
-                <p class="subjects-hint">↓ 滚动开始横向探索</p>
+                <p class="subjects-hint">{{ isTouchDevice ? '← 左右滑动探索' : '↓ 滚动开始横向探索' }}</p>
               </div>
 
-              <div class="subjects-viewport">
+              <div class="subjects-viewport" @scroll="updateSubjectsProgress">
                 <div ref="subjectsTrackRef" class="subjects-track" :style="{ transform: `translate3d(${subjectsTranslate}px,0,0)` }">
                   <template v-for="group in subjects" :key="group.group">
                     <div class="subject-card" v-for="card in group.cards" :key="card.name" :style="{ '--accent': card.accent }" @click="goSubject(card.name)">
@@ -238,9 +238,11 @@ const communityStats = computed(() => {
 onMounted(() => {
   store.fetchDocs()
   loadToday()
+  // 科目图谱：PC = 下滑驱动横移；平板/手机 = 原生横向滚动（进度条由模板 @scroll 更新）
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('mousemove', onMouseMove, { passive: true })
   onScroll()
+  updateSubjectsProgress()
 })
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
@@ -280,7 +282,7 @@ const doSearch = async () => {
   router.push({ path: '/notes', query: q ? { search: q } : {} })
 }
 const goSubject = (name) => router.push({ path: '/notes', query: { type: name } })
-const goDoc = (doc) => router.push(`/docs/${doc.slug}`)
+const goDoc = (doc) => router.push(`/docs/${doc.public_id}`)
 
 const onFeatureClick = (feat) => {
   if (feat.title === 'AI 助手') { aiOpen.value = true; return }
@@ -290,26 +292,48 @@ const onFeatureClick = (feat) => {
   aiOpen.value = true
 }
 
-// ── 科目横向漫游（下滑驱动 translateX） ───────────────────
+// ── 科目横向漫游 ─────────────────────────────────────────
+// PC(鼠标)：下滑仅横移 —— 280vh sticky，页面滚动驱动图谱横向平移（恢复原行为）
+// 平板/手机(触摸)：普通区块 —— 下滑正常滚动跳过图谱区，图谱区左右滑动探索（原生横向滚动）
 const subjectsWrapRef = ref(null)
 const subjectsTrackRef = ref(null)
 const subjectsTranslate = ref(0)
 const subjectsProgress = ref(0)
+const isTouchDevice = window.matchMedia('(pointer: coarse)').matches
 
+const applySubjectsX = (x) => {
+  const wrap = subjectsWrapRef.value
+  const track = subjectsTrackRef.value
+  if (!wrap || !track) return
+  const viewport = wrap.querySelector('.subjects-viewport')
+  if (!viewport) return
+  const maxX = Math.max(0, track.scrollWidth - viewport.clientWidth)
+  const v = Math.min(0, Math.max(-maxX, x))
+  subjectsTranslate.value = v
+  subjectsProgress.value = maxX > 0 ? -v / maxX : 0
+}
+
+// PC：页面滚动驱动横移（触摸设备不劫持滚动——下滑直接滑过图谱区，图谱靠左右滑动探索）
 const onScroll = () => {
+  if (isTouchDevice) return
   const wrap = subjectsWrapRef.value
   if (!wrap) return
   const total = wrap.offsetHeight - window.innerHeight
   if (total <= 0) return
-  let p = -wrap.getBoundingClientRect().top / total
-  p = Math.min(1, Math.max(0, p))
-  subjectsProgress.value = p
-  const track = subjectsTrackRef.value
-  const viewport = wrap.querySelector('.subjects-viewport')
-  if (track && viewport) {
-    const maxX = Math.max(0, track.scrollWidth - viewport.clientWidth)
-    subjectsTranslate.value = -p * maxX
-  }
+  const p = Math.min(1, Math.max(0, -wrap.getBoundingClientRect().top / total))
+  applySubjectsX(-p * (() => {
+    const track = subjectsTrackRef.value
+    const viewport = wrap.querySelector('.subjects-viewport')
+    return track && viewport ? Math.max(0, track.scrollWidth - viewport.clientWidth) : 0
+  })())
+}
+
+// 平板/手机：普通区块，原生横向滚动，进度条跟随容器滚动位置
+const updateSubjectsProgress = () => {
+  const vp = subjectsWrapRef.value?.querySelector('.subjects-viewport')
+  if (!vp) return
+  const max = vp.scrollWidth - vp.clientWidth
+  if (max > 0) subjectsProgress.value = vp.scrollLeft / max
 }
 </script>
 <style scoped>
@@ -317,6 +341,7 @@ const onScroll = () => {
   position: relative;
   min-height: 100vh;
   color: var(--text1);
+  overflow-x: clip; /* 裁切横向溢出但【不创建滚动容器】：overflow-x:hidden 会破坏内部 sticky（下滑横移失效），clip 不会 */
   transition: color .4s ease, background .4s ease;
 }
 .kb-content {
@@ -560,6 +585,7 @@ const onScroll = () => {
 }
 
 /* ═══════════ 科目横向漫游 ═══════════ */
+/* 下滑仅横移（全端）：280vh 滚动区 + sticky 视口，页面滚动经过时驱动图谱横向平移（滚动驱动，恢复原行为） */
 .kb-subjects {
   position: relative;
   height: 280vh;
@@ -880,30 +906,108 @@ const onScroll = () => {
   .subjects-viewport { width: 100%; }
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
 }
+/* 平板/手机(触摸设备)：图谱为普通区块 —— 下滑正常滚动跳过图谱区，图谱区左右滑动探索（原生横向滚动） */
+@media (pointer: coarse) {
+  .kb-subjects { height: auto; padding: 136px 0 88px; } /* 顶部拉开与精选笔记的距离，底部拉开与能力版图的距离 */
+  .subjects-sticky { position: static; height: auto; }
+  .subjects-viewport {
+    overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+  .subjects-viewport::-webkit-scrollbar { display: none; }
+  .subjects-track { user-select: none; gap: 30px; } /* 卡片之间隔开一点 */
+}
 @media (max-width: 720px) {
   .nav-links { display: none; }
   .theme-label { display: none; }
+  /* 手机端无鼠标：隐藏跟随光晕（fixed 光晕停在左上角会让内容视觉偏右） */
+  .mouse-glow { display: none; }
   .today-strip {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 18px;
-  margin: 18px auto 0; padding: 12px 22px;
-  max-width: 640px; border-radius: 999px;
-  background: var(--bg-soft);
-  border: 1px solid var(--border);
-  font-size: 13px; color: var(--text2);
-}
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px;
+    margin: 16px auto 0; padding: 9px 16px;
+    max-width: 480px; border-radius: 999px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    font-size: 12.5px; color: var(--text2);
+  }
 .ts-item b { color: var(--brand-1); font-size: 14px; }
 .ts-link {
   color: #fff; text-decoration: none;
   background: linear-gradient(120deg, var(--brand-1), var(--brand-2));
   padding: 5px 14px; border-radius: 999px; font-size: 12.5px;
 }
-.hero-stats { grid-template-columns: repeat(2, 1fr); gap: 14px; }
-  .feature-grid { grid-template-columns: 1fr; }
+  .hero-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .subject-card { width: 258px; min-height: 330px; }
   .recent-time { display: none; }
+  /* ── 手机端首页：App 风格（紧凑顶部 + 2×2 功能宫格），不再是全屏大字封面 ── */
+  .kb-hero { min-height: auto; padding: 36px 16px 18px; }
+  .hero-inner { width: 100%; }
+  .hero-kicker {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--brand-1) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brand-1) 28%, transparent);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+  }
+  .hero-title { font-size: 26px; line-height: 1.2; margin-bottom: 10px; }
+  .hero-title-accent { display: inline; font-size: inherit; }
+  .hero-tagline { font-size: 14px; margin-bottom: 6px; }
+  .hero-desc { display: none; }
+  .hero-search {
+    max-width: 100%;
+    padding: 6px 6px 6px 16px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-1);
+  }
+  .hero-stats { padding: 14px 12px; }
+  /* 功能宫格 2×2：图标 + 标题居中（去掉描述/角标/箭头） */
+  .feature-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .feature-card { padding: 18px 14px; border-radius: 18px; text-align: center; }
+  .feature-icon { font-size: 26px; margin-bottom: 10px; }
+  .feature-title-row { justify-content: center; margin-bottom: 0; }
+  .feature-title { font-size: 15px; }
+  .feature-tag, .feature-desc, .feature-arrow { display: none; }
+  /* 宫格卡片窄高：竖向居中，更高更窄 */
+  .feature-card {
+    padding: 26px 14px;
+    min-height: 104px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  /* 手机端 hero：居中布局，竖高占满一页，卡片内部 padding 收紧 */
+  .kb-hero { min-height: calc(100vh - 56px); align-items: center; justify-content: center; padding: 40px 20px 32px; }
+  .hero-inner { width: 100%; max-width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; }
+  .hero-kicker { margin-bottom: 16px; }
+  .hero-title { font-size: 30px; line-height: 1.22; margin-bottom: 14px; }
+  .hero-tagline { font-size: 14.5px; margin-bottom: 10px; }
+  /* 搜索框：对称 padding + 绝对居中 */
+  .hero-search { width: 100%; max-width: 420px; margin: 0 auto 30px; padding: 6px 6px 6px 14px; }
+  /* 今日概览：居中细胶囊，限宽不贴边 */
+  .today-strip {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+    margin: 0 auto 26px;
+    padding: 8px 12px;
+    max-width: 420px;
+    border-radius: 999px;
+    font-size: 12.5px;
+  }
+  /* 统计卡：2×2 限宽居中（视觉略偏右，整体左移一点点） */
+  .hero-stats { width: 100%; max-width: 420px; margin: 0 auto; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 12px 10px; transform: translateX(-10px); }
+  .kb-features { padding: 44px 20px; }
+  .kb-recent { padding: 44px 20px 60px; }
+  .kb-features .section-desc, .kb-recent .section-desc { margin-bottom: 28px; }
+  .feature-grid { gap: 14px; }
+  .feature-icon { margin-bottom: 12px; }
 }
 @keyframes grad-flow {
-  0% { background-position: 0% 50%; filter: hue-rotate(0deg); }
-  100% { background-position: 100% 50%; filter: hue-rotate(22deg); }
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
 }
 </style>

@@ -23,13 +23,13 @@ const router = createRouter({
             component: Home,
         },
         { path: '/docs', component: Docs },
-        { path: '/docs/:slug', component: Docs },
+        { path: '/docs/:key', component: Docs },
         { path: '/changelog', component: Changelog },
         { path: '/activity', component: Activity },
         { path: '/guide', component: Guide },
         { path: '/notes', component: NotesSquare },
-        { path: '/notes/:id', component: NoteReader },
-        { path: '/user/:id', component: Profile },
+        { path: '/notes/:key', component: NoteReader },
+        { path: '/user/:key', component: Profile },
         { path: '/friends', component: Friends },
 { path: '/messages', component: Messages },
         { path: '/mall', component: Mall },
@@ -55,7 +55,9 @@ import { useAuthStore } from "@/stores/auth.js";
 
 router.beforeEach((to, from, next) => {
     const auth = useAuthStore()
-    if (to.path.startsWith('/admin') || to.path.startsWith('/edit')) {
+    // 需要登录的页面：编辑、后台、私信、好友、设置、商城
+    const needsAuth = ['/admin', '/edit', '/messages', '/friends', '/settings', '/mall'].some(p => to.path.startsWith(p))
+    if (needsAuth) {
         if (auth.isLogin) next()
         else next('/login')
     } else if (to.path === '/login' && auth.isLogin) {

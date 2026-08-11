@@ -3,7 +3,15 @@
   <nav ref="navBarRoot" class="kb-navbar">
     <div class="nav-inner">
       <router-link class="nav-brand" to="/">
-        <span class="brand-mark">✦</span>
+        <span class="brand-mark">
+          <svg viewBox="0 0 64 64" width="26" height="26" aria-hidden="true">
+            <path d="M31 7 C 37 7, 39 11, 34 16
+                     A 10 10 0 0 0 34 36
+                     A 16 16 0 0 0 34 58
+                     A 16 16 0 0 0 34 26"
+                  fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
         <span class="brand-name">知屿</span>
       </router-link>
 
@@ -13,9 +21,8 @@
           v-for="link in links"
           :key="link.label"
           class="nav-link"
+          :class="{ active: isNavActive(link) }"
           :to="link.to"
-          :exact-active-class="link.exact ? 'active' : undefined"
-          :active-class="link.exact ? undefined : 'active'"
         >{{ link.label }}</router-link>
       </div>
 
@@ -55,7 +62,7 @@
           </Transition>
         </div>
         <!-- 个人主页头像（登录后） -->
-        <router-link v-if="auth.isLogin && auth.user" class="me-link" :to="'/user/' + auth.user.id" data-tip="个人主页">
+        <router-link v-if="auth.isLogin && auth.user" class="me-link" :to="'/user/' + (auth.user.public_id || auth.user.id)" data-tip="个人主页">
           <img v-if="auth.user.avatar" class="me-avatar" :src="auth.user.avatar" alt="avatar" />
           <span v-else class="me-avatar">{{ (auth.user.nickname || auth.user.username || '?').slice(0, 1) }}</span>
         </router-link>
@@ -67,7 +74,7 @@
     <!-- 移动端菜单面板 -->
     <Transition name="bell-panel">
       <div v-if="menuOpen" class="nav-mobile-menu">
-        <router-link v-for="link in links" :key="link.label" class="mm-link" :to="link.to" :exact-active-class="link.exact ? 'active' : undefined" @click="menuOpen = false">{{ link.label }}</router-link>
+        <router-link v-for="link in links" :key="link.label" class="mm-link" :to="link.to" :class="{ active: isNavActive(link) }" @click="menuOpen = false">{{ link.label }}</router-link>
         <router-link v-if="!auth.isLogin" class="mm-link" to="/login" @click="menuOpen = false">登录</router-link>
         <router-link v-else class="mm-link" to="/admin" @click="menuOpen = false">书房</router-link>
         <router-link v-if="auth.isLogin" class="mm-link" to="/friends" @click="menuOpen = false">关注</router-link>
@@ -82,11 +89,22 @@
 <script setup>
 import ThemeDropdown from '@/components/ThemeDropdown.vue'
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
 
 import api from '@/utils/api.js'
 
 const auth = useAuthStore()
+const route = useRoute()
+
+// 导航高亮：vue-router 内置 active 要求 name 相等，带参数子路由（如 /docs/:key）会让父入口（/docs）不亮。
+// 改为按路径匹配：exact 项（首页）精确匹配，其余前缀匹配。
+const isNavActive = (link) => {
+  const p = route.path
+  if (link.exact) return p === link.to
+  const to = String(link.to).replace(/\/$/, '')
+  return p === to || p.startsWith(to + '/')
+}
 
 const bellOpen = ref(false)
 const menuOpen = ref(false)
@@ -137,10 +155,10 @@ const openNoti = async (n) => {
     return
   }
   bellOpen.value = false
-  if (n.type === 'message') { window.location.href = '/zhiyu/messages?with=' + n.actor_id; return }
-  if (n.doc_id) window.location.href = '/zhiyu/notes/' + n.doc_id + '?focus=' + n.type
+  if (n.type === 'message') { window.location.href = '/zhiyu/messages?with=' + (n.actor_public_id || n.actor_id); return }
+  if (n.doc_id) window.location.href = '/zhiyu/notes/' + (n.public_id || n.doc_id) + '?focus=' + n.type
   else if (n.type === 'friend_request') window.location.href = '/zhiyu/friends'
-  else if (n.actor_id) window.location.href = '/zhiyu/user/' + n.actor_id
+  else if (n.actor_id) window.location.href = '/zhiyu/user/' + (n.actor_public_id || n.actor_id)
 }
 const notiIcon = (t) => ({ like: '👍', favorite: '⭐', comment: '💬', friend_request: '👋', digest: '🤖', message: '✉️' }[t] || '🔔')
 const notiText = (n) => {
@@ -370,9 +388,23 @@ const links = [
 
 @media (max-width: 900px) {
   .nav-links { display: none; }
-  /* 窄屏隐藏好友/商城文字入口，保留头像与书房/登录 */
-  .nav-right .admin-link { display: none; }
-  .nav-right .admin-link:last-child { display: inline-flex; }
+  /* 移动端：去掉书房/登录文字按钮（入口已收进汉堡菜单） */
+  .nav-right .admin-link { display: none !important; }
+  /* 移动端重排：nav-right 占满剩余宽度——主题+通知+消息居中，头像+汉堡靠右贴边 */
+  .nav-right { flex: 1; gap: 6px; }
+  /* 导航内容占满视口（--layout-max-width 1152px 在手机端不适用，否则两侧 logo/头像被挤出视口） */
+  .nav-inner { max-width: 100%; padding: 0 12px; }
+  .nav-right .bell-wrap { order: 1; margin-left: auto; }
+  .nav-right .kb-theme-wrap { order: 2; }
+  .nav-right .msg-link { order: 3; }
+  .nav-right .me-link { order: 4; margin-left: auto; }
+  .nav-right .nav-burger { order: 5; }
+  /* 通知按钮更小 */
+  .nav-right .bell-btn { width: 26px; height: 26px; }
+  .nav-right .bell-btn .bell-svg { width: 14px; height: 14px; }
+  .nav-right .bell-dot { min-width: 13px; height: 13px; font-size: 9px; padding: 0 3px; }
+  /* 头像与汉堡菜单靠右贴边 */
+  .kb-navbar { padding-right: 8px; }
 }
 .nav-burger { display: none; background: none; border: none; color: var(--text2); font-size: 20px; cursor: pointer; padding: 4px 8px; }
 .nav-mobile-menu { position: fixed; top: 56px; right: 12px; z-index: 130; min-width: 170px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 14px; padding: 8px; box-shadow: var(--shadow-1); display: flex; flex-direction: column; }

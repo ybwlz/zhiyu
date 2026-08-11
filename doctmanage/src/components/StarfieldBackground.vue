@@ -103,11 +103,8 @@ function draw(t) {
     ctx.beginPath()
     ctx.arc(x, y, s.r, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`
-    ctx.shadowBlur = s.r > 1.4 ? 8 : 0
-    ctx.shadowColor = 'rgba(140,180,255,0.9)'
     ctx.fill()
   }
-  ctx.shadowBlur = 0
   raf = requestAnimationFrame(draw)
 }
 

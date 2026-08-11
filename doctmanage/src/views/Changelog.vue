@@ -8,28 +8,32 @@
     </div>
 
     <div class="cl-layout">
-      <!-- 左栏：版本档案 -->
-      <aside class="cl-sidebar">
-        <p class="side-label">版本档案</p>
-        <div class="side-group" v-for="g in versionGroups" :key="g.label">
-          <p class="side-group-label" @click="toggleGroupFold(g.label)">
-            {{ g.label }}
-            <span class="fold-caret" :class="{ open: !collapsedGroups.has(g.label) }">▸</span>
-          </p>
-          <div v-if="!collapsedGroups.has(g.label)">
-            <div
-              class="side-item"
-              v-for="v in g.items"
-              :key="v.version"
-              :class="{ on: v.version === activeVersion }"
-              @click="activeVersion = v.version"
-            >
-              <span class="side-ver">v{{ v.version }}</span>
-              <span class="side-date">{{ v.date }}</span>
+      <div class="arch-wrap">
+        <!-- 移动端：展开版本档案 -->
+        <button class="arch-toggle" @click="archOpen = !archOpen">📦 版本档案 <span class="fold-caret" :class="{ open: archOpen }">▸</span></button>
+        <!-- 左栏：版本档案 -->
+        <aside class="cl-sidebar" :class="{ open: archOpen }">
+          <p class="side-label">版本档案</p>
+          <div class="side-group" v-for="g in versionGroups" :key="g.label">
+            <p class="side-group-label" @click="toggleGroupFold(g.label)">
+              {{ g.label }}
+              <span class="fold-caret" :class="{ open: !collapsedGroups.has(g.label) }">▸</span>
+            </p>
+            <div v-if="!collapsedGroups.has(g.label)">
+              <div
+                class="side-item"
+                v-for="v in g.items"
+                :key="v.version"
+                :class="{ on: v.version === activeVersion }"
+                @click="pickVersion(v)"
+              >
+                <span class="side-ver">v{{ v.version }}</span>
+                <span class="side-date">{{ v.date }}</span>
+              </div>
             </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      </div>
 
       <!-- 右栏：当前版本详情 -->
       <div class="cl-detail">
@@ -61,12 +65,74 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 
+// 移动端：版本档案默认收起，点按钮展开
+const archOpen = ref(false)
+
 const CAT = { feat: '新功能', fixed: '修复', improved: '改进' }
 const catLabel = (k) => CAT[k] || k
 
 const versions = [
   {
-    version: '0.6.0', date: '2026-08-11', latest: true,
+    version: '1.0.0', date: '2026-08-12', latest: true,
+    summary: '品牌焕新：知屿正式定名 + 葫芦图标 + 手机端首页 App 化 + 分享链接脱敏。',
+    sections: {
+      feat: [
+        { title: '品牌焕新：站名「知屿」+ 全新图标', desc: '网站标题正式定为「知屿」；葫芦线条图标（8 字去右上弧 + 底胖 + 蒂右弯）作为 favicon 与导航栏 logo 统一使用，深蓝渐变背景、居中完整显示。' },
+        { title: '首页手机端 App 化改版', desc: '紧凑 hero（徽章 + 标题 + 搜索 + 今日概览 + 统计卡）、2×2 功能宫格（图标 + 标题居中）、精选笔记移至下滑可见，胶囊收窄、间距透气。' },
+        { title: '分享链接脱敏', desc: '文档 / 笔记 / 用户页 URL 改用短 public_id 标识，不再暴露数字 id 与中文 slug；旧数字 id / 用户名链接不再兼容。' },
+      ],
+      improved: [
+        { title: '统计卡居中微调', desc: '手机端统计卡整体左移 10px，视觉更居中。' },
+      ],
+      fixed: [
+        { title: '修复 favicon 被裁切只剩左上角', desc: 'SVG 缺 width/height 导致浏览器按默认尺寸渲染取左上角；ico 路径坐标未按尺寸缩放导致线条画在画布外——均已修复，三端（favicon / ico / 导航栏）图形统一完整。' },
+      ],
+    },
+  },
+  {
+    version: '0.9.0', date: '2026-08-12', latest: false,
+    summary: '沉浸式阅读全面丝滑：一帧切换、只隐藏必要元素、导航栏固定置顶。',
+    sections: {
+      feat: [
+        { title: '沉浸切换一帧完成', desc: '笔记广场 / 笔记阅读页 / 阅览室移除过渡动画，点沉浸直接瞬切，与 docs 页一致的轻量体验。' },
+        { title: '沉浸只隐藏必要元素', desc: '阅读页沉浸仅隐藏右侧大纲栏，头部/操作栏/评论区保留；导航栏隐藏后内容自动向上补齐原空位。' },
+      ],
+      improved: [
+        { title: '全局导航栏固定置顶', desc: '所有页面下滑时导航栏保持置顶不动，仅沉浸模式隐藏。' },
+      ],
+      fixed: [
+        { title: '修复阅读页沉浸卡顿', desc: '移除 .reader-page 的 padding 过渡动画，沉浸切换从 0.3s 动画变为一帧完成。' },
+      ],
+    },
+  },
+  {
+    version: '0.8.0', date: '2026-08-11', latest: false,
+    summary: '阅览室体验优化：大纲自绘面板、加载态简洁、移动端正文铺满。',
+    sections: {
+      feat: [
+        { title: '大纲改为自绘固定面板', desc: '替代 el-popover：fixed 定位不跳出屏幕、滚动自动关闭，不再错位。' },
+        { title: '上一篇/下一篇等正文就绪再显示', desc: '加载中只显示「加载中…」，正文渲染完成才出现前后翻页，与笔记页时序一致。' },
+      ],
+      improved: [
+        { title: '加载态简洁化', desc: '去掉骨架屏占位条的跳动，统一为「加载中…」文字。' },
+        { title: '移动端正文铺满', desc: '手机端去掉卡片围边与边框，正文铺满屏幕。' },
+      ],
+    },
+  },
+  {
+    version: '0.7.0', date: '2026-08-11', latest: false,
+    summary: '阅读页体验升级：代码块深色高亮、选中文字定位评论、自定义删除确认。',
+    sections: {
+      feat: [
+        { title: '代码块深色高亮', desc: 'github-dark 主题 + 深色代码块背景，长代码不再白底浅字看不清。' },
+        { title: '选中文字定位评论', desc: '选中正文文字弹出「📍 定位到评论」浮层，直接定位评论锚点，替代评论区按钮。' },
+        { title: '删除评论自定义确认框', desc: '删除评论改用站内主题确认弹窗，不再使用浏览器原生弹窗。' },
+        { title: '一键回到顶部 / 底部', desc: '右下角悬浮按钮，点击平滑跳转到页面顶部或底部。' },
+      ],
+    },
+  },
+  {
+    version: '0.6.0', date: '2026-08-11', latest: false,
     summary: 'AI 修改全面 Cursor 化：内嵌红绿 diff 逐个确认、真流式 + 思考可见、所有 AI 写入都先预览后生效。',
     sections: {
       feat: [
@@ -202,6 +268,12 @@ const versions = [
 
 const activeVersion = ref(versions[0].version)
 
+// 选择版本：移动端选中后自动收起档案面板
+const pickVersion = (v) => {
+  activeVersion.value = v.version
+  if (window.innerWidth <= 860) archOpen.value = false
+}
+
 // 切换版本时回到页面顶部（版本内容长短不一，避免停留在上一版的滚动位置）
 watch(activeVersion, () => window.scrollTo({ top: 0 }))
 
@@ -253,6 +325,7 @@ const versionGroups = computed(() => {
   gap: 28px;
   align-items: start;
 }
+.arch-wrap { min-width: 0; }
 .cl-sidebar {
   position: sticky;
   top: 84px;
@@ -331,8 +404,27 @@ const versionGroups = computed(() => {
   100% { background-position: 100% 50%; filter: hue-rotate(22deg); }
 }
 
+/* 移动端展开版本档案按钮（仅 ≤860px 显示） */
+.arch-toggle {
+  display: none;
+  align-items: center; gap: 8px;
+  border: 1px solid var(--border); background: var(--card-bg);
+  color: var(--text1); font-size: 14px; font-weight: 700;
+  padding: 10px 16px; border-radius: 12px; cursor: pointer;
+  box-shadow: var(--shadow-1); margin-bottom: 14px;
+}
+.arch-toggle:hover { color: var(--brand-1); }
+
 @media (max-width: 860px) {
-  .cl-layout { grid-template-columns: 1fr; }
-  .cl-sidebar { position: static; }
+  .cl-layout { grid-template-columns: 1fr; gap: 16px; }
+  .arch-wrap { display: flex; flex-direction: column; }
+  .arch-toggle { display: flex; margin-bottom: 0; box-shadow: none; }
+  /* 版本档案默认收起（不顶到页面顶部），点按钮展开；面板紧贴按钮下方 */
+  .cl-sidebar {
+    position: static;
+    display: none;
+    border-radius: 14px;
+  }
+  .cl-sidebar.open { display: block; }
 }
 </style>

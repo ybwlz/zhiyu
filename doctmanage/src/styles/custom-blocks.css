@@ -52,6 +52,32 @@
   margin-bottom: 4px;
 }
 
+/* Example: 例题（蓝色系，带左侧色条，更像"框"） */
+.markdown-body .custom-block.example {
+  background-color: rgba(64, 158, 255, 0.09);
+  border: 1px solid rgba(64, 158, 255, 0.28);
+  border-left: 3px solid #409eff;
+  color: #000;
+}
+.markdown-body .custom-block.example .custom-block-title {
+  color: #409eff;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+/* Formula: 公式（紫色系） */
+.markdown-body .custom-block.formula {
+  background-color: rgba(147, 112, 219, 0.09);
+  border: 1px solid rgba(147, 112, 219, 0.26);
+  border-left: 3px solid #9370db;
+  color: #000;
+}
+.markdown-body .custom-block.formula .custom-block-title {
+  color: #7b5cd6;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
 /* Details: Grey background */
 .markdown-body .custom-block.details {
   border: 1px solid var(--c-border); /* Details usually needs border to look like a box */
@@ -123,4 +149,8 @@ html.dark .markdown-body .custom-block.tip { background-color: rgba(147, 112, 21
 html.dark .markdown-body .custom-block.warning { background-color: rgba(234, 179, 8, .1); border-color: rgba(234, 179, 8, .2); }
 html.dark .markdown-body .custom-block.danger { background-color: rgba(220, 38, 38, .1); border-color: rgba(220, 38, 38, .2); }
 html.dark .markdown-body .custom-block.details { background-color: #202127; }
+html.dark .markdown-body .custom-block.example { background-color: rgba(64, 158, 255, .14); border-color: rgba(64, 158, 255, .3); color: var(--c-text-1); }
+html.dark .markdown-body .custom-block.example .custom-block-title { color: #79b8ff; }
+html.dark .markdown-body .custom-block.formula { background-color: rgba(147, 112, 219, .16); border-color: rgba(147, 112, 219, .32); color: var(--c-text-1); }
+html.dark .markdown-body .custom-block.formula .custom-block-title { color: #b49ce8; }
 

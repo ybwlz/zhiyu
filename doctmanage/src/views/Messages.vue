@@ -1,5 +1,5 @@
 <template>
-  <div class="msg-page">
+  <div class="msg-page" :class="{ chatting: !!active || !!activeGroup }">
     <div class="msg-list">
       <div class="msg-list-head">
         <span class="head-title">💬 私信</span>
@@ -10,7 +10,7 @@
       </div>
 
       <!-- AI 助手（官方账号，默认置顶会话） -->
-      <div v-if="aiInfo" class="msg-item ai" :class="{ on: !activeGroup && active === aiInfo.id }" @click="openConv(aiInfo.id)">
+      <div v-if="aiInfo" class="msg-item ai" :class="{ on: !activeGroup && active === (aiInfo.public_id || aiInfo.id) }" @click="openConv(aiInfo.public_id || aiInfo.id)">
         <div class="m-avatar ai-avatar">🤖</div>
         <div class="m-info">
           <div class="m-top"><span class="m-name">{{ aiInfo.nickname || 'AI 助手' }}</span><span class="m-time">官方账号</span></div>
@@ -33,7 +33,7 @@
       <!-- 私聊 -->
       <template v-if="convs.length">
         <div class="list-divider">私聊 · {{ convs.length }}</div>
-        <div v-for="c in convs" :key="c.peer.id" class="msg-item" :class="{ on: !activeGroup && active === c.peer.id }" @click="openConv(c.peer.id)">
+        <div v-for="c in convs" :key="c.peer.id" class="msg-item" :class="{ on: !activeGroup && active === (c.peer.public_id || c.peer.id) }" @click="openConv(c.peer.public_id || c.peer.id)">
           <div class="m-avatar">
             <img v-if="c.peer.avatar" :src="c.peer.avatar" alt="" />
             <span v-else>{{ (c.peer.nickname || c.peer.username || '?').slice(0, 1) }}</span>
@@ -59,6 +59,7 @@
       <!-- 群聊会话 -->
       <template v-if="activeGroup">
         <div class="chat-head">
+          <button class="chat-back" data-tip="返回列表" @click="backToList">←</button>
           <div class="ch-user">
             <span class="ch-avatar group-avatar">👥</span>
             <div class="ch-txt">
@@ -91,7 +92,8 @@
         </div>
         <template v-else>
           <div class="chat-head">
-            <div class="ch-user" @click="goUser(peer.id)">
+            <button class="chat-back" data-tip="返回列表" @click="backToList">←</button>
+            <div class="ch-user" @click="goUser(peer.public_id || peer.id)">
               <span class="ch-avatar">
                 <img v-if="peer.avatar" :src="peer.avatar" alt="" />
                 <span v-else>{{ (peer.nickname || peer.username || '?').slice(0, 1) }}</span>
@@ -101,7 +103,7 @@
                 <div class="ch-id">@{{ peer.username }}</div>
               </div>
             </div>
-            <button class="ch-go" @click="goUser(peer.id)">查看主页 →</button>
+            <button class="ch-go" @click="goUser(peer.public_id || peer.id)">查看主页 →</button>
           </div>
           <div class="chat-body" ref="chatBody">
             <div v-if="!msgs.length" class="center empty"><div class="empty-emoji">👋</div>还没有消息，打个招呼吧</div>
@@ -176,17 +178,28 @@ export default {
     gName() { const g = this.groups.find(x => x.id === this.activeGroup); return g ? g.name : '群聊' },
   },
   mounted() {
-    const withId = Number(this.$route.query.with || 0)
+    const withKey = this.$route.query.with
     this.loadAll()
-    if (withId) this.openConv(withId)
+    if (withKey) this.openConv(withKey)
     // 轻量轮询：有新消息时自动刷新（6s）
     this.timer = setInterval(() => {
       if (this.activeGroup) this.loadGMsgs()
       else if (this.active) this.loadMsgs()
     }, 6000)
   },
-  beforeUnmount() { if (this.timer) clearInterval(this.timer) },
+  beforeUnmount() {
+    if (this.timer) clearInterval(this.timer)
+    document.body.classList.remove('chatting')
+  },
+  watch: {
+    active() { this.syncChatting() },
+    activeGroup() { this.syncChatting() },
+  },
   methods: {
+    // 进入具体聊天（移动端）：隐藏顶部导航栏，聊天页全屏
+    syncChatting() {
+      document.body.classList.toggle('chatting', !!this.active || !!this.activeGroup)
+    },
     async loadAll() {
       await Promise.all([this.loadConvs(), this.loadGroups()])
     },
@@ -275,12 +288,18 @@ export default {
       this.activeGroup = null
       await this.loadMsgs()
     },
+    // 移动端 QQ 式：从聊天返回会话列表
+    backToList() {
+      this.active = null
+      this.activeGroup = null
+      this.peer = null
+    },
     async loadMsgs() {
       try {
         const res = await api.get('/messages?with=' + this.active)
         this.peer = res.data.peer
         this.msgs = res.data.messages
-        const conv = this.convs.find(c => c.peer.id === this.active)
+        const conv = this.convs.find(c => (c.peer.public_id || c.peer.id) === this.active)
         if (conv) conv.unread = 0
         this.$nextTick(() => {
           const el = this.$refs.chatBody
@@ -350,18 +369,16 @@ export default {
 }
 .msg-list-head {
   position: sticky; top: 0; z-index: 2;
-  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  padding: 14px 18px;
   display: flex; align-items: center; justify-content: space-between;
-  background: color-mix(in srgb, var(--card-bg) 88%, transparent);
-  backdrop-filter: blur(10px);
+  background: transparent;
 }
 .head-title { font-size: 15px; font-weight: 800; color: var(--text1); }
 .head-acts { display: flex; align-items: center; gap: 10px; }
 .head-sub { font-size: 11.5px; font-weight: 500; color: var(--text2); }
 .head-btn {
   padding: 4px 12px; border-radius: 999px; cursor: pointer; font-size: 12px;
-  border: 1px solid color-mix(in srgb, var(--brand-1) 45%, transparent);
-  background: transparent; color: var(--brand-1); transition: all .18s;
+  border: none; background: transparent; color: var(--brand-1); transition: background .18s;
 }
 .head-btn:hover { background: color-mix(in srgb, var(--brand-1) 12%, transparent); }
 .list-divider {
@@ -425,8 +442,8 @@ export default {
 .ch-id { font-size: 11.5px; color: var(--text2); }
 .ch-go {
   padding: 6px 16px; border-radius: 999px; cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--brand-1) 50%, transparent);
-  background: transparent; color: var(--brand-1); font-size: 12.5px; transition: all .18s;
+  border: none;
+  background: transparent; color: var(--brand-1); font-size: 12.5px; transition: background .18s;
 }
 .ch-go:hover { background: color-mix(in srgb, var(--brand-1) 12%, transparent); }
 
@@ -511,8 +528,38 @@ export default {
 .msg-list::-webkit-scrollbar, .chat-body::-webkit-scrollbar, .g-pick::-webkit-scrollbar { width: 6px; }
 .msg-list::-webkit-scrollbar-thumb, .chat-body::-webkit-scrollbar-thumb, .g-pick::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-@media (max-width: 720px) {
-  .msg-page { grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 64px); }
-  .msg-list { max-height: 220px; }
+/* 返回列表按钮（仅移动端聊天页显示） */
+.chat-back {
+  display: none; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; background: transparent;
+  color: var(--text2); cursor: pointer; font-size: 15px; flex-shrink: 0;
+  transition: color .15s;
+}
+.chat-back:hover { color: var(--brand-1); }
+
+/* 移动端 QQ 式：先会话列表，点入后才是聊天页 */
+@media (max-width: 900px) {
+  .msg-page {
+    grid-template-columns: 1fr;
+    height: calc(100vh - 60px);
+    min-height: 0;
+    max-width: 100%;
+    padding: 70px 0 0;
+    gap: 0;
+  }
+  .msg-list { border-radius: 0; border: none; max-height: none; }
+  /* 列表背景与顶部导航栏同款半透明毛玻璃 */
+  .msg-list {
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: none;
+  }
+  .msg-chat { display: none; border-radius: 0; border: none; }
+  .msg-page.chatting .msg-list { display: none; }
+  .msg-page.chatting .msg-chat { display: flex; }
+  .msg-page.chatting { padding-top: 0; height: 100vh; } /* 进入会话：导航栏已隐藏，聊天全屏 */
+  .chat-back { display: inline-flex; }
 }
 </style>

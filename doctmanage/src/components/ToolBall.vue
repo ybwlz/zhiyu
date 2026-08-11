@@ -9,7 +9,17 @@
     @pointermove="onMove"
     @pointerup="onUp"
   >
-    <div class="tball-inner">🤖</div>
+    <div class="tball-inner">
+      <!-- 内联 SVG 机器人（线条风格）：不用 🤖 emoji（Android 平板渲染为方块），SVG 全平台统一 -->
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 4.6v1.5"/>
+        <circle cx="12" cy="3.5" r="1"/>
+        <rect x="5" y="7.6" width="14" height="10.4" rx="3.8"/>
+        <circle cx="9.4" cy="12.5" r="1.15" fill="#fff" stroke="none"/>
+        <circle cx="14.6" cy="12.5" r="1.15" fill="#fff" stroke="none"/>
+        <path d="M9.6 15.7h4.8" stroke-width="1.5"/>
+      </svg>
+    </div>
   </div>
 </template>
 

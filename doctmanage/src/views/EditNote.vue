@@ -2,12 +2,13 @@
 import { ref, computed, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
+import Container from 'markdown-it-container'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import { full as emoji } from 'markdown-it-emoji'
 import mathjax3 from 'markdown-it-mathjax3'
 import mdImgSize from '@/utils/mdImgSize.js'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import TurndownService from 'turndown'
 import { diffLines } from 'diff'
 import katex from 'katex'
@@ -18,6 +19,13 @@ import { setupAnnotation, bindAnnotations, ensureDoodleCanvas, drawStrokes, bind
 
 const route = useRoute()
 const router = useRouter()
+// 返回：按来源页跳转（阅览室→回阅览室，笔记阅读→回该笔记，默认回书房）
+const goBack = () => {
+  const from = route.query.from
+  if (from === 'docs') router.push('/docs')
+  else if (from === 'note' && route.params.id) router.push('/notes/' + (loadedPubId.value || route.params.id))
+  else router.push('/admin')
+}
 
 const isEdit = computed(() => !!route.params.id)
 const docId = computed(() => Number(route.params.id))
@@ -35,7 +43,25 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true, highlight:
   return hljs.highlightAuto(code).value
 }}).use(emoji).use(mathjax3).use(mdImgSize)
 setupAnnotation(md)
+// 自定义块容器：例题 / 公式 / 提示 / 信息 / 警告 / 注意（:::example / :::formula / :::tip …）
+const createBlock = (klass, defaultTitle) => [Container, klass, {
+  render(tokens, idx) {
+    const token = tokens[idx]
+    const info = token.info.trim().slice(klass.length).trim()
+    if (token.nesting === 1) {
+      return `<div class="${klass} custom-block"><p class="custom-block-title">${info || defaultTitle}</p>\n`
+    }
+    return `</div>\n`
+  }
+}]
+md.use(...createBlock('example', '例题'))
+md.use(...createBlock('formula', '公式'))
+md.use(...createBlock('tip', '提示'))
+md.use(...createBlock('info', '信息'))
+md.use(...createBlock('warning', '警告'))
+md.use(...createBlock('danger', '注意'))
 const rightEl = ref(null)
+const loadedPubId = ref('') // 文档 public_id（返回笔记页时用，避免 URL 暴露数字 id）
 const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 // ── 公式占位 + KaTeX 渲染成图 ──
@@ -615,7 +641,20 @@ const sendAiEdit = async () => {
     const targetTxt = aiSelRange.toString()
     const res = await api.post('/ai/edit-suggest', { instruction: aiInstText.value.trim(), target: targetTxt, context: content.value })
     const edits = res.data.edits || []
+    // 空笔记场景：后端直接返回完整内容（content 字段）→ 写入编辑器，用户继续编辑后保存
+    if (res.data.content) {
+      content.value = res.data.content
+      ElMessage.success('AI 已生成内容，可继续编辑后保存')
+      return
+    }
     if (!edits.length) { ElMessage.warning('AI 没有返回有效内容，请换个说法重试'); return }
+    // 兜底：空笔记时 AI 可能返回 target 为空的 edit → 同样直接写入
+    const emptyEdit = edits.find(e => !(e.target || '').trim())
+    if (emptyEdit) {
+      content.value = emptyEdit.replacement
+      ElMessage.success('AI 已生成内容，可继续编辑后保存')
+      return
+    }
     if (targetTxt.trim()) {
       // 选中文字 → 定点修改：同样走 aiBlocks 内嵌（统一逻辑：内嵌 diff + acceptBlock/rejectBlock）
       const e0 = edits.find(e => targetTxt.includes(e.target) || e.target.includes(targetTxt)) || edits[0]
@@ -635,7 +674,7 @@ const sendAiEdit = async () => {
       }
     }
   } catch (e) { ElMessage.error(e.response?.data?.error || 'AI 请求失败') }
-  aiSugLoading.value = false
+  finally { aiSugLoading.value = false }
 }
 
 const hideSelBar = () => { selBar.value.show = false }
@@ -835,6 +874,7 @@ const load = async () => {
   try {
     const res = await api.get('/docs/' + docId.value)
     title.value = res.data.title
+    loadedPubId.value = res.data.public_id || ''
     type.value = res.data.type
     content.value = res.data.content
     visibility.value = res.data.visibility
@@ -890,11 +930,20 @@ const load = async () => {
   renderRight()
 }
 
-const save = async () => {
+const save = async (opts = {}) => {
   if (!title.value.trim()) { ElMessage.warning('请填写标题'); return }
   if (!content.value.trim()) { ElMessage.warning('内容不能为空'); return }
   if (!type.value.trim()) { ElMessage.warning('请填写分类（如：高等数学）'); return }
-  flushEdit()   // 确保编辑区最新内容已转成 markdown
+  // AI 接受/拒绝场景（opts.noFlush）：content.value 已是权威值，跳过 flushEdit，
+  // 避免 turndown 把预览区里残留的 diff 块按钮文字（✓ 接受 ✕ 拒绝）转进正文
+  if (!opts.noFlush) {
+    // 手动保存时：若预览区还有未处理的 AI diff 块，先用 content.value 重建（恢复被 diff 块替换的原文），
+    // 避免 diff 块按钮文字被 turndown 转进正文；未接受的修改仍保留在 aiBlocks 中，之后可继续接受
+    if (rightEl.value && rightEl.value.querySelector('.ai-inline-diff[data-block]')) {
+      renderRight()
+    }
+    flushEdit()   // 确保编辑区最新内容已转成 markdown
+  }
   busy.value = true
   try {
     if (isEdit.value) {
@@ -969,34 +1018,45 @@ const cleanAiInsertText = (raw) => {
 
 // 智能定位插入点：AI 内容若含章节号（如 "3.3 代码实现"），插到对应 ## 章节末尾；否则插到全文末尾
 const locateAiInsertPos = (aiText) => {
-  const content = content.value || ''
-  // 提取 AI 内容里的章节号，如 "3.3 代码实现" → 3
-  const secMatch = aiText.match(/^\s*(\d+)(?:\.\d+)?\s*[、.．]?\s*[^\n]*$/m)
-  if (!secMatch) return content.length
+  const c = content.value || ''   // 注意：不能用 const content（会遮蔽外层 ref 触发 TDZ）
+  // 提取 AI 内容里的章节号，如 "### 3.3 代码实现" → 3；只匹配行首数字（标题行），避免匹配到正文里的数字
+  const secMatch = aiText.match(/^#{1,4}\s*(\d+)(?:\.\d+)?\s*[、.．]?\s*[^\n]*$/m) || aiText.match(/^\s*(\d+)\s*[、.．]\s*[^\n]*$/m)
+  if (!secMatch) return c.length
   const secNum = parseInt(secMatch[1], 10)
-  if (!secNum) return content.length
+  if (!secNum) return c.length
   // 找笔记里对应的一级章节 ## N. 标题
   const re = /^##\s*(\d+)[、.．]?\s*[^\n]*$/gm
   let mm = null
   let targetIdx = -1
   let nextIdx = -1
-  while ((mm = re.exec(content)) !== null) {
+  while ((mm = re.exec(c)) !== null) {
     const n = parseInt(mm[1], 10)
     if (n === secNum) targetIdx = mm.index
     else if (targetIdx !== -1 && n > secNum) { nextIdx = mm.index; break }
   }
-  if (targetIdx === -1) return content.length
-  return nextIdx !== -1 ? nextIdx : content.length
+  if (targetIdx === -1) return c.length
+  return nextIdx !== -1 ? nextIdx : c.length
 }
 
-// 全局 AI 助手「插入正文」动作 → 剥离思考、生成内嵌 diff 块（用户确认后才应用，统一走 diff）
+// 取插入点前最后一个「有效内容行」做锚点：跳过空行、`* * *` 分隔线、纯符号行（这些 normLine 后为空，无法定位）
+const pickInsertAnchor = (original, pos) => {
+  const lines = original.slice(0, pos).split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const s = lines[i].trim()
+    if (!s) continue
+    if (/^[*\-_=~]{3,}\s*$/.test(s)) continue   // * * * 分隔线
+    if (!normLine(s)) continue                   // 去符号后为空（纯 markdown 符号）
+    return s
+  }
+  return ''
+}
+
 const onAiInsert = (e) => {
   const text = cleanAiInsertText(e.detail?.text)
   if (!text) return
   const original = content.value || ''
   const pos = locateAiInsertPos(text)
-  const beforeLines = original.slice(0, pos).split('\n').filter(l => l.trim())
-  const anchor = beforeLines.length ? beforeLines[beforeLines.length - 1].trim() : ''
+  const anchor = pickInsertAnchor(original, pos)
   if (!anchor) { ElMessage.warning('无法定位插入位置，请手动插入'); return }
   const block = makeBlock(anchor, anchor + '\n' + text)
   if (!block.found) { ElMessage.warning('插入位置在正文中找不到，请手动插入'); return }
@@ -1174,7 +1234,7 @@ const relocateBlocks = () => {
   }
 }
 
-const acceptBlock = (b) => {
+const acceptBlock = async (b) => {
   if (b.applied) return
   let t = content.value || ''
   let pos = locateAnchor(t, b.target)
@@ -1185,8 +1245,8 @@ const acceptBlock = (b) => {
   content.value = t
   b.applied = true
   b.failed = false
-  // content.value 变更会触发 watch → renderRight 重建 + aiBlocks watcher 重插入剩余块
-  save()
+  // content.value 已是权威值：跳过 flushEdit 直接保存（避免 diff 块按钮文字被 turndown 转进正文）
+  save({ noFlush: true })
   ElMessage.success('已应用该处修改')
   // 其余块位置可能已变，重新定位
   relocateBlocks()
@@ -1198,7 +1258,7 @@ const rejectBlock = (b) => {
   if (!aiBlocks.value.length) return
 }
 
-const acceptAllBlocks = () => {
+const acceptAllBlocks = async () => {
   const t0 = content.value || ''
   // 一次性定位所有未应用块（基于同一份原文），从后往前应用避免位置漂移
   const located = []
@@ -1224,8 +1284,8 @@ const acceptAllBlocks = () => {
     item.b.applied = true; ok++
   }
   content.value = t
-  // content.value 变更触发 watch → renderRight 重建；aiBlocks 过滤后 watcher 重插入剩余块（如有）
-  save()
+  // content.value 已是权威值：跳过 flushEdit 直接保存（避免 diff 块按钮文字被 turndown 转进正文）
+  await save({ noFlush: true })
   if (failed.length) ElMessage.warning(`已应用 ${ok} 处；${failed.length} 处找不到原文位置已跳过，${skipped} 处相互重叠已跳过`)
   else if (skipped) ElMessage.warning(`已应用 ${ok} 处修改（${skipped} 处相互重叠已跳过）`)
   else ElMessage.success(`已应用 ${ok} 处修改`)
@@ -1256,23 +1316,40 @@ const renderAiBlocksInline = () => {
   bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText })
   ensureAnnCanvases(rightEl.value)
   const ctx = content.value || ''
-  for (const b of blocks) {
+  // 从后往前替换：先替换位置靠后的块，避免前面的块被替换成 diff 后，
+  // 其内部渲染的 keep 行干扰后面块的锚点匹配（多块 target 相邻/重叠时只显示一个的问题）
+  const ordered = [...blocks].sort((a, b) => (b.start || 0) - (a.start || 0))
+  for (const b of ordered) {
     const pos = locateAnchor(ctx, b.target)
     if (!pos) continue
-    // 用 target 首行（去符号后）在 rightEl 里定位文本节点
+    // 定位：取 target 首行/末行去符号文本，在 rightEl 里找包含它们的块级元素（LI/P/DIV/TR 等）。
+    // 按元素 textContent 匹配可跨 markdown 拆出的多个文本节点（如 <li><strong>单链表</strong>：…），
+    // 避免按文本节点精确匹配必然失败的问题
     const tLines = b.target.split('\n').map(s => normLine(s)).filter(s => s.length > 0)
-    const firstPlain = (tLines[0] || '').slice(0, 24)
+    const firstPlain = (tLines[0] || '').slice(0, 20)
+    const lastPlain = tLines.length > 1 ? (tLines[tLines.length - 1] || '').slice(0, 20) : firstPlain
     if (!firstPlain) continue
-    const walker = document.createTreeWalker(rightEl.value, NodeFilter.SHOW_TEXT)
-    let node = null
+    const BLOCK_TAGS = ['LI', 'P', 'DIV', 'TR', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'UL', 'OL']
+    // 收集块级元素，定位 target 覆盖的起止元素（首行 → 末行），整体替换成 diff 块。
+    // 修复：旧实现只替换「首行所在块」，target 其余原文残留，导致删改大段内容时旧内容删不干净。
+    const els = []
+    const walker = document.createTreeWalker(rightEl.value, NodeFilter.SHOW_ELEMENT)
     while (walker.nextNode()) {
-      if (walker.currentNode.textContent.includes(firstPlain)) { node = walker.currentNode; break }
+      const el = walker.currentNode
+      if (!BLOCK_TAGS.includes(el.tagName)) continue
+      els.push(el)
     }
-    if (!node || !node.textContent.includes(firstPlain)) continue
-    const idx = node.textContent.indexOf(firstPlain)
-    const range = document.createRange()
-    range.setStart(node, idx)
-    range.setEnd(node, idx + firstPlain.length)
+    let startIdx = -1
+    let endIdx = -1
+    for (let i = 0; i < els.length; i++) {
+      const txt = normLine(els[i].textContent)
+      if (startIdx < 0 && txt.includes(firstPlain)) startIdx = i
+      if (startIdx >= 0 && txt.includes(lastPlain)) { endIdx = i; break }
+    }
+    if (startIdx < 0) continue
+    if (endIdx < 0) endIdx = startIdx
+    const startEl = els[startIdx]
+    const endEl = els[endIdx]
     const wrap = document.createElement('div')
     wrap.className = 'ai-inline-diff'
     wrap.setAttribute('contenteditable', 'false')
@@ -1285,6 +1362,12 @@ const renderAiBlocksInline = () => {
     ).join('')
     wrap.innerHTML = rows + '<div class="ai-diff-ops"><button class="ai-accept" type="button">✓ 接受</button><button class="ai-reject" type="button">✕ 拒绝</button></div>'
     try {
+      // 用 diff 块替换 target 覆盖的整段（首行元素到末行元素）：
+      // 被删的原文行显示红色、新增行显示绿色（Cursor 式就地预览），
+      // 接受/拒绝后 watcher 会重建 rightEl（应用新内容 / 恢复原文）
+      const range = document.createRange()
+      range.setStartBefore(startEl)
+      range.setEndAfter(endEl)
       range.deleteContents()
       range.insertNode(wrap)
     } catch (e) { /* 忽略定位失败 */ }
@@ -1298,6 +1381,14 @@ const renderAiBlocksInline = () => {
 // aiBlocks 变化后同步内嵌渲染（watch 里调用，避免每次赋值都手动调）
 const aiBlocksWatcher = watch(aiBlocks, () => { nextTick(() => renderAiBlocksInline()) }, { deep: true })
 
+
+// AI 声明改标题（【知屿标题：新标题】）→ 填入标题输入框
+const onAiTitle = (e) => {
+  const t = (((e.detail || {}).title) || '').trim()
+  if (!t) return
+  title.value = t
+  ElMessage.success('AI 已设置标题：' + t)
+}
 
 // 聊天框/草稿 AI 修改 → 完整内容 diff → 内嵌多修改点
 const onAiDiff = async (e) => {
@@ -1318,9 +1409,7 @@ const onAiDiff = async (e) => {
     if (!cleaned) { ElMessage.warning('AI 没有返回有效的新增内容，请换个说法重试'); return }
     // 定位插入点：AI 内容含章节号时插到对应 ## 章节末尾；否则全文末尾
     const pos = locateAiInsertPos(cleaned)
-    const before = original.slice(0, pos)
-    const beforeLines = before.split('\n').filter(l => l.trim())
-    const anchor = beforeLines.length ? beforeLines[beforeLines.length - 1].trim() : ''
+    const anchor = pickInsertAnchor(original, pos)
     if (!anchor) { ElMessage.warning('无法定位插入位置，请手动插入'); return }
     // 锚点行作为 target，replacement = 锚点行 + 新内容（diff 里锚点显示为不变，新内容显示为绿色新增）
     const block = makeBlock(anchor, anchor + '\n' + cleaned)
@@ -1328,6 +1417,22 @@ const onAiDiff = async (e) => {
     mergeAiBlocks([block])
     ElMessage.info('AI 新增内容已内嵌到对应位置（绿色为新增），可接受/拒绝')
   } else {
+    // 若 AI 输出明显是「要插入的片段」（含代码块或新小节标题）→ 视为插入，不触发整篇修改的过短拦截
+    if (/```|^\s*#{2,4}\s/.test(sug)) {
+      const cleaned = cleanAiInsertText(sug)
+      if (!cleaned) { ElMessage.warning('AI 没有返回有效的新增内容，请换个说法重试'); return }
+      const pos = locateAiInsertPos(cleaned)
+      const anchor = pickInsertAnchor(original, pos)
+      if (anchor) {
+        const block = makeBlock(anchor, anchor + '\n' + cleaned)
+        if (block.found) {
+          mergeAiBlocks([block])
+          ElMessage.info('AI 新增内容已内嵌到对应位置（绿色为新增），可接受/拒绝')
+          nextTick(() => { if (aiBlocks.value.length) locateAiDiff() })
+          return
+        }
+      }
+    }
     // 安全：AI 输出过短（片段）不应用，避免毁掉整篇
     if (original.length > 0 && sug.length < original.length * 0.3) {
       ElMessage.error('AI 输出的内容像是片段而不是完整笔记，已取消。请让 AI 重新生成完整内容')
@@ -1383,7 +1488,7 @@ const locateAiDiff = () => {
 }
 
 onMounted(() => {
-  // 新建页：AI 通过工具预填的草稿（zhiyu_draft_new）自动载入
+  // 新建页：载入暂存草稿（zhiyu_draft_new）——AI 预填的直接应用并删除；用户普通暂存（未保存的新建内容）也恢复
   if (!isEdit.value) {
     try {
       const raw = localStorage.getItem('zhiyu_draft_new')
@@ -1398,6 +1503,16 @@ onMounted(() => {
           }
           localStorage.removeItem('zhiyu_draft_new')
           ElMessage.success('已载入 AI 生成的内容，确认后点「保存」')
+        } else if (d && (d.content || d.title)) {
+          // 用户自己暂存的新建草稿：恢复标题/分类/内容
+          if (d.title) title.value = d.title
+          if (d.type) type.value = d.type
+          if (d.visibility !== undefined) visibility.value = d.visibility
+          if (d.content) {
+            content.value = d.content
+            nextTick(() => renderRight())
+          }
+          ElMessage.success('已恢复未保存的新建草稿')
         }
       }
     } catch (e) {}
@@ -1409,15 +1524,20 @@ onMounted(() => {
   document.addEventListener('click', closeSymbolPanel)
   window.addEventListener('zhiyu:ai-insert', onAiInsert)
   window.addEventListener('zhiyu:ai-diff', onAiDiff)
+  window.addEventListener('zhiyu:ai-title', onAiTitle)
   window.addEventListener('zhiyu:ann-doodle-save', onAnnDoodleSave)
   document.addEventListener('selectionchange', showSelBar)
   document.addEventListener('mousedown', onSelDown)
   document.addEventListener('mouseup', onSelUp)
   window.addEventListener('scroll', hideSelBar, true)
+  // 移动端编辑页隐藏全局导航（页面自带返回按钮）
+  document.body.classList.add('editing')
 })
 onBeforeUnmount(() => {
+  document.body.classList.remove('editing')
   window.removeEventListener('zhiyu:ai-insert', onAiInsert)
   window.removeEventListener('zhiyu:ai-diff', onAiDiff)
+  window.removeEventListener('zhiyu:ai-title', onAiTitle)
   window.removeEventListener('zhiyu:ann-doodle-save', onAnnDoodleSave)
   document.removeEventListener('selectionchange', showSelBar)
   document.removeEventListener('mousedown', onSelDown)
@@ -1429,7 +1549,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="edit-page">
     <div class="edit-topbar">
-      <button class="back-btn" @click="router.push('/admin')">← 书房</button>
+      <button class="back-btn" @click="goBack">← 返回</button>
       <input v-model="title" class="title-input" :placeholder="isEdit ? '笔记标题' : '新笔记标题'" />
       <input v-model="type" class="type-input" placeholder="分类（如：高等数学）" />
       <div class="vis-seg">
@@ -1466,7 +1586,7 @@ onBeforeUnmount(() => {
               <button data-tip="代码块" @click="fmtBlock('pre')">&lt;/&gt; 代码</button>
               <button data-tip="插入公式（点公式可改源码）" @click="openEqInsert">∑ 公式</button>
               <button data-tip="数学符号面板" @click="symbolPanel = !symbolPanel">∑ 符号</button>
-              <button data-tip="插入块级公式" @click="openEqInsertBlock">$$\text{块公式}$$</button>
+              <button data-tip="插入块级公式" @click="openEqInsertBlock">块公式</button>
               <button data-tip="插入图片（也可直接 Ctrl+V 粘贴）" @click="pickImage">🖼 图片</button>
               <button data-tip="手绘：在笔记上自由涂写画线" @click="openDoodle">✏️ 手绘</button>
               <button data-tip="AI：修改选中文字，或在光标处新增内容" @click="openAiEdit">✨ AI</button>
@@ -1888,6 +2008,22 @@ onBeforeUnmount(() => {
 .markdown-body :deep(blockquote) { border-left: 3px solid var(--brand-1); margin: 12px 0; padding: 4px 14px; color: var(--text2); background: color-mix(in srgb, var(--brand-1) 6%, transparent); }
 
 @media (max-width: 860px) {
+  /* 顶部精简：导航已隐藏（body.editing），页面顶部让位减小 */
+  .edit-page { padding: 14px 12px 0; }
+  .edit-topbar { gap: 8px; margin-bottom: 10px; }
+  /* 第一行：返回 + 标题 + 保存；第二行：分类 + 私密/公开 */
+  .back-btn { order: 1; padding: 7px 12px; font-size: 12.5px; flex-shrink: 0; }
+  .title-input { order: 1; flex: 1; min-width: 0; padding: 8px 12px; font-size: 15px; }
+  .save-btn { order: 1; margin-left: auto; padding: 8px 18px; font-size: 13px; flex-shrink: 0; }
+  .type-input { order: 3; flex: 1 1 40%; min-width: 0; }
+  .vis-seg { order: 3; }
+  .draft-badge { display: none; }
+  /* 工具栏：单行横滑，不再换行留空；源码按钮固定最右同一行 */
+  .tb-row { padding: 6px 8px; gap: 6px; flex-wrap: nowrap; }
+  .tb-btns { flex: 1; min-width: 0; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tb-btns::-webkit-scrollbar { display: none; }
+  .tb-btns button { flex-shrink: 0; padding: 4px 8px; font-size: 12px; }
+  .src-toggle { flex-shrink: 0; }
   .editor-cols { grid-template-columns: 1fr; }
   .preview-area { min-height: 300px; }
 }

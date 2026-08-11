@@ -6,7 +6,17 @@
       <div v-if="open" class="ai-panel">
         <header class="ai-header" @mousedown="startAiDrag" title="按住拖动">
           <div class="ai-header-left">
-            <span class="ai-avatar">🤖</span>
+            <span class="ai-avatar">
+              <!-- 与悬浮球同款线条机器人：不用 🤖 emoji（Android 平板渲染为方块），全平台统一 -->
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 4.6v1.5"/>
+                <circle cx="12" cy="3.5" r="1"/>
+                <rect x="5" y="7.6" width="14" height="10.4" rx="3.8"/>
+                <circle cx="9.4" cy="12.5" r="1.15" fill="#fff" stroke="none"/>
+                <circle cx="14.6" cy="12.5" r="1.15" fill="#fff" stroke="none"/>
+                <path d="M9.6 15.7h4.8" stroke-width="1.5"/>
+              </svg>
+            </span>
             <div>
               <div class="ai-title">{{ ai.title }}</div>
               <div class="ai-status">
@@ -36,8 +46,8 @@
             </div>
             <div class="ai-msg-bubble" v-if="m.html" v-html="m.content"></div>
             <div class="ai-msg-bubble" v-else-if="m.role === 'user'">{{ m.content }}</div>
-            <div class="ai-msg-bubble" v-else-if="m.content" v-html="renderMd(m.content)"></div>
-            <div class="ai-msg-bubble typing" v-else-if="m.stream"><i></i><i></i><i></i></div>
+            <div class="ai-msg-bubble" v-else-if="m.content && !m.stream" v-html="renderMd(m.content)"></div>
+            <div class="ai-msg-bubble ai-plain" v-else-if="m.content && m.stream">{{ m.content }}</div>
             <div v-if="m.actions && m.actions.length" class="ai-actions">
               <button v-for="(a, ai) in m.actions" :key="ai" class="ai-act" @click="runAction(a)">{{ a.label }}</button>
             </div>
@@ -115,8 +125,8 @@ const auth = useAuthStore()
 const pageInfo = computed(() => {
   const p = route.path
   if (p.startsWith('/edit')) return { kind: 'editor', isNew: !route.params.id, note_id: route.params.id ? Number(route.params.id) : null }
-  if (p.startsWith('/notes/')) return { kind: 'note-reader', note_id: Number(route.params.id) }
-  if (p.startsWith('/docs/')) return { kind: 'docs-reader', note_slug: route.params.slug }
+  if (p.startsWith('/notes/')) return { kind: 'note-reader', note_key: route.params.key }
+  if (p.startsWith('/docs')) return { kind: 'docs-reader', note_key: route.params.key || undefined }
   if (p === '/notes') return { kind: 'notes-square' }
   return { kind: 'other' }
 })
@@ -226,6 +236,30 @@ const send = async () => {
   const assistantMsg = { role: 'assistant', content: '', reasoning: '', stream: true, actions: [], reasoningOpen: false }
   messages.value.push(assistantMsg)
   scrollToBottom()
+  // 打字机节流：Vue 响应式是异步批处理，同一批到达的 delta 若直接 += 只触发一次渲染（正文“唰”地一次性出现）。
+  // 把 delta 先累积到 typeBuf，由定时器逐字追加到 content（16ms/字 ≈ 60字/秒）。
+  // flushType 仅用于：流结束等待超时兜底 / 异常路径（错误信息覆盖正文）；正常流结束靠等待循环自然收尾。
+  let typeBuf = ''
+  let typeTimer = null
+  const flushType = () => {
+    if (typeTimer) { clearInterval(typeTimer); typeTimer = null }
+    if (typeBuf) { assistantMsg.content += typeBuf; typeBuf = '' }
+  }
+  const startType = () => {
+    if (typeTimer) return
+    typeTimer = setInterval(() => {
+      if (typeBuf) {
+        // 逐字打字机：无论网络一次到达多少字符，都按固定速率逐字显示（16ms/字 ≈ 60字/秒），
+        // 避免整批 delta 在一次 read 到达时被整体渲染成“一次性出现”
+        assistantMsg.content += typeBuf.slice(0, 1)
+        typeBuf = typeBuf.slice(1)
+        scrollToBottom()
+      } else {
+        clearInterval(typeTimer)
+        typeTimer = null
+      }
+    }, 16)
+  }
   let ctxNotes = []
   let aiChanged = false
   try {
@@ -276,13 +310,13 @@ const send = async () => {
           try {
             const obj = JSON.parse(raw)
             if (obj.reasoning) {
-              // 思考过程（DeepSeek reasoning_content）实时累加
+              // 思考过程（工具轮思考 / DeepSeek reasoning_content）实时累加，默认展开让用户看到思考
               assistantMsg.reasoning += obj.reasoning
+              assistantMsg.reasoningOpen = true
               scrollToBottom()
             } else if (obj.delta) {
-              assistantMsg.content += obj.delta
-              assistantMsg.stream = true
-              scrollToBottom()
+              typeBuf += obj.delta
+              startType()
             } else if (obj.error) {
               assistantMsg.content += '\n\n😅 ' + obj.error
             } else if (obj.action) {
@@ -292,7 +326,7 @@ const send = async () => {
                 router.push(a.to)
               } else if (a.type === 'new_note') {
                 try {
-                  localStorage.setItem('zhiyu_draft_new', JSON.stringify({ title: a.title || '', type: '', visibility: 'private', content: a.content || '', ts: Date.now(), ai: true }))
+                  localStorage.setItem('zhiyu_draft_new', JSON.stringify({ title: a.title || '', type: a.category || '', visibility: 'private', content: a.content || '', ts: Date.now(), ai: true }))
                 } catch (e) {}
                 router.push('/edit')
               }
@@ -308,7 +342,32 @@ const send = async () => {
           } catch (e) { /* 忽略坏帧 */ }
         }
       }
+      // 流结束：不一次性补齐（否则整批 delta 在一次 read 到达时会被 flushType 瞬间倒出，打字机失效）。
+      // 等逐字定时器把残余 typeBuf 输出完（打字机自然收尾），超时/异常才兜底补齐，保证 content 完整。
+      const tWait0 = Date.now()
+      while (typeBuf && Date.now() - tWait0 < 10000) {
+        await new Promise(r => setTimeout(r, 20))
+      }
+      flushType()
       assistantMsg.stream = false
+      // 思考识别：DeepSeek-chat 的思考是 content 开头的叙述段（无 reasoning_content 字段），
+      // 把开头「我来/我先/根据/用户要求/需要/好的/接下来/这是插入…」等思考口吻的段落挪进 reasoning 折叠框
+      if (!assistantMsg.reasoning) {
+        const c = (assistantMsg.content || '').trim()
+        const thinkRe = /^(?:我来|我先|根据|用户要求|需要|这是(?:插入|修改|新增)|我已经|我检查|我读取|我看了|这是给|在(?:给|为).{0,20}(?:添加|加|补充|写))/m
+        const m = c.match(thinkRe)
+        if (m) {
+          // 思考段 = 从开头到第一个"正文转折"（空行+标题/代码块/【知屿操作】之前）
+          const cut = c.search(/\n\s*(?:#{1,4}\s|```|【知屿操作|>|[-*] )/)
+          const sep = cut > 0 ? cut : c.length
+          const thinkText = c.slice(0, sep).trim()
+          const rest = c.slice(sep).trim()
+          if (thinkText && rest && thinkText.length < rest.length) {
+            assistantMsg.reasoning = thinkText
+            assistantMsg.content = rest
+          }
+        }
+      }
       // 动作按钮：检索到的笔记可打开 + 页面能力 + 生成内容可存为笔记
       const acts = []
       for (const n of ctxNotes) acts.push({ type: 'open', id: n.id, label: '📄 打开《' + n.title + '》' })
@@ -318,8 +377,14 @@ const send = async () => {
       const diagIntent = /看看|检查|审查|审阅|体检|有什么问题|有没有问题|有问题吗|毛病|评价一下|咋样|怎么样|挑错|找茬|质量/.test(intent)
       const writeIntent = /写|生成|起草|总结|整理|编排|补全|续写|制作|提纲|大纲|笔记|文章|补一个|建一个|记录/.test(intent)
       // 编辑器页：让 AI 自己声明操作（插入/修改/回答），前端照执行；AI 没声明才用意图兜底
-      const insertIntent = /插入|追加|末尾|后面|新增|补(?:充|一个|上)?|加(?:上|一个|个)?/.test(intent)
+      const insertIntent = /插入|追加|末尾|后面|新增|补充|补(?:充|一个|上)?|加(?:上|一个|个|几个|一些|点|段)?|代码|示例|例子/.test(intent)
+      const applyIntent = /改|修|换|替换|重写|更新|调整|润色|优化|整理|排版|理顺/.test(intent)
       if (pageInfo.value.kind === 'editor') {
+        // AI 声明改标题（【知屿标题：新标题】）→ 通知编辑页填入标题输入框
+        const aiTitle = (assistantMsg.content.match(/【知屿标题[:：]\s*(.+?)】/) || [])[1]?.trim()
+        if (aiTitle) {
+          window.dispatchEvent(new CustomEvent('zhiyu:ai-title', { detail: { title: aiTitle } }))
+        }
         const op = (assistantMsg.content.match(/【知屿操作[:：](.+?)】/) || [])[1]?.trim()
         const aiText = (assistantMsg.content || '').trim()
         // 结构转换意图（把 X 写成/改成/转成/整理成表格等）→ 一定是修改，走 diff，覆盖 AI 误判的「插入」
@@ -347,7 +412,6 @@ const send = async () => {
         // op === '回答' → 无操作，正常显示
       }
       // 阅览室：按钮选择权交给 AI——按回复末尾【知屿应用：xxx】声明决定显示哪个按钮；AI 未声明才用意图兜底
-      const applyIntent = /改|修|换|替换|重写|更新|调整|润色|优化|整理|排版|理顺/.test(intent)
       if (pageInfo.value.kind === 'docs-reader') {
         const meta = (assistantMsg.content.match(/【知屿应用[:：](.+?)】/) || [])[1]?.trim()
         // 局部替换：AI 输出了「原内容/新内容」结构 → 精确定位替换后进编辑页
@@ -361,25 +425,31 @@ const send = async () => {
           // AI 输出了笔记内容（整篇或片段，无论是否带声明）→ 自动进编辑页预览，AI 自己判断，无需用户触发
           window.dispatchEvent(new CustomEvent('zhiyu:ai-goto-edit', { detail: { text: assistantMsg.content } }))
         } else if (meta === '追加到末尾') acts.push({ type: 'insert-doc', label: '📥 追加到末尾' })
-        // AI 已通过 save_draft / write_note 改了这篇（aiChanged）→ 兜底提供跳编辑页查看红绿 diff
-        if (aiChanged) {
-          acts.push({ type: 'goto-edit-current', label: '✏️ 去编辑页查看修改' })
-        }
       }
       // 声明行是给系统的指令，从用户看到的回复里去掉
-      assistantMsg.content = assistantMsg.content.replace(/【知屿应用[:：][^】]*】/g, '').replace(/【知屿操作[:：][^】]*】/g, '').trim()
+      assistantMsg.content = assistantMsg.content.replace(/【知屿应用[:：][^】]*】/g, '').replace(/【知屿操作[:：][^】]*】/g, '').replace(/【知屿标题[:：][^】]*】/g, '').trim()
       // 用户让 AI 写/生成内容 → 存为笔记（仅当 AI 真的输出了正文内容，短句/操作反馈/诊断检查不显示）
-      if (writeIntent && !diagIntent && (assistantMsg.content || '').trim().length > 100) {
+      // 若 AI 回复是「询问/对话」（在征询用户意见、让用户回复确认），不弹存为笔记，避免把对话存成笔记
+      const aiContent = (assistantMsg.content || '').trim()
+      const aiIsQuestion = /(?:你看|你(?:觉得|想|说)|请问|要不要|是否要|回复「|请(?:告诉|回复|选择)|你可以选择|需要我).{0,30}(?:吗|吧|呢|？|\?|即可|告诉|回复)/.test(aiContent)
+      if (writeIntent && !diagIntent && !aiIsQuestion && aiContent.length > 100 && !aiChanged) {
+        // aiChanged（AI 已通过 save_draft/write_note 存草稿/改笔记）时不再弹「存为笔记/插入」：
+        // 内容已进草稿，再存会把 AI 的对话总结误存成新笔记（脏数据）
         acts.push({ type: 'save-note', label: '📥 存为笔记' })
         // 正在编辑 / 正在阅读某篇具体笔记时，AI 内容可插入（更新）当前笔记（编辑器已自动插入的场合不再显示按钮）
         if (pageInfo.value.kind === 'editor' && !insertIntent) acts.push({ type: 'insert', label: '📥 插入正文' })
         if (pageInfo.value.kind === 'note-reader') acts.push({ type: 'insert', label: '📥 插入笔记' })
+      }
+      // AI 已通过工具改了笔记/存草稿 → 任何页面都提供「去编辑页查看红绿 diff」入口
+      if (aiChanged) {
+        acts.push({ type: 'goto-edit-current', label: '✏️ 去编辑页查看修改' })
       }
       if (pageInfo.value.kind === 'note-reader') acts.push({ type: 'comment', label: '💬 写评论' })
       assistantMsg.actions = acts
       scrollToBottom()
     }
   } catch (e) {
+    flushType()
     assistantMsg.content = '😅 网络异常，AI 回答中断：' + e.message
     assistantMsg.stream = false
     scrollToBottom()
@@ -414,10 +484,10 @@ const runAction = async (act) => {
   if (act.type === 'open') {
     // 阅览室：就地打开对应笔记（切到当前阅览室的该篇），不跳笔记广场
     if (pageInfo.value.kind === 'docs-reader') {
-      window.dispatchEvent(new CustomEvent('zhiyu:ai-open-note', { detail: { id: act.id } }))
+      window.dispatchEvent(new CustomEvent('zhiyu:ai-open-note', { detail: { id: act.id, public_id: act.public_id } }))
       return
     }
-    router.push('/notes/' + act.id)
+    router.push('/notes/' + (act.public_id || act.id))
     return
   }
   if (act.type === 'insert' || act.type === 'insert-doc') {
@@ -427,10 +497,17 @@ const runAction = async (act) => {
     return
   }
   if (act.type === 'save-note') {
-    const text = (msg?.content || '').replace(/^```(?:markdown)?\s*/m, '').replace(/\s*```$/, '').trim()
-    const title = (text.match(/^#\s+(.+)$/m) || [])[1]?.trim() || text.slice(0, 20) || 'AI 笔记'
+    // 剥离 AI 回复中的对话性叙述（"我注意到…你看要不要…回复「新建」即可"），只存真正的正文
+    let text = (msg?.content || '').replace(/^```(?:markdown)?\s*/m, '').replace(/\s*```$/, '').trim()
+    text = text
+      .replace(/^(我(?:注意到|查看|看了|发现)|根据|你(?:提到|说|想要)|这是(?:给|在)[^\n]*)[^\n]*\n+/g, '')
+      .replace(/(?:你看|你觉得|你想|要不要|是否要|回复「|请(?:告诉|回复|选择)|你可以选择|需要我)[^\n]*\n+/g, '')
+      .replace(/^\s*(新建|确定|还是|或者|告诉|请回复)[：:][^\n]*\n+/g, '')
+      .trim()
+    // 标题：取正文第一个 Markdown 标题行；没有则用正文首行
+    const title = (text.match(/^#\s+(.+)$/m) || [])[1]?.trim() || text.split('\n').find(l => l.trim())?.slice(0, 20) || 'AI 笔记'
     try {
-      const res = await api.post('/docs', { type: 'AI 笔记', title: title.slice(0, 50), content: text, visibility: 'private' })
+      const res = await api.post('/docs', { type: 'AI 笔记', title: title.slice(0, 50), content: text || (msg?.content || ''), visibility: 'private' })
       ElMessage.success('已保存到书房')
       router.push('/edit/' + res.data.id)
     } catch (e) { ElMessage.error(e.response?.data?.error || '保存失败') }
@@ -530,6 +607,14 @@ watch(open, (v) => { if (v) scrollToBottom() })
   background: var(--btn-bg);
   border: 1px solid var(--border);
   border-top-left-radius: 4px;
+}
+/* 流式中的纯文本气泡：避免每帧全量 markdown 渲染卡住 UI（渲染放到流式结束后） */
+.ai-msg-bubble.ai-plain {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
 }
 .ai-reasoning {
   width: 100%;

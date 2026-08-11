@@ -10,7 +10,9 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-const uid = computed(() => Number(route.params.id))
+// 路由参数是对外 key（public_id）；旧数字 id / 用户名链接不再兼容（要新的，不做旧链接解析）
+const resolvedId = ref(null)
+const uid = computed(() => resolvedId.value)
 const isMe = computed(() => auth.isLogin && auth.user?.id === uid.value)
 const profile = ref(null)
 const tab = ref('notes') // notes | favorites | likes | mine
@@ -33,16 +35,13 @@ const loadHeatmap = async () => {
     const res = await api.get('/user/heatmap', { params: { uid: uid.value } })
     const map = {}
     res.data.data.forEach(d => { map[d.date] = d.seconds })
-    // 生成最近 90 天（从 13 周前周一开始，7 列布局）
+    // 生成最近约 90 天的热力图：起点对齐到周日（保证列=周），终点=今天，日期连续顺延到今天
     const cells = []
     const now = new Date()
     const start = new Date(now)
     start.setDate(start.getDate() - 90)
     start.setDate(start.getDate() - start.getDay()) // 对齐到周日
-    for (let i = 0; i < 91; i++) {
-      const d = new Date(start)
-      d.setDate(start.getDate() + i)
-      if (d > now) continue
+    for (let d = new Date(start); d <= now; d.setDate(d.getDate() + 1)) {
       const key = d.toISOString().slice(0, 10)
       cells.push({ date: key, seconds: map[key] || 0 })
     }
@@ -67,6 +66,12 @@ const loadProfile = async () => {
   loading.value = true
   notFound.value = false
   try {
+    if (uid.value == null) {
+      const key = route.params.key
+      if (!key) { notFound.value = true; loading.value = false; return }
+      const kr = await api.get('/users/by-key/' + encodeURIComponent(key))
+      resolvedId.value = kr.data.id
+    }
     const res = await api.get('/users/' + uid.value)
     profile.value = res.data
     editForm.value = { nickname: res.data.nickname || '', bio: res.data.bio || '', interests: res.data.interests || '' }
@@ -128,7 +133,7 @@ const toggleFollow = async () => {
     profile.value.followers_count = res.data.followers_count
   } catch (e) { ElMessage.error(e.response?.data?.error || '操作失败') }
 }
-const openChat = () => { router.push('/messages?with=' + uid.value) }
+const openChat = () => { router.push('/messages?with=' + (profile.value.public_id || uid.value)) }
 const openFollowList = async (kind) => {
   followListOpen.value = kind
   try {
@@ -144,7 +149,7 @@ const toggleFollowUser = async (u) => {
     if (u.id === uid.value) profile.value.is_following = res.data.following
   } catch (e) { ElMessage.error(e.response?.data?.error || '操作失败') }
 }
-const goUser = (id) => { router.push('/user/' + id) }
+const goUser = (u) => { const k = (u && typeof u === 'object') ? (u.public_id || u.id) : u; if (k) router.push('/user/' + k) }
 
 const onAvatarChange = (e) => {
   const file = e.target.files && e.target.files[0]
@@ -253,8 +258,9 @@ const copyId = async () => {
 
 onMounted(loadProfile)
 
-// 同一组件内路由参数变化（user/1 -> user/5）时重新加载，否则页面停留旧用户数据
-watch(() => route.params.id, () => {
+// 同一组件内路由参数变化（user/xxx -> user/yyy）时重新加载，否则页面停留旧用户数据
+watch(() => route.params.key, () => {
+  resolvedId.value = null
   loading.value = true
   heatmap.value = []
   loadProfile()
@@ -335,14 +341,14 @@ watch(() => route.params.id, () => {
       <div v-else-if="tab !== 'feed' && filteredNotes.length === 0" class="center empty">没有匹配「{{ noteQuery }}」的笔记</div>
       <div v-if="tab === 'feed'" class="feed-list">
         <div v-if="lists.feed.length === 0" class="center empty">TA 还没有动态</div>
-        <div v-for="(f, i) in lists.feed" :key="i" class="feed-item" @click="f.doc_id && openNote(f.doc_id)">
+        <div v-for="(f, i) in lists.feed" :key="i" class="feed-item" @click="f.doc_id && openNote(f.doc_public_id || f.doc_id)">
           <span class="feed-ic">{{ feedIcon(f) }}</span>
           <span class="feed-txt">{{ feedText(f) }}</span>
           <span class="feed-time">{{ String(f.ts || '').slice(0, 16) }}</span>
         </div>
       </div>
       <div v-if="tab !== 'feed'" class="note-grid">
-        <div v-for="n in filteredNotes" :key="n.id" class="note-card" @click="openNote(n.id)">
+        <div v-for="n in filteredNotes" :key="n.id" class="note-card" @click="openNote(n.public_id || n.id)">
           <div class="card-top">
             <span class="type-badge">{{ n.type }}</span>
             <span class="vis" v-if="tab === 'mine'">{{ n.visibility === 'public' ? '公开' : '私密' }}</span>
@@ -366,7 +372,7 @@ watch(() => route.params.id, () => {
               <button v-if="profile.following_count > 5" class="as-more" @click="openFollowList('following')">全部 {{ profile.following_count }}</button>
             </div>
             <div v-if="!followingList.length" class="as-empty">还没有关注任何人</div>
-            <div v-for="u in followingList.slice(0, 5)" :key="u.id" class="as-user" @click="goUser(u.id)">
+            <div v-for="u in followingList.slice(0, 5)" :key="u.id" class="as-user" @click="goUser(u)">
               <span class="as-avatar"><img v-if="u.avatar" :src="u.avatar" alt="" /><span v-else>{{ (u.nickname || u.username || '?').slice(0, 1) }}</span></span>
               <span class="as-name">{{ u.nickname || u.username }}</span>
               <span class="as-id">@{{ u.username }}</span>
@@ -378,7 +384,7 @@ watch(() => route.params.id, () => {
               <button v-if="profile.followers_count > 5" class="as-more" @click="openFollowList('followers')">全部 {{ profile.followers_count }}</button>
             </div>
             <div v-if="!followersList.length" class="as-empty">还没有粉丝</div>
-            <div v-for="u in followersList.slice(0, 5)" :key="u.id" class="as-user" @click="goUser(u.id)">
+            <div v-for="u in followersList.slice(0, 5)" :key="u.id" class="as-user" @click="goUser(u)">
               <span class="as-avatar"><img v-if="u.avatar" :src="u.avatar" alt="" /><span v-else>{{ (u.nickname || u.username || '?').slice(0, 1) }}</span></span>
               <span class="as-name">{{ u.nickname || u.username }}</span>
               <span class="as-id">@{{ u.username }}</span>
@@ -396,7 +402,7 @@ watch(() => route.params.id, () => {
           <div class="as-card">
             <div class="as-head"><span class="as-title">📚 TA 的最新公开笔记</span></div>
             <div v-if="!lists.notes.length" class="as-empty">TA 还没有公开笔记</div>
-            <div v-for="n in lists.notes.slice(0, 6)" :key="n.id" class="as-note" @click="openNote(n.id)">
+            <div v-for="n in lists.notes.slice(0, 6)" :key="n.id" class="as-note" @click="openNote(n.public_id || n.id)">
               <span class="as-note-type">{{ n.type }}</span>
               <span class="as-note-title">{{ n.title }}</span>
               <span class="as-note-meta">👍 {{ n.likes_count || 0 }} · 💬 {{ n.comments_count || 0 }}</span>
@@ -429,7 +435,7 @@ watch(() => route.params.id, () => {
         <h3>{{ followListOpen === 'following' ? 'TA 的关注' : 'TA 的粉丝' }}（{{ followList.length }}）</h3>
         <div v-if="!followList.length" class="center empty">这里还空空的</div>
         <div class="fl-scroll">
-          <div v-for="u in followList" :key="u.id" class="fl-row" @click="goUser(u.id)">
+          <div v-for="u in followList" :key="u.id" class="fl-row" @click="goUser(u)">
             <span class="as-avatar"><img v-if="u.avatar" :src="u.avatar" alt="" /><span v-else>{{ (u.nickname || u.username || '?').slice(0, 1) }}</span></span>
             <div class="fl-info">
               <div class="fl-name">{{ u.nickname || u.username }}</div>
@@ -503,7 +509,11 @@ watch(() => route.params.id, () => {
 </template>
 
 <style scoped>
-.profile-page { min-height: 100vh; padding: 92px 24px 60px; box-sizing: border-box; }
+.profile-page { min-height: 100vh; padding: 92px 24px 60px; box-sizing: border-box; overflow-x: hidden; /* 防横向滚动导致弹窗视觉偏移 */ }
+/* 移动端：页面左右边距收窄，与其他页面一致 */
+@media (max-width: 640px) {
+  .profile-page { padding: 84px 14px 50px; }
+}
 .center { text-align: center; color: var(--text2); padding: 80px 0; }
 .profile-wrap {
   max-width: 1060px; margin: 0 auto;
@@ -666,8 +676,8 @@ html[data-theme="starlight"] .profile-bg { opacity: .32; }
 }
 .bio { color: var(--text2); font-size: 14px; margin: 4px 0; }
 .interests { color: var(--text2); font-size: 13px; margin: 4px 0; }
-.stats-row { display: flex; gap: 26px; margin: 16px 0 14px; }
-.stat { display: flex; flex-direction: column; align-items: center; }
+.stats-row { display: flex; flex-wrap: wrap; gap: 20px 28px; margin: 16px 0 14px; }
+.stat { display: flex; flex-direction: row; align-items: baseline; gap: 5px; white-space: nowrap; }
 .stat b { font-size: 17px; color: var(--text1); }
 .stat span { font-size: 12px; color: var(--text2); margin-top: 2px; }
 .edit-btn {
@@ -796,11 +806,24 @@ html[data-theme="starlight"] .profile-bg { opacity: .32; }
   position: fixed; inset: 0; z-index: 200;
   background: var(--overlay-bg);
   display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
 }
 .modal {
+  margin: 0 auto;
   width: 400px; max-width: 92vw;
   background: var(--bg-soft); border: 1px solid var(--border);
   border-radius: 18px; padding: 26px;
+}
+/* 移动端：编辑资料等弹窗收小 */
+@media (max-width: 640px) {
+  .modal {
+    max-width: 86vw;
+    padding: 18px 16px;
+    border-radius: 14px;
+  }
+  .modal h3 { margin-bottom: 12px; }
+  .field { margin-bottom: 10px; }
 }
 .modal h3 { margin: 0 0 16px; color: var(--text1); }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; color: var(--text2); font-size: 13px; }

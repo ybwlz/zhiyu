@@ -142,7 +142,7 @@ const shift = (dir) => {
 const onCard = (i) => {
   if (i === activeIndex.value) {
     const doc = items.value[i]
-    if (doc && doc.slug) router.push(`/docs/${doc.slug}`)
+    if (doc && doc.public_id) router.push(`/docs/${doc.public_id}`)
   } else {
     activeIndex.value = i
     resetAuto()

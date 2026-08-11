@@ -20,6 +20,14 @@ import ImageViewer from '@/components/ImageViewer.vue'
 import DoodleBall from '@/components/DoodleBall.vue'
 import { setupAnnotation, bindAnnotations, bindAnnGlobal } from '@/utils/annotation.js'
 
+// ── 沉浸式阅读：隐藏导航/侧栏，只留正文 ──
+const immersive = ref(false)
+const toggleImmersive = () => {
+  immersive.value = !immersive.value
+  document.body.classList.toggle('immersive', immersive.value)
+}
+onUnmounted(() => { document.body.classList.remove('immersive') })
+
 // ── 正文图片点击放大 ──
 const viewerOpen = ref(false)
 const viewerUrl = ref('')
@@ -89,13 +97,11 @@ const updateWidth = () => {
 // 逻辑:
 // < 960: 移动端 (抽屉 + 弹出框，无侧边栏)
 // >= 960: 桌面端布局 (左侧边栏可见)
-// >= 1400: 显示右侧边栏 (原为 1100，现在更严格以避免遮挡)
+// 960~1399: 显示右侧边栏但默认收起为窄条（平板端初始先缩小）；>= 1400 默认展开（与 PC 一致）
 // < 1280: 使用 "..." 菜单切换主题
 const showLeftSidebar = computed(() => windowWidth.value >= 960)
-const showRightSidebar = computed(() => windowWidth.value >= 1400)
+const showRightSidebar = computed(() => windowWidth.value >= 960)
 const isMobile = computed(() => windowWidth.value < 960)
-// 当右侧边栏隐藏 (但非移动端) 时，需要显示大纲按钮
-const showOutlineButton = computed(() => !showRightSidebar.value && !isMobile.value)
 
 // --- 抽屉与弹出框状态 ---
 const showMenuDrawer = ref(false)
@@ -111,7 +117,8 @@ const auth = useAuthStore()
 const roomIds = ref(new Set())
 const roomLoading = ref(false)
 const sidebarCollapsed = ref(localStorage.getItem('kb_sidebar_collapsed') === '1')    // 手动收起左侧栏（Reasonix 式，带记忆）
-const rightSidebarCollapsed = ref(localStorage.getItem('kb_right_collapsed') === '1')   // 手动收起右侧大纲栏（带记忆）
+// 右侧大纲栏：默认恒展开；不记忆收起状态（避免刷新后残留 48px 窄条"留缝"）
+const rightSidebarCollapsed = ref(false)
 const isMyDoc = (doc) => auth.isLogin && doc.user_id === auth.user?.id
 
 const loadRoom = async () => {
@@ -195,12 +202,12 @@ const editCurrent = () => { if (currentDoc.value) router.push('/edit/' + current
 
 // AI 工具改完笔记后刷新当前阅览室内容
 const onAiChanged = () => {
-  if (currentDoc.value) store.fetchDocBySlug(route.params.slug)
+  if (currentDoc.value) store.fetchDocByKey(route.params.key)
 }
 
 // 全局 AI 助手「去编辑页查看修改」→ 用当前文档 id 跳编辑页（编辑页会自动加载 AI 草稿并弹红绿 diff）
 const onAiGotoCurrentEdit = () => {
-  if (currentDoc.value) router.push('/edit/' + currentDoc.value.id)
+  if (currentDoc.value) router.push('/edit/' + currentDoc.value.id + '?from=docs')
 }
 
 // 全局 AI 助手「局部替换」→ 在原文中定位被替换的块，替换为新块后预填编辑页
@@ -222,7 +229,7 @@ const onAiLocalEdit = (e) => {
       content: newContent, ts: Date.now(), ai: true,
     }))
   } catch (err) {}
-  router.push('/edit/' + doc.id)
+  router.push('/edit/' + doc.id + '?from=docs')
 }
 
 // 全局 AI 助手「说改就改」→ 把 AI 修改内容写入编辑页草稿并跳转编辑页（编辑页左侧源码+右侧预览，可微调再保存）
@@ -236,7 +243,7 @@ const onAiGotoEdit = (e) => {
       content: text, ts: Date.now(), ai: true,
     }))
   } catch (err) {}
-  router.push('/edit/' + doc.id)
+  router.push('/edit/' + doc.id + '?from=docs')
 }
 
 // 全局 AI 助手「应用修改」→ 载入 AI 修改预览（在阅览室预览区先看效果，确认后再保存）
@@ -267,24 +274,25 @@ const applyAiPreview = async () => {
     }))
   } catch (err) {}
   aiPreview.value = null
-  router.push('/edit/' + doc.id)
+  router.push('/edit/' + doc.id + '?from=docs')
 }
 const cancelAiPreview = () => { aiPreview.value = null }
 
 // 全局 AI 助手「打开笔记」→ 阅览室就地打开（不跳笔记广场）；不在本阅览室列表才降级跳广场
 const onAiOpenNote = (e) => {
   const id = e.detail?.id
-  if (!id) return
+  const pubId = e.detail?.public_id
+  if (!id && !pubId) return
   if (currentDoc.value && currentDoc.value.id === id) {
     ElMessage.info('已在这篇笔记中')
     return
   }
-  const doc = flatDocs.value.find(d => d.id === id)
+  const doc = flatDocs.value.find(d => d.id === id) || (pubId ? flatDocs.value.find(d => d.public_id === pubId) : null)
   if (doc) {
     selectDoc(doc)
     ElMessage.success('已在阅览室打开《' + (doc.title || '') + '》')
   } else {
-    router.push('/notes/' + id)
+    router.push('/notes/' + (pubId || id))
   }
 }
 
@@ -300,7 +308,7 @@ const onAiInsert = async (e) => {
       content: (doc.content || '') + '\n\n' + text, ts: Date.now(), ai: true,
     }))
   } catch (err) {}
-  router.push('/edit/' + doc.id)
+  router.push('/edit/' + doc.id + '?from=docs')
 }
 
 // 侧栏收起
@@ -323,10 +331,21 @@ onMounted(() => {
   bindAnnGlobal({ onDel: onDelAnn })
 
   
-  store.fetchDocs()
+  const docsP = store.fetchDocs()
   loadRoom()
-  const slug = route.params.slug
-  if (slug) store.fetchDocBySlug(slug)
+  const key = route.params.key
+  if (key) {
+    store.fetchDocByKey(key)
+  } else {
+    // 无 key（顶部导航进 /docs）：等列表加载后自动跳到第一篇，让 URL 带正确 key（AI 据此感知当前笔记）
+    docsP.then(() => {
+      if (!route.params.key) {
+        const docs = store.getData() || []
+        const first = docs[0]
+        if (first && first.public_id) router.replace('/docs/' + first.public_id)
+      }
+    })
+  }
 })
 
 onUnmounted(() => {
@@ -343,10 +362,17 @@ onUnmounted(() => {
   window.removeEventListener('contextmenu', closeCtxMenuGlobal)
 })
 
-watch(() => route.params.slug, (slug) => {
-  if (slug) store.fetchDocBySlug(slug)
+// 切换笔记：先显示加载态（不显示旧内容），新内容就绪后再滚到顶部，避免“先跳顶+旧文字”的闪烁
+const docLoading = ref(false)
+watch(() => route.params.key, async (key) => {
+  if (!key) return
   showMenuDrawer.value = false // 导航时关闭抽屉
-  // 滚动到顶部
+  docLoading.value = true
+  try {
+    await store.fetchDocByKey(key)
+  } catch (e) { /* 忽略 */ }
+  docLoading.value = false
+  await nextTick()
   window.scrollTo({ top: 0, behavior: 'instant' })
 })
 
@@ -463,7 +489,7 @@ const toggleGroup = (t) => {
 }
 
 const selectDoc = (doc) => {
-  router.push(`/docs/${doc.slug}`)
+  router.push(`/docs/${doc.public_id}`)
 }
 
 const goHome = () => router.push('/')
@@ -893,6 +919,10 @@ const activeId = ref('')
 const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
+// 一键回到顶部 / 到底部（与笔记阅读页同款）
+const jumpTo = (pos) => {
+  window.scrollTo({ top: pos === 'top' ? 0 : document.documentElement.scrollHeight, behavior: 'smooth' })
+}
 
 const scrollToHeading = (id) => {
   const el = document.getElementById(id)
@@ -934,8 +964,8 @@ const onScroll = () => {
 // --- 上一篇 / 下一篇 逻辑 ---
 const flatDocs = computed(() => grouped.value.flatMap(g => g.items))
 const currentIndex = computed(() => {
-  if (!route.params.slug) return -1
-  return flatDocs.value.findIndex(d => d.slug === route.params.slug)
+  if (!route.params.key) return -1
+  return flatDocs.value.findIndex(d => d.public_id === route.params.key)
 })
 const prevDoc = computed(() => {
   const idx = currentIndex.value
@@ -951,62 +981,56 @@ const nextDoc = computed(() => {
 </script>
 
 <template>
-  <div class="docs-layout">
+  <div class="docs-layout" :class="{ immersive }">
+    <!-- 一键回到顶部 / 到底部（与笔记阅读页同款，仅沉浸式阅读显示） -->
+    <div class="scroll-jump" v-if="immersive">
+      <button class="sj-btn" data-tip="回到顶部" data-tip-align="left" @click="jumpTo('top')">↑</button>
+      <button class="sj-btn" data-tip="到底部" data-tip-align="left" @click="jumpTo('bottom')">↓</button>
+    </div>
     
-    <!-- 移动端头部 (第一行: 标题 + 首页 + 菜单) -->
-    <!-- 仅在左侧边栏隐藏时显示 (移动端) -->
-    <header v-if="!showLeftSidebar" class="mobile-header-top">
-      <div class="mobile-header-inner">
-         <span class="site-title" @click="goHome">知屿</span>
-         <div class="mobile-actions">
-            <router-link to="/" class="nav-link-text">Home</router-link>
-         </div>
-      </div>
-    </header>
-
-    <!-- 移动端子头部 (第二行: 菜单 + 大纲) -->
+    <!-- 移动端顶部刘海条（Menu + 大纲）：fixed 固定在全局导航栏下方（= 卡片顶部），不随内容滚动、不盖导航栏 -->
     <div v-if="!showLeftSidebar" class="mobile-header-sub">
-       <div class="sub-inner">
-          <button class="icon-btn" @click="showMenuDrawer = true">
-            <el-icon><IconMenu /></el-icon>
-            <span class="btn-text">Menu</span>
-          </button>
-          
-          <el-popover
-            trigger="click"
-            placement="bottom-end"
-            :width="isMobile ? '92vw' : '400px'"
-            popper-class="outline-popover"
-            :teleported="true"
-            :append-to-body="true"
-          >
-            <template #reference>
-              <button class="icon-btn">
-                <span class="btn-text">大纲</span>
-                <el-icon><ArrowDown /></el-icon>
-              </button>
-            </template>
-            <div class="popover-outline">
-              <div class="outline-item return-top" @click="scrollToTop">Return to top</div>
-              <div 
-                v-for="h in outline" :key="h.id"
-                class="outline-item"
-                :class="{ 'indent-2': h.level === 2, 'indent-3': h.level === 3, 'active': activeId === h.id }"
-                @click="scrollToHeading(h.id)"
-              >
-                {{ h.title }}
-              </div>
+      <div class="sub-inner">
+        <button class="icon-btn" @click="showMenuDrawer = true">
+          <el-icon><IconMenu /></el-icon>
+          <span class="btn-text">Menu</span>
+        </button>
+        <el-popover
+          ref="outlinePopperRefMobile"
+          trigger="click"
+          placement="bottom-end"
+          :width="isMobile ? '92vw' : '400px'"
+          popper-class="outline-popover"
+          :teleported="true"
+          :append-to-body="true"
+          @show="fixOutlinePopper"
+        >
+          <template #reference>
+            <button class="icon-btn">
+              <span class="btn-text">大纲</span>
+              <el-icon><ArrowDown /></el-icon>
+            </button>
+          </template>
+          <div class="popover-outline">
+            <div
+              v-for="h in outline" :key="h.id"
+              class="outline-item"
+              :class="{ 'indent-2': h.level === 2, 'indent-3': h.level === 3, 'active': activeId === h.id }"
+              @click="scrollToHeading(h.id)"
+            >
+              {{ h.title }}
             </div>
-          </el-popover>
-       </div>
+          </div>
+        </el-popover>
+      </div>
     </div>
 
     <!-- 主布局容器 -->
     <div class="main-wrapper" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'right-collapsed': rightSidebarCollapsed }">
       
-      <!-- 左侧边栏 (桌面/平板)：收起时保留窄条（VSCode 式） -->
+      <!-- 左侧边栏 (桌面/平板)：收起时保留窄条（与右侧栏同构） -->
       <aside v-if="showLeftSidebar" class="left-sidebar" :class="{ collapsed: sidebarCollapsed }">
-        <div v-if="!sidebarCollapsed" class="left-sidebar-inner">
+        <div class="left-sidebar-inner" :class="{ 'is-collapsed': sidebarCollapsed }">
           <div class="sidebar-header">
              <span class="site-title" @click="goHome">知屿 <em class="room-tag">阅览室</em></span>
              <span class="group-ctrl">
@@ -1028,7 +1052,7 @@ const nextDoc = computed(() => {
                   v-for="item in g.items" 
                   :key="item.id"
                   class="doc-link"
-                  :class="{ active: route.params.slug === item.slug }"
+                  :class="{ active: route.params.key === item.public_id }"
                   @click="selectDoc(item)"
                   @contextmenu.prevent="openCtxMenu($event, item)"
                 >
@@ -1041,9 +1065,9 @@ const nextDoc = computed(() => {
             </div>
           </div>
         </div>
-        <button v-else class="sb-rail" data-tip="展开侧栏" data-tip-align="left" @click="toggleSidebar">
+        <button v-if="sidebarCollapsed" class="sb-rail" data-tip="展开侧栏" data-tip-align="left" @click="toggleSidebar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><line x1="10.2" y1="4" x2="10.2" y2="20"/></svg>
-          <span class="sb-rail-text">目录</span>
+          <span class="sb-rail-text">导航</span>
         </button>
       </aside>
 
@@ -1053,35 +1077,9 @@ const nextDoc = computed(() => {
         <main class="doc-main">
           <div class="doc-container">
             <article class="doc-card">
-              <!-- 右上角大纲浮钮（当右侧大纲栏隐藏时） -->
-              <el-popover
-                v-if="showOutlineButton"
-                trigger="click"
-                placement="bottom-end"
-                :width="300"
-                popper-class="outline-popover"
-                :teleported="true"
-              >
-                <template #reference>
-                  <button class="outline-fab" aria-label="Table of Contents">
-                    <el-icon><Operation /></el-icon>
-                    <span>大纲</span>
-                  </button>
-                </template>
-                <div class="popover-outline">
-                  <div class="outline-item return-top" @click="scrollToTop">Return to top</div>
-                  <div
-                    v-for="h in outline" :key="h.id"
-                    class="outline-item"
-                    :class="{ 'indent-2': h.level === 2, 'indent-3': h.level === 3, 'active': activeId === h.id }"
-                    @click="scrollToHeading(h.id)"
-                  >
-                    {{ h.title }}
-                  </div>
-                </div>
-              </el-popover>
-              <div class="doc-tools" v-if="currentDoc && (isMyDoc(currentDoc) || auth.user?.role === 'admin')">
-                <button class="tool-btn" @click="editCurrent">✏️ 编辑此页</button>
+              <div class="doc-tools" v-if="currentDoc">
+                <button v-if="isMyDoc(currentDoc) || auth.user?.role === 'admin'" class="tool-btn" @click="editCurrent">✏️ 编辑此页</button>
+                <button class="immersive-btn" :class="{ on: immersive }" @click="toggleImmersive" data-tip="沉浸">⛶</button>
               </div>
               <div v-if="aiPreview" class="ai-preview-bar">
                 <div class="ai-preview-info">
@@ -1093,10 +1091,12 @@ const nextDoc = computed(() => {
                   <button class="ai-pv-apply" type="button" @click="applyAiPreview">✓ 应用修改</button>
                 </div>
               </div>
-              <div class="markdown-body" v-html="rendered" @click="onContentClick"></div>
+              <div v-if="docLoading" class="doc-loading">加载中…</div>
+              <div v-else class="markdown-body" v-html="rendered" @click="onContentClick"></div>
               <ImageViewer :visible="viewerOpen" :url="viewerUrl" @close="viewerOpen = false" />
               <DoodleBall v-if="currentDoc" target=".doc-card" :doc-id="currentDoc.id" :is-mine="isMyDoc(currentDoc)" />
-              <div class="doc-footer">
+              <!-- 上一篇/下一篇：等正文加载完成（docLoading=false 且 currentDoc 就绪）才显示，加载中只显示「加载中…」与 notes 页一致 -->
+              <div v-if="currentDoc && !docLoading" class="doc-footer">
                 <div class="prev-next-nav">
                     <a v-if="prevDoc" class="pager-link prev" href="#" @click.prevent="selectDoc(prevDoc)">
                       <span class="desc">Previous page</span>
@@ -1115,7 +1115,7 @@ const nextDoc = computed(() => {
 
       <!-- 右侧边栏 (如果 >= 1400 则可见)：收起时保留窄条 -->
       <aside v-if="showRightSidebar" class="right-sidebar" :class="{ collapsed: rightSidebarCollapsed }">
-        <div v-if="!rightSidebarCollapsed" class="right-sidebar-inner">
+        <div class="right-sidebar-inner" :class="{ 'is-collapsed': rightSidebarCollapsed }">
           <div class="outline-content">
             <div class="outline-head">
               <button class="rs-collapse-btn" data-tip="收起大纲" data-tip-align="left" @click="toggleRightSidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><line x1="13.8" y1="4" x2="13.8" y2="20"/></svg></button>
@@ -1133,7 +1133,7 @@ const nextDoc = computed(() => {
             </div>
           </div>
         </div>
-        <button v-else class="sb-rail" data-tip="展开大纲" data-tip-align="right" @click="toggleRightSidebar">
+        <button v-if="rightSidebarCollapsed" class="sb-rail" data-tip="展开大纲" data-tip-align="right" @click="toggleRightSidebar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><line x1="13.8" y1="4" x2="13.8" y2="20"/></svg>
           <span class="sb-rail-text">大纲</span>
         </button>
@@ -1162,7 +1162,7 @@ const nextDoc = computed(() => {
                 v-for="item in g.items" 
                 :key="item.id"
                 class="doc-link"
-                :class="{ active: route.params.slug === item.slug }"
+                :class="{ active: route.params.key === item.public_id }"
                 @click="selectDoc(item)"
               >
                 <span v-html="highlightTitle(item.title)"></span>
@@ -1213,54 +1213,57 @@ const nextDoc = computed(() => {
   color: var(--c-text-1);
 }
 
-/* --- Mobile Headers --- */
-.mobile-header-top {
-  height: 56px;
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-bg);
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-.mobile-header-inner {
-  max-width: var(--layout-max);
-  margin: 0 auto;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-}
-.mobile-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+/* 移动端顶部：Menu/大纲 两个小浮空按钮（无背景，不占横幅），fixed 在全局导航栏下方 */
 .mobile-header-sub {
-  height: 48px;
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-bg);
-  position: sticky;
-  top: 56px;
-  z-index: 19;
+  position: fixed; top: 60px; left: 0; right: 0;
+  z-index: 90;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 .sub-inner {
-  max-width: var(--layout-max);
-  margin: 0 auto;
-  height: 100%;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
 }
+
+/* 一键回到顶部 / 到底部（与笔记阅读页同款） */
+.scroll-jump {
+  position: fixed; right: 18px; bottom: 96px; z-index: 300;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sj-btn {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--bg-soft);
+  color: var(--text2); font-size: 16px; cursor: pointer;
+  box-shadow: var(--shadow-1); transition: all .2s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sj-btn:hover { color: var(--brand-1); border-color: color-mix(in srgb, var(--brand-1) 45%, transparent); transform: scale(1.06); }
+
+/* 沉浸式阅读：隐藏左侧列表/右侧大纲/编辑按钮，正文单列居中放大 */
+.docs-layout.immersive .left-sidebar,
+.docs-layout.immersive .right-sidebar { display: none; }
+.docs-layout.immersive .doc-tools .tool-btn { display: none; }
+.docs-layout.immersive .main-wrapper {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'main';
+}
+.docs-layout.immersive .doc-container { max-width: 1280px; }
 
 /* --- Desktop Layout --- */
 .main-wrapper {
   display: grid;
   width: 100%;
-  /* VSCode 式三栏：左/右侧栏宽度由内容决定（可动画收缩），中间内容区自适应 */
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  /* 固定三栏宽度（可动画）：收起时列宽由 grid-template-columns 过渡平滑伸缩。
+     不要用 auto 轨道——auto 轨道跟随内容尺寸，内容 v-if 切换时宽度会瞬时跳变，
+     且对侧栏自身的 width transition 无效（实测不产生动画）。 */
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
   grid-template-areas: 'left main right';
+  transition: grid-template-columns .3s ease;
   position: relative;
   /* Removed overflow-x: hidden to prevent breaking sticky positioning if container height is constrained */
 }
@@ -1268,8 +1271,7 @@ const nextDoc = computed(() => {
 /* Left Sidebar */
 .left-sidebar {
   grid-area: left;
-  /* Default: Dynamic Spacer Mode (Wide Screen) */
-  flex: 1; 
+  width: 100%; /* 填满轨道；轨道负责收起/展开的宽度动画 */
   min-width: 0;
   background: var(--c-sidebar-bg);
   display: flex;
@@ -1277,18 +1279,27 @@ const nextDoc = computed(() => {
   align-items: flex-end; /* Stick content to the right (next to doc) */
   border-right: 1px solid transparent; 
   /* Ensure it stretches to full height of parent so sticky child can move within it */
-  align-self: stretch; 
+  align-self: stretch;
+  position: relative; /* 供收起后的窄条按钮绝对定位覆盖 */
 }
 
 .left-sidebar-inner {
-  width: 262px;
-  min-width: 262px;
-  height: calc(100vh - 60px); /* 避开全局导航 */
+  width: 100%;
+  min-width: 0; /* 不强制撑宽：展开/收起宽度过渡由 grid 轨道驱动，内容被自身裁切 */
+  height: calc(100vh - 60px);
   position: sticky;
-  top: 60px; /* 全局导航下方，让侧栏往左上靠 */
+  top: 60px; /* 全局导航下方 */
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden; /* 收起过渡期间裁切横向溢出的内容，避免文字跑出窄条 */
+}
+/* 收起态：内容隐藏，保留 DOM（避免 v-if 重建导致 sticky 重排/闪烁）。
+   不用 opacity/transform 过渡——实测会让 grid 宽度动画的启动晚 1~2 帧（点击停顿感），
+   与书房一致：内容显隐交给宽度裁切，点击立即响应。 */
+.left-sidebar-inner.is-collapsed {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 品牌区：与顶部有明显留白，去掉硬分隔线，靠留白分区 */
@@ -1296,6 +1307,8 @@ const nextDoc = computed(() => {
 .gc-btn {
   width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
   border: none; background: transparent;
+  outline: none; /* 点击获焦时不显默认蓝框 */
+  -webkit-tap-highlight-color: transparent; /* 平板触屏点击不闪浏览器默认高亮 */
   color: var(--text2); font-size: 12px; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
   transition: all .15s;
@@ -1308,6 +1321,7 @@ const nextDoc = computed(() => {
   justify-content: space-between;
   padding: 18px 22px 22px;
   margin-bottom: 6px;
+  overflow: hidden; /* 窄轨道动画期间裁切换行/溢出内容，固定头部高度，避免卡片上下跳变 */
 }
 .site-title {
   font-weight: 700;
@@ -1318,6 +1332,7 @@ const nextDoc = computed(() => {
   gap: 8px;
   cursor: pointer;
   color: var(--c-text-1);
+  white-space: nowrap; /* 标题不换行：窄轨道下保持单行，高度恒定 */
 }
 .site-title::before {
   content: '✦';
@@ -1346,11 +1361,12 @@ const nextDoc = computed(() => {
   position: relative; /* 供收起恢复按钮贴边缘定位 */
 }
 
-/* 侧栏收起：宽度 280 → 48 动画（grid 列为 auto，跟随宽度平滑伸缩），另一侧栏不动 */
-.main-wrapper.sidebar-collapsed .left-sidebar { width: 48px; }
-.main-wrapper.right-collapsed .right-sidebar { width: 48px; }
-.left-sidebar { width: 280px; transition: width .3s ease; }
-.right-sidebar { width: 280px; transition: width .3s ease; }
+/* 侧栏收起：左/右栏保留 48px 窄条；列宽由 grid-template-columns 过渡平滑伸缩。
+   不用 width 动画驱动轨道——grid auto 轨道跟随内容尺寸，内容 v-if 切换时宽度瞬时跳变，
+   对侧栏自身 width 的 transition 无效（实测不产生动画）。 */
+.main-wrapper.sidebar-collapsed { grid-template-columns: 48px minmax(0, 1fr) 280px; }
+.main-wrapper.right-collapsed { grid-template-columns: 280px minmax(0, 1fr) 48px; }
+.main-wrapper.sidebar-collapsed.right-collapsed { grid-template-columns: 48px minmax(0, 1fr) 48px; }
 /* 窄条样式：VSCode 活动栏式——透明底、无边框，融入页面背景 */
 .left-sidebar.collapsed,
 .right-sidebar.collapsed {
@@ -1368,8 +1384,12 @@ const nextDoc = computed(() => {
   border-right: none;
 }
 .sb-rail {
+  position: absolute; /* 覆盖在常驻的 inner 之上：不参与 flex 排列（否则会被挤到内容下方视口外） */
+  inset: 0;
   width: 100%; height: 100%;
   border: none; background: transparent; cursor: pointer;
+  outline: none; /* 点击获焦时不显默认蓝框 */
+  -webkit-tap-highlight-color: transparent; /* 平板触屏点击不闪浏览器默认高亮 */
   display: flex; flex-direction: column; align-items: center;
   justify-content: flex-start; /* 靠上 */
   padding-top: 18px;
@@ -1422,23 +1442,29 @@ const nextDoc = computed(() => {
 /* Right Sidebar */
 .right-sidebar {
   grid-area: right;
-  flex: 1; /* Dynamic Spacer */
+  width: 100%; /* 填满轨道；轨道负责收起/展开的宽度动画 */
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start; /* Align content to left (next to doc) */
   align-self: stretch; 
+  position: relative; /* 供收起后的窄条按钮绝对定位覆盖 */
 }
 
 .right-sidebar-inner {
   width: 100%; /* Fill available space */
-  min-width: 260px;
+  min-width: 0; /* 不强制撑宽：展开/收起宽度过渡由 grid 轨道驱动，内容被自身裁切 */
   height: calc(100vh - 60px); 
   position: sticky;
   top: 60px; /* 与左侧导航栏同高对齐 */
   padding: 20px 0 24px; 
   overflow-y: auto;
   overflow-x: hidden;
+}
+/* 收起态：内容隐藏，保留 DOM。同左栏——不用 opacity/transform 过渡，避免 grid 动画启动延迟 */
+.right-sidebar-inner.is-collapsed {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 大纲标题行：收缩按钮在"大纲"文字左边，垂直居中 */
@@ -1447,10 +1473,13 @@ const nextDoc = computed(() => {
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
+  overflow: hidden; /* 窄轨道动画期间裁切溢出内容，固定头部高度，避免卡片上下跳变 */
 }
 .rs-collapse-btn {
   width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; cursor: pointer;
   border: none; background: transparent; color: var(--text2);
+  outline: none; /* 点击获焦时不显默认蓝框 */
+  -webkit-tap-highlight-color: transparent; /* 平板触屏点击不闪浏览器默认高亮 */
   display: inline-flex; align-items: center; justify-content: center;
   transition: background .15s, color .15s;
 }
@@ -1491,19 +1520,26 @@ const nextDoc = computed(() => {
 */
 @media (max-width: 1400px) {
   .main-wrapper {
-    grid-template-columns: 270px minmax(0, 1fr);
-    grid-template-areas: 'left main';
+    grid-template-columns: 270px minmax(0, 1fr) 260px;
+    grid-template-areas: 'left main right';
   }
   .main-wrapper.sidebar-collapsed {
-    grid-template-columns: 48px minmax(0, 1fr);
-    grid-template-areas: 'left main';
+    grid-template-columns: 48px minmax(0, 1fr) 260px;
+    grid-template-areas: 'left main right';
+  }
+  .main-wrapper.right-collapsed {
+    grid-template-columns: 270px minmax(0, 1fr) 48px;
+    grid-template-areas: 'left main right';
+  }
+  .main-wrapper.sidebar-collapsed.right-collapsed {
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
+    grid-template-areas: 'left main right';
   }
   
   .left-sidebar {
     /* 切换到固定宽度 */
     grid-area: left;
-    flex: 0 0 270px;
-    width: 270px;
+    width: 100%; /* 填满轨道（轨道在收起时平滑收缩到 48px） */
     align-items: stretch; /* 填充宽度 */
   }
   
@@ -1511,17 +1547,19 @@ const nextDoc = computed(() => {
     width: 100%;
     min-width: 0;
   }
+
+  .right-sidebar {
+    width: 100%;
+  }
   
   .content-wrapper {
     /* 切换到流式宽度 */
     grid-area: main;
     flex: 1;
-    width: auto;
+    width: 100%; /* 填满中间轨道：轨道 < 1000px 时正文随轨道宽度，不向两侧栏溢出 */
     max-width: 1000px; /* 可选的最大宽度以提高可读性 */
+    margin-inline: auto; /* 中间列在轨道内居中（收起后轨道 > 1000px 时正文保持居中，不再靠左） */
   }
-  
-  /* 右侧边栏在这里可能被 JS 隐藏，但如果没有，它会挤压内容。 
-     JS 应确保在 ~1400px 以下 showRightSidebar 为 false。 */
 }
 
 /* 移动端调整由 showLeftSidebar 逻辑 (< 960px) 处理 */
@@ -1648,6 +1686,7 @@ const nextDoc = computed(() => {
   font-weight: 600;
   margin-bottom: 0;
   font-size: 14px;
+  white-space: nowrap; /* 标题不换行：窄轨道下保持单行，高度恒定 */
 }
 .outline-list {
   position: relative;
@@ -1836,6 +1875,17 @@ const nextDoc = computed(() => {
   max-height: 60vh;
   overflow-y: auto;
 }
+/* 大纲浮层：跟随站内主题（暗色/浅色都统一，不再纯白） */
+.outline-popover {
+  --el-popover-bg-color: var(--bg-soft) !important;
+  --el-popover-border-color: var(--border) !important;
+  --el-text-color-primary: var(--text1) !important;
+  background: var(--bg-soft) !important;
+  border-color: var(--border) !important;
+  color: var(--text1) !important;
+  box-shadow: var(--shadow-1) !important;
+  border-radius: 12px !important;
+}
 .outline-item {
   padding: 8px 16px;
   cursor: pointer;
@@ -1845,11 +1895,6 @@ const nextDoc = computed(() => {
 .outline-item:hover, .outline-item.active {
   color: var(--c-brand);
   background: var(--c-bg-soft);
-}
-.outline-item.return-top {
-  border-bottom: 1px solid var(--c-border);
-  margin-bottom: 4px;
-  font-weight: 500;
 }
 .outline-item.indent-3 {
   padding-left: 32px;
@@ -1877,9 +1922,16 @@ const nextDoc = computed(() => {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'main';
   }
-  .doc-container {
-    padding: 24px 24px;
+  /* 移动端：正文铺满屏幕，去掉卡片围边；卡片顶部圆角与刘海条匹配消除缝隙（!important 防止被后面普通规则覆盖） */
+  .doc-container { padding: 0 !important; }
+  .doc-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 16px 16px 0 0 !important; /* 顶部圆角与刘海条一致，左右两边缘无缝 */
+    padding: 20px 18px 44px !important;
   }
+  .doc-card::before { display: none !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1892,13 +1944,9 @@ const nextDoc = computed(() => {
   background: transparent;
   min-height: 100vh;
 }
-
-/* 移动端头部：避开全局导航，毛玻璃化 */
-.mobile-header-top {
-  top: 60px;
-  background: color-mix(in srgb, var(--c-bg) 78%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+/* 移动端：顶部浮空按钮（约 40px）占位，内容从导航栏 + 按钮下方开始 */
+@media (max-width: 959px) {
+  .docs-layout { padding-top: 100px; }
 }
 
 /* 左侧栏：融入背景，目录玻璃卡片化 */
@@ -1913,6 +1961,8 @@ const nextDoc = computed(() => {
 .gc-btn {
   width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
   border: none; background: transparent;
+  outline: none; /* 点击获焦时不显默认蓝框 */
+  -webkit-tap-highlight-color: transparent; /* 平板触屏点击不闪浏览器默认高亮 */
   color: var(--text2); font-size: 12px; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
   transition: all .15s;
@@ -1944,6 +1994,12 @@ const nextDoc = computed(() => {
 
 /* 文档卡片：更大圆角 + 柔和阴影 + 半透明玻璃（保证正文在全局背景上可读）
    内边距加宽：把标题锚点 # 也包进卡片内 */
+.doc-loading {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--text2);
+  font-size: 14px;
+}
 .doc-card {
   position: relative;
   border-radius: 20px;
@@ -1978,40 +2034,11 @@ const nextDoc = computed(() => {
   z-index: 1;
 }
 
-/* 右上角大纲浮钮：毛玻璃小胶囊，悬浮在卡片右上角 */
-.outline-fab {
-  position: absolute;
-  top: 16px;
-  right: 20px;
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 13px;
-  border-radius: 999px;
-  border: 1px solid var(--c-border);
-  background: color-mix(in srgb, var(--c-bg) 55%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: var(--c-text-2);
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: all .25s;
-}
-.outline-fab:hover {
-  color: var(--brand-1);
-  border-color: color-mix(in srgb, var(--brand-1) 45%, transparent);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--brand-1) 20%, transparent);
-}
 /* 锚点 # 相对标题定位，让锚点落在卡片内侧 */
 :deep(.markdown-body h1),
 :deep(.markdown-body h2),
 :deep(.markdown-body h3) {
   position: relative;
-}
-/* 文档大标题（h1）右侧留出大纲按钮空间，避免遮挡 */
-:deep(.markdown-body h1) {
-  padding-right: 96px;
 }
 
 /* ═══ 阅览室 ═══ */
@@ -2031,7 +2058,7 @@ const nextDoc = computed(() => {
 .dl-room { font-size: 10px; margin-left: 4px; }
 .sidebar-restore { display: none; }
 .sidebar-restore svg { display: none; }
-.doc-tools { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.doc-tools { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 14px; }
 .tool-btn { padding: 7px 16px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--brand-1) 45%, transparent); background: color-mix(in srgb, var(--brand-1) 8%, transparent); color: var(--brand-1); font-size: 12.5px; cursor: pointer; transition: all .2s; }
 .tool-btn:hover { background: linear-gradient(120deg, var(--brand-1), var(--brand-2)); color: #fff; border-color: transparent; }
 
@@ -2070,4 +2097,32 @@ const nextDoc = computed(() => {
 .add-btn.in { color: var(--text2); border-color: var(--border); background: var(--btn-bg); }
 /* ═══ 阅览室 END ═══ */
 .from-square { font-size: 10px; color: var(--brand-1); background: color-mix(in srgb, var(--brand-1) 12%, transparent); border: 1px solid color-mix(in srgb, var(--brand-1) 30%, transparent); padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle; white-space: nowrap; }
+</style>
+
+<style>
+/* 代码块：主题感知的半透明背景（浅色=浅灰，深色/星空=半透明深色），文字跟随主题色 */
+.doc-card .markdown-body pre {
+  background: color-mix(in srgb, var(--bg-soft) 80%, transparent) !important;
+  color: var(--text1) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  overflow-x: auto !important;
+}
+.doc-card .markdown-body pre code {
+  background: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+}
+/* 代码高亮配色：跟随主题变量（星空/深色=亮色系，浅色=鲜艳深色系），覆盖 hljs 默认暗淡配色 */
+.doc-card .markdown-body .hljs-keyword, .doc-card .markdown-body .hljs-literal, .doc-card .markdown-body .hljs-selector-tag { color: var(--code-kw) !important; }
+.doc-card .markdown-body .hljs-string, .doc-card .markdown-body .hljs-regexp, .doc-card .markdown-body .hljs-addition { color: var(--code-str) !important; }
+.doc-card .markdown-body .hljs-number, .doc-card .markdown-body .hljs-symbol { color: var(--code-num) !important; }
+.doc-card .markdown-body .hljs-comment, .doc-card .markdown-body .hljs-quote { color: var(--code-com) !important; font-style: italic; }
+.doc-card .markdown-body .hljs-title, .doc-card .markdown-body .hljs-section, .doc-card .markdown-body .hljs-function .hljs-title, .doc-card .markdown-body .hljs-class .hljs-title { color: var(--code-tit) !important; }
+.doc-card .markdown-body .hljs-type, .doc-card .markdown-body .hljs-built_in { color: var(--code-typ) !important; }
+.doc-card .markdown-body .hljs-attr, .doc-card .markdown-body .hljs-attribute, .doc-card .markdown-body .hljs-selector-attr { color: var(--code-attr) !important; }
+.doc-card .markdown-body .hljs-meta { color: var(--code-meta) !important; }
+.doc-card .markdown-body .hljs-variable, .doc-card .markdown-body .hljs-template-variable { color: var(--code-typ) !important; }
+.doc-card .markdown-body .hljs-deletion { color: var(--code-kw) !important; }
 </style>

@@ -91,6 +91,7 @@ def init_db():
                 type VARCHAR(100) NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 slug VARCHAR(255) NOT NULL UNIQUE,
+                public_id VARCHAR(16),
                 content LONGTEXT NOT NULL,
                 downloadable TINYINT NOT NULL DEFAULT 1,
                 price INT NOT NULL DEFAULT 0,
@@ -105,6 +106,14 @@ def init_db():
             cur.execute("ALTER TABLE docs ADD COLUMN slug VARCHAR(255) NOT NULL UNIQUE")
         except Exception:
             pass
+        try:
+            cur.execute("ALTER TABLE docs ADD COLUMN public_id VARCHAR(16) NULL")
+        except Exception:
+            pass
+        try:
+            cur.execute("CREATE UNIQUE INDEX uq_docs_public_id ON docs(public_id)")
+        except Exception:
+            pass
         # 用户表
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -113,14 +122,23 @@ def init_db():
                 password_hash VARCHAR(255) NOT NULL,
                 role VARCHAR(16) NOT NULL DEFAULT 'user',
                 nickname VARCHAR(64),
+                public_id VARCHAR(16),
                 email VARCHAR(128),
                 email_verified TINYINT NOT NULL DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
         try:
+            cur.execute("ALTER TABLE users ADD COLUMN public_id VARCHAR(16) NULL")
+        except Exception:
+            pass
+        try:
             cur.execute("ALTER TABLE users ADD COLUMN email VARCHAR(128)")
             cur.execute("ALTER TABLE users ADD COLUMN email_verified TINYINT NOT NULL DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            cur.execute("CREATE UNIQUE INDEX uq_users_public_id ON users(public_id)")
         except Exception:
             pass
         try:
@@ -330,6 +348,23 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             KEY idx_user (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS ai_chat_logs (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            user_id BIGINT,
+            page VARCHAR(32) DEFAULT '',
+            note_id BIGINT,
+            question TEXT,
+            system_prompt MEDIUMTEXT,
+            answer MEDIUMTEXT,
+            reasoning MEDIUMTEXT,
+            tool_names VARCHAR(255) DEFAULT '',
+            changed TINYINT(1) DEFAULT 0,
+            err VARCHAR(500) DEFAULT '',
+            delta_count INT DEFAULT 0,
+            elapsed_ms INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_ai_logs_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
         cur.execute("""CREATE TABLE IF NOT EXISTS notifications (
             id BIGINT PRIMARY KEY AUTO_INCREMENT,
             user_id BIGINT NOT NULL,
@@ -379,8 +414,29 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             KEY idx_user (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
+    # 为已有文档回填 public_id（对外 URL 用不可猜测的随机短串，不暴露数字 id 或明文 slug）
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM docs WHERE public_id IS NULL")
+            for row in cur.fetchall():
+                cur.execute("UPDATE docs SET public_id=%s WHERE id=%s", (gen_public_id(), row['id']))
+    except Exception:
+        pass
+    # 为已有用户回填 public_id（/user/{public_id} 对外 URL，不暴露数字 id）
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE public_id IS NULL")
+            for row in cur.fetchall():
+                cur.execute("UPDATE users SET public_id=%s WHERE id=%s", (gen_public_id(), row['id']))
+    except Exception:
+        pass
     conn.commit()
     conn.close()
+
+def gen_public_id():
+    """生成对外展示用的不可猜测短 ID（去掉易混淆字符 O/0/I/l/1）。"""
+    alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+    return ''.join(secrets.choice(alphabet) for _ in range(10))
 
 def make_slug(text: str) -> str:
     s = text.strip().lower()
@@ -482,7 +538,7 @@ def get_current_user():
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT u.id, u.username, u.role, u.nickname, u.email, u.avatar, u.cover, u.likes_public, u.favorites_public
+            cur.execute("""SELECT u.id, u.username, u.role, u.nickname, u.email, u.avatar, u.cover, u.public_id, u.likes_public, u.favorites_public
                 FROM tokens t JOIN users u ON u.id = t.user_id
                 WHERE t.token=%s""", (token,))
             row = cur.fetchone()
@@ -597,8 +653,8 @@ def auth_register():
                 if cur.fetchone()['cnt'] > 0:
                     final_user = f'{username[:32]}_{secrets.token_hex(3)}'
             cur.execute(
-                "INSERT INTO users (username, password_hash, role, nickname, email, email_verified) VALUES (%s, %s, %s, %s, %s, 1)",
-                (final_user, generate_password_hash(password), role, nickname or None, email)
+                "INSERT INTO users (username, password_hash, role, nickname, email, email_verified, public_id) VALUES (%s, %s, %s, %s, %s, 1, %s)",
+                (final_user, generate_password_hash(password), role, nickname or None, email, gen_public_id())
             )
             new_id = cur.lastrowid
             # AI 官方账号自动关注新用户
@@ -621,7 +677,7 @@ def auth_login():
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, username, password_hash, role, nickname, email, avatar, cover FROM users WHERE email=%s OR username=%s",
+                "SELECT id, username, password_hash, role, nickname, email, avatar, cover, public_id FROM users WHERE email=%s OR username=%s",
                 (account, account)
             )
             user = cur.fetchone()
@@ -632,7 +688,7 @@ def auth_login():
         return jsonify({'error': '账号或密码错误'}), 401
     token = issue_token(user['username'])
     return jsonify({'token': token, 'user': {
-        'id': user['id'], 'username': user['username'], 'role': user['role'], 'nickname': user['nickname'], 'email': user['email'], 'avatar': user['avatar'], 'cover': user['cover']
+        'id': user['id'], 'username': user['username'], 'role': user['role'], 'nickname': user['nickname'], 'email': user['email'], 'avatar': user['avatar'], 'cover': user['cover'], 'public_id': user['public_id']
     }})
 
 @app.route('/api/auth/change-password', methods=['POST'])
@@ -738,12 +794,12 @@ def auth_logout():
 
 # 列表预览：提取正文 markdown 图片（最多 5 张）
 IMG_RE = re.compile(r'!\[[^\]]*\]\(([^)\s]+)\)')
-DOC_SELECT = """SELECT d.id, d.type, d.title, d.slug, d.visibility,
+DOC_SELECT = """SELECT d.id, d.type, d.title, d.slug, d.public_id, d.visibility,
     d.likes_count, d.favorites_count, d.comments_count, d.downloads_count, d.pinned_until,
     d.downloadable, d.price, d.preview_only, d.format, d.attachment,
     d.origin_id,
     CAST(d.updated_at AS CHAR) as updated_at, CAST(d.created_at AS CHAR) as created_at,
-    d.user_id, u.nickname AS author_nickname, u.username AS author_username, u.avatar AS author_avatar"""
+    d.user_id, u.nickname AS author_nickname, u.username AS author_username, u.avatar AS author_avatar, u.public_id AS author_public_id"""
 
 @app.route('/api/docs', methods=['GET'])
 def list_docs():
@@ -803,14 +859,16 @@ def list_docs():
         print('[ERROR]', e)
         return jsonify({'error': 'server_error'}), 500
 
-def fetch_doc_visible(doc_id=None, slug=None):
-    """取文档并按可见性过滤，返回 (doc, error_resp)"""
+def fetch_doc_visible(doc_id=None, slug=None, key=None):
+    """取文档并按可见性过滤，返回 (doc, error_resp)。key 兼容 public_id / 明文 slug / 数字 id。"""
     user = get_current_user()
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             if doc_id is not None:
                 cur.execute(DOC_SELECT + ", d.content FROM docs d LEFT JOIN users u ON d.user_id=u.id WHERE d.id=%s", (doc_id,))
+            elif key is not None:
+                cur.execute(DOC_SELECT + ", d.content FROM docs d LEFT JOIN users u ON d.user_id=u.id WHERE d.public_id=%s OR d.slug=%s OR CAST(d.id AS CHAR)=%s", (key, key, key))
             else:
                 cur.execute(DOC_SELECT + ", d.content FROM docs d LEFT JOIN users u ON d.user_id=u.id WHERE d.slug=%s", (slug,))
             row = cur.fetchone()
@@ -834,6 +892,18 @@ def fetch_doc_visible(doc_id=None, slug=None):
             row['content'] = content[:500]
             row['preview'] = True
     return row, None
+
+@app.route('/api/docs/by-key/<key>', methods=['GET'])
+def get_doc_by_key(key: str):
+    """按对外 key（public_id）取文档；兼容旧链接（明文 slug / 数字 id）。"""
+    try:
+        row, err = fetch_doc_visible(key=key)
+        if err:
+            return err
+        return jsonify(row)
+    except Exception as e:
+        print('[ERROR]', e)
+        return jsonify({'error': 'server_error'}), 500
 
 @app.route('/api/docs/by-slug/<slug>', methods=['GET'])
 def get_doc_by_slug(slug: str):
@@ -933,9 +1003,10 @@ def create_doc(user=None):
             with conn.cursor() as cur:
                 base_slug = make_slug(title_val)
                 slug_val = ensure_unique_slug(conn, base_slug)
+                pid_val = gen_public_id()
                 cur.execute(
-                    "INSERT INTO docs (type, title, slug, content, user_id, visibility, format, attachment, downloadable, price, preview_only, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (type_val, title_val, slug_val, content_val, user['id'], visibility, fmt, attachment, downloadable, price, preview_only, datetime.now(), datetime.now())
+                    "INSERT INTO docs (type, title, slug, public_id, content, user_id, visibility, format, attachment, downloadable, price, preview_only, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (type_val, title_val, slug_val, pid_val, content_val, user['id'], visibility, fmt, attachment, downloadable, price, preview_only, datetime.now(), datetime.now())
                 )
                 new_id = cur.lastrowid
             if visibility == 'public' and daily_points(conn, user['id'], 'note_published', 9) < 9:
@@ -943,7 +1014,7 @@ def create_doc(user=None):
             conn.commit()
         finally:
             conn.close()
-        return jsonify({'id': new_id, 'slug': slug_val})
+        return jsonify({'id': new_id, 'slug': slug_val, 'public_id': pid_val})
     except Exception as e:
         print('[ERROR]', e)
         return jsonify({'error': 'server_error'}), 500
@@ -981,9 +1052,10 @@ def copy_doc_to_studio(doc_id: int, user=None):
                 new_title = row['title'] + '（批注版）'
                 base_slug = make_slug(new_title)
                 slug_val = ensure_unique_slug(conn, base_slug)
+                pid_val = gen_public_id()
                 cur.execute(
-                    "INSERT INTO docs (type, title, slug, content, user_id, visibility, format, attachment, downloadable, price, preview_only, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, 'private', %s, %s, 0, 0, 0, %s, %s)",
-                    (row['type'], new_title, slug_val, row['content'], user['id'], row.get('format') or 'md', row.get('attachment'), datetime.now(), datetime.now())
+                    "INSERT INTO docs (type, title, slug, public_id, content, user_id, visibility, format, attachment, downloadable, price, preview_only, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, 'private', %s, %s, 0, 0, 0, %s, %s)",
+                    (row['type'], new_title, slug_val, pid_val, row['content'], user['id'], row.get('format') or 'md', row.get('attachment'), datetime.now(), datetime.now())
                 )
                 new_id = cur.lastrowid
                 if strokes:
@@ -1020,9 +1092,10 @@ def collect_doc(doc_id: int, user=None):
                 new_title = row['title']  # 加入书房：标题保留原名，来源用 origin_id 角标标识
                 base_slug = make_slug(new_title)
                 slug_val = ensure_unique_slug(conn, base_slug)
+                pid_val = gen_public_id()
                 cur.execute(
-                    "INSERT INTO docs (type, title, slug, content, user_id, visibility, format, attachment, downloadable, price, preview_only, origin_id, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, 'private', %s, %s, 0, 0, 0, %s, %s, %s)",
-                    (row['type'], new_title, slug_val, row['content'], user['id'], row.get('format') or 'md', row.get('attachment'), doc_id, datetime.now(), datetime.now())
+                    "INSERT INTO docs (type, title, slug, public_id, content, user_id, visibility, format, attachment, downloadable, price, preview_only, origin_id, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, 'private', %s, %s, 0, 0, 0, %s, %s, %s)",
+                    (row['type'], new_title, slug_val, pid_val, row['content'], user['id'], row.get('format') or 'md', row.get('attachment'), doc_id, datetime.now(), datetime.now())
                 )
                 new_id = cur.lastrowid
                 # 副本自动加入阅览室
@@ -1136,6 +1209,10 @@ def delete_doc(doc_id: int, user=None):
                         return jsonify({'error': 'forbidden'}), 403
                 elif doc['user_id'] != user['id']:
                     return jsonify({'error': 'forbidden'}), 403
+                # 级联清理关联数据（草稿/版本/点赞/收藏/分享/评论/批注/阅读记录）
+                for tbl in ('doc_drafts', 'doc_versions', 'note_likes', 'note_favorites', 'note_shares',
+                            'note_comments', 'note_annotations', 'reading_list'):
+                    cur.execute(f"DELETE FROM {tbl} WHERE doc_id=%s", (doc_id,))
                 cur.execute("DELETE FROM docs WHERE id=%s", (doc_id,))
             conn.commit()
         finally:
@@ -1364,7 +1441,7 @@ def note_comments(doc_id):
     try:
         with conn.cursor() as cur:
             cur.execute("""SELECT c.id, c.content, c.parent_id, c.anchor, CAST(c.created_at AS CHAR) AS created_at,
-                c.user_id, u.nickname, u.username, u.avatar,
+                c.user_id, u.nickname, u.username, u.avatar, u.public_id AS user_public_id,
                 pu.nickname AS parent_nickname, pu.username AS parent_username
                 FROM note_comments c
                 LEFT JOIN users u ON c.user_id=u.id
@@ -1413,6 +1490,26 @@ def note_comment(doc_id, user=None):
             notify(conn, parent_uid, user['id'], 'reply', doc_id)
         conn.commit()
         return jsonify({'success': True, 'id': cid})
+    finally:
+        conn.close()
+
+@app.route('/api/notes/<int:doc_id>/comments/<int:comment_id>', methods=['DELETE'])
+@require_login
+def delete_note_comment(doc_id, comment_id, user=None):
+    # 仅评论作者本人可删除（删除后评论数 -1）
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, user_id FROM note_comments WHERE id=%s AND doc_id=%s", (comment_id, doc_id))
+            c = cur.fetchone()
+            if not c:
+                return jsonify({'error': 'not_found'}), 404
+            if c['user_id'] != user['id']:
+                return jsonify({'error': 'forbidden'}), 403
+            cur.execute("DELETE FROM note_comments WHERE id=%s", (comment_id,))
+        bump_doc_count(conn, doc_id, 'comments_count', -1)
+        conn.commit()
+        return jsonify({'success': True})
     finally:
         conn.close()
 
@@ -1477,12 +1574,30 @@ def note_read(doc_id, user=None):
         conn.close()
 # ═══════════════ 用户主页 / 资料 / 好友 / 积分 ═══════════════
 
+@app.route('/api/users/by-key/<key>', methods=['GET'])
+def user_by_key(key: str):
+    """按对外 key（public_id）取用户；兼容旧链接（数字 id / 用户名）。"""
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM users WHERE public_id=%s LIMIT 1", (key,))
+                r = cur.fetchone()
+        finally:
+            conn.close()
+        if not r:
+            return jsonify({'error': 'not_found'}), 404
+        return user_profile(r['id'])
+    except Exception as e:
+        print('[ERROR]', e)
+        return jsonify({'error': 'server_error'}), 500
+
 @app.route('/api/users/<int:uid>', methods=['GET'])
 def user_profile(uid):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT id, username, nickname, avatar, cover, bio, interests, points, read_seconds, badge,
+            cur.execute("""SELECT id, username, nickname, avatar, cover, bio, interests, points, read_seconds, badge, public_id,
                 likes_public, favorites_public,
                 CAST(created_at AS CHAR) AS created_at FROM users WHERE id=%s""", (uid,))
             u = cur.fetchone()
@@ -1777,8 +1892,8 @@ def notifications_list(user=None):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT n.id, n.type, n.doc_id, n.is_read, n.extra, CAST(n.created_at AS CHAR) AS created_at,
-                u.nickname, u.username, d.title AS doc_title
+            cur.execute("""SELECT n.id, n.type, n.doc_id, d.public_id, n.is_read, n.extra, CAST(n.created_at AS CHAR) AS created_at,
+                u.nickname, u.username, u.public_id AS actor_public_id, d.title AS doc_title
                 FROM notifications n
                 LEFT JOIN users u ON n.actor_id=u.id
                 LEFT JOIN docs d ON n.doc_id=d.id
@@ -1853,13 +1968,13 @@ def friend_list(user=None):
     try:
         with conn.cursor() as cur:
             cur.execute("""SELECT f.id, f.status, f.created_at,
-                u.id AS other_id, u.username, u.nickname, u.avatar, u.bio, u.points
+                u.id AS other_id, u.username, u.nickname, u.avatar, u.bio, u.points, u.public_id AS other_public_id
                 FROM friendships f JOIN users u ON u.id = IF(f.user_id=%s, f.friend_id, f.user_id)
                 WHERE (f.user_id=%s OR f.friend_id=%s)
                 ORDER BY f.created_at DESC""", (user['id'], user['id'], user['id']))
             rows = cur.fetchall()
             # 区分：发给我的（user_id=对方）
-            cur.execute("""SELECT f.id, f.status, u.id AS other_id, u.username, u.nickname, u.avatar
+            cur.execute("""SELECT f.id, f.status, u.id AS other_id, u.username, u.nickname, u.avatar, u.public_id AS other_public_id
                 FROM friendships f JOIN users u ON u.id=f.user_id
                 WHERE f.friend_id=%s AND f.status='pending'""", (user['id'],))
             incoming = cur.fetchall()
@@ -1948,7 +2063,7 @@ def user_followers(uid):
     try:
         with conn.cursor() as cur:
             viewer = get_current_user()
-            cur.execute("""SELECT u.id, u.username, u.nickname, u.avatar, u.points, u.bio
+            cur.execute("""SELECT u.id, u.username, u.nickname, u.avatar, u.points, u.bio, u.public_id
                 FROM follows f JOIN users u ON u.id=f.follower_id
                 WHERE f.followee_id=%s ORDER BY f.created_at DESC LIMIT 200""", (uid,))
             rows = cur.fetchall()
@@ -1969,7 +2084,7 @@ def user_following(uid):
     try:
         with conn.cursor() as cur:
             viewer = get_current_user()
-            cur.execute("""SELECT u.id, u.username, u.nickname, u.avatar, u.points, u.bio
+            cur.execute("""SELECT u.id, u.username, u.nickname, u.avatar, u.points, u.bio, u.public_id
                 FROM follows f JOIN users u ON u.id=f.followee_id
                 WHERE f.follower_id=%s ORDER BY f.created_at DESC LIMIT 200""", (uid,))
             rows = cur.fetchall()
@@ -1993,7 +2108,7 @@ def user_search(user=None):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT id, username, nickname, avatar, points FROM users
+            cur.execute("""SELECT id, username, nickname, avatar, points, public_id FROM users
                 WHERE username LIKE %s OR nickname LIKE %s ORDER BY id ASC LIMIT 20""",
                 ('%' + q + '%', '%' + q + '%'))
             rows = cur.fetchall()
@@ -2010,18 +2125,26 @@ def user_search(user=None):
 @require_login
 def message_send(user=None):
     data = request.get_json(silent=True) or {}
-    try:
-        to_id = int(data.get('to_user_id') or 0)
-    except (TypeError, ValueError):
-        to_id = 0
+    to_key = str(data.get('to_user_id') or '').strip()
     content = (data.get('content') or '').strip()
-    if not to_id or to_id == user['id']:
+    if not to_key:
         return jsonify({'error': '参数错误'}), 400
     if not content or len(content) > 2000:
         return jsonify({'error': '内容需在 1-2000 字内'}), 400
     conn = get_conn()
     try:
         with conn.cursor() as cur:
+            # to_user_id 支持 public_id 或数字 id（数字兼容旧引用）
+            to_id = 0
+            if to_key.isdigit():
+                to_id = int(to_key)
+            else:
+                cur.execute("SELECT id FROM users WHERE public_id=%s LIMIT 1", (to_key,))
+                r = cur.fetchone()
+                if r:
+                    to_id = r['id']
+            if not to_id or to_id == user['id']:
+                return jsonify({'error': '参数错误'}), 400
             cur.execute("SELECT id FROM users WHERE id=%s", (to_id,))
             if not cur.fetchone():
                 return jsonify({'error': '用户不存在'}), 404
@@ -2073,14 +2196,24 @@ def _ai_reply(user_id, content):
     system = (
         "你是「知屿」的 AI 助手（官方账号），在私信里陪伴用户学习备考（考研 408 / 数学 / 英语 / 政治）。"
         "回答简洁、准确、友善；涉及数学或 408 内容给出关键步骤；可用 Markdown；不知道的不要编造。"
+        "若用户问「你是什么模型/谁开发的」：直接干脆地回答你是「知屿」的 AI 助手即可，"
+        "不要提及或暗示底层模型名称（DeepSeek/Claude/GPT/OpenAI 等），不要回避问题，也不要说『没有公开信息』之类的话。"
     )
-    messages = [{'role': 'system', 'content': system}]
+    input_items = []
     for h in hist:
         role = 'user' if h['sender_id'] == user_id else 'assistant'
-        messages.append({'role': role, 'content': str(h['content'])[:2000]})
-    payload = {'model': DEEPSEEK_MODEL, 'messages': messages, 'temperature': 0.6, 'stream': False}
+        input_items.append({'role': role, 'content': str(h['content'])[:2000]})
+    # 统一走 Responses API + deepseek-v4-flash（关闭思考，保持轻快）
+    payload = {
+        'model': DEEPSEEK_RESPONSES_MODEL,
+        'instructions': system,
+        'input': input_items,
+        'temperature': 0.6,
+        'reasoning': {'effort': 'none'},
+        'stream': False,
+    }
     req = urllib.request.Request(
-        DEEPSEEK_URL,
+        DEEPSEEK_RESPONSES_URL,
         data=json.dumps(payload).encode('utf-8'),
         headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + DEEPSEEK_API_KEY},
         method='POST',
@@ -2088,7 +2221,13 @@ def _ai_reply(user_id, content):
     try:
         with urllib.request.urlopen(req, timeout=90) as resp:
             result = json.loads(resp.read().decode('utf-8'))
-        return result['choices'][0]['message']['content'].strip()
+        answer = ''
+        for item in result.get('output') or []:
+            if item.get('type') == 'message':
+                for c in item.get('content') or []:
+                    if c.get('type') == 'output_text':
+                        answer += c.get('text') or ''
+        return answer.strip() or None
     except Exception:
         return None
 
@@ -2229,7 +2368,7 @@ def message_conversations(user=None):
                 if ai_id and pid == ai_id:
                     continue
                 last = msgs[0]
-                cur.execute("SELECT id, username, nickname, avatar FROM users WHERE id=%s", (pid,))
+                cur.execute("SELECT id, username, nickname, avatar, public_id FROM users WHERE id=%s", (pid,))
                 pu = cur.fetchone() or {}
                 cur.execute("SELECT COUNT(*) AS c FROM messages WHERE sender_id=%s AND receiver_id=%s AND read_at IS NULL", (pid, user['id']))
                 unread = cur.fetchone()['c']
@@ -2244,7 +2383,7 @@ def message_conversations(user=None):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, username, nickname, avatar FROM users WHERE username='ai'")
+            cur.execute("SELECT id, username, nickname, avatar, public_id FROM users WHERE username='ai'")
             ai_info = cur.fetchone()
     finally:
         conn.close()
@@ -2255,16 +2394,24 @@ def message_conversations(user=None):
 def message_history(user=None):
     """与某人对话（with=<peer_id>），返回后标记已读"""
     data = request.args
-    try:
-        peer_id = int(data.get('with') or 0)
-    except (TypeError, ValueError):
-        peer_id = 0
-    if not peer_id:
+    with_key = str(data.get('with') or '').strip()
+    if not with_key:
         return jsonify({'error': '缺少对方'}), 400
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, username, nickname, avatar FROM users WHERE id=%s", (peer_id,))
+            # with 支持 public_id（URL 不暴露数字 id）；数字 id 兼容旧链接/内部引用
+            peer_id = 0
+            if with_key.isdigit():
+                peer_id = int(with_key)
+            else:
+                cur.execute("SELECT id FROM users WHERE public_id=%s LIMIT 1", (with_key,))
+                r = cur.fetchone()
+                if r:
+                    peer_id = r['id']
+            if not peer_id:
+                return jsonify({'error': '用户不存在'}), 404
+            cur.execute("SELECT id, username, nickname, avatar, public_id FROM users WHERE id=%s", (peer_id,))
             peer = cur.fetchone()
             if not peer:
                 return jsonify({'error': '用户不存在'}), 404
@@ -2282,8 +2429,9 @@ def message_history(user=None):
 
 # ═══════════════ AI 助手（DeepSeek 检索问答） ═══════════════
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
-DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
-DEEPSEEK_MODEL = 'deepseek-chat'
+# Responses API：全站 AI 统一使用（deepseek-v4-flash + 服务端联网搜索 web_search + function 工具）
+DEEPSEEK_RESPONSES_URL = 'https://api.deepseek.com/responses'
+DEEPSEEK_RESPONSES_MODEL = 'deepseek-v4-flash'
 FREE_AI_QUOTA = 20  # 每个用户免费次数
 
 def ai_search_context(user, question, limit=8, max_chars=4000):
@@ -2347,15 +2495,16 @@ AI_TOOLS = [
     }},
     {'type': 'function', 'function': {
         'name': 'navigate',
-        'description': '跳转到站内页面。可用路径：/（首页）、/notes（笔记广场）、/docs（阅览室）、/notes/{id}（打开某篇笔记）、/edit/{id}（编辑某篇笔记）、/edit（新建笔记）、/admin（书房）、/friends（好友）、/mall（积分商城）、/messages（消息）、/changelog（更新日志）、/guide（使用引导）、/user/{id}（个人主页）。用户要求「帮我跳转到某页 / 打开某笔记 / 去 XX」时调用；若用户只给了笔记标题而你不知道 ID，先调用 search_note 按标题搜索得到 ID 后再跳转。',
+        'description': '跳转到站内页面。可用路径：/（首页）、/notes（笔记广场）、/docs（阅览室）、/notes/{public_id}（打开某篇笔记，public_id 由 search_note 返回，不要自己编）、/edit/{id}（编辑某篇笔记，仍用数字 id）、/edit（新建笔记）、/admin（书房）、/friends（好友）、/mall（积分商城）、/messages（消息）、/changelog（更新日志）、/guide（使用引导）、/user/{public_id}（个人主页，不编 id）。用户要求「帮我跳转到某页 / 打开某笔记 / 去 XX」时调用；若用户只给了笔记标题而你不知道 public_id，先调用 search_note 按标题搜索得到 public_id 后再跳转。',
         'parameters': {'type': 'object', 'properties': {'to': {'type': 'string', 'description': '站内路径，如 /notes/55'}}, 'required': ['to']},
     }},
     {'type': 'function', 'function': {
         'name': 'new_note',
-        'description': '新建一篇笔记并打开编辑器。用户要求「新建笔记 / 帮我写一篇新笔记」时调用；content 可传预填内容，title 可传标题。',
+        'description': '新建一篇笔记并打开编辑器。用户要求「新建笔记 / 帮我写一篇新笔记 / 在某分类下写一篇笔记」时调用；content 可传预填内容，title 可传标题，type 可传分类（用户指定分类时）。',
         'parameters': {'type': 'object', 'properties': {
             'title': {'type': 'string', 'description': '笔记标题（可选）'},
             'content': {'type': 'string', 'description': '预填内容（Markdown，可选）'},
+            'type': {'type': 'string', 'description': '笔记分类（可选），如「中学公式」「数据结构」'},
         }},
     }},
     {'type': 'function', 'function': {
@@ -2367,6 +2516,39 @@ AI_TOOLS = [
         }, 'required': ['to', 'content']},
     }},
 ]
+
+# Responses API 版工具：function 展平成扁平格式（name/description/parameters 顶层）+ 服务端联网搜索 web_search。
+# web_search 由服务端执行：搜索结果自动注入模型上下文，无需客户端处理 web_search_call。
+AI_TOOLS_RESPONSES = [
+    {'type': 'function', 'name': t['function']['name'], 'description': t['function']['description'],
+     'parameters': t['function'].get('parameters', {})}
+    for t in AI_TOOLS
+] + [{'type': 'web_search'}]
+
+def to_public_path(to, user):
+    """把 AI 生成的 /notes/{id}、/docs/{slug}、/user/{id} 等路径转成 public_id 形式（对外 URL 不暴露明文 id/slug）。"""
+    m = re.match(r'^/(notes|docs|user)/([^/?#]+)', to or '')
+    if not m:
+        return to or '/'
+    seg = m.group(2)
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            if m.group(1) == 'user':
+                cur.execute(
+                    "SELECT public_id FROM users WHERE public_id=%s OR CAST(id AS CHAR)=%s OR username=%s LIMIT 1",
+                    (seg, seg, seg))
+            else:
+                cur.execute(
+                    "SELECT public_id FROM docs "
+                    "WHERE (public_id=%s OR slug=%s OR CAST(id AS CHAR)=%s) AND (visibility='public' OR user_id=%s) LIMIT 1",
+                    (seg, seg, seg, user['id']))
+            r = cur.fetchone()
+    finally:
+        conn.close()
+    if r and r.get('public_id'):
+        return '/' + m.group(1) + '/' + r['public_id']
+    return to or '/'
 
 def run_ai_tool(name, args, user):
     """执行 AI 工具调用，返回 (结果文本, changed)。changed=True 表示笔记/草稿有变化，前端需刷新。"""
@@ -2416,9 +2598,10 @@ def run_ai_tool(name, args, user):
             return '修改内容已存为草稿，请让用户到编辑器查看红绿 diff 并确认（提示用户去编辑页）', True
         if name == 'navigate':
             # 前端动作：由 sse_gen 转发 action 事件给前端执行跳转
-            return '已通知前端跳转到 ' + str(args.get('to') or '/'), False
+            # 把 id/slug 路径统一转成 public_id，保证对外 URL 不暴露明文
+            return '已通知前端跳转到 ' + to_public_path(str(args.get('to') or '/'), user), False
         if name == 'search_note':
-            # 按标题搜索笔记（可见范围内），返回 id + 标题列表供 AI 用 navigate 跳转
+            # 按标题搜索笔记（可见范围内），返回 public_id + 标题列表供 AI 用 navigate 跳转
             keyword = str(args.get('keyword') or '').strip()
             if not keyword:
                 return '请输入搜索关键词', False
@@ -2426,7 +2609,7 @@ def run_ai_tool(name, args, user):
             try:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT id, title, type FROM docs "
+                        "SELECT id, title, type, public_id FROM docs "
                         "WHERE (visibility='public' OR user_id=%s) AND title LIKE %s "
                         "ORDER BY updated_at DESC LIMIT 10",
                         (user['id'], '%' + keyword + '%'))
@@ -2435,8 +2618,8 @@ def run_ai_tool(name, args, user):
                 conn.close()
             if not rows:
                 return f'没有找到标题包含「{keyword}」的笔记', False
-            lines = [f"{r['id']}.《{r['title']}》（{r['type']}）" for r in rows]
-            return '按标题搜索到的笔记（用对应 ID 拼 /notes/{id} 跳转）：\n' + '\n'.join(lines), False
+            lines = [f"{r['public_id']}.《{r['title']}》（{r['type']}）" for r in rows]
+            return '按标题搜索到的笔记（用 public_id 拼 /notes/{public_id} 跳转）：\n' + '\n'.join(lines), False
         if name == 'new_note':
             # 前端动作：由 sse_gen 转发 action 事件给前端打开新建笔记编辑器
             return '已通知前端打开新建笔记编辑器', False
@@ -2465,6 +2648,24 @@ def run_ai_tool(name, args, user):
     except Exception as e:
         return f'工具执行出错：{e}', False
     return f'未知工具：{name}', False
+
+def log_ai_chat(user, page, note_id, question, system_prompt, answer, reasoning, tool_names, changed, err, delta_count, elapsed_ms):
+    """记录一次 AI 对话的输入输出（用于复盘/优化 prompt）。纯旁路写入，失败不影响主流程。"""
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO ai_chat_logs (user_id, page, note_id, question, system_prompt, answer, reasoning, tool_names, changed, err, delta_count, elapsed_ms) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (user['id'], page, note_id, str(question)[:2000], system_prompt,
+                     str(answer or '')[:20000], str(reasoning or '')[:20000],
+                     ','.join(tool_names)[:500], 1 if changed else 0, str(err or '')[:500], delta_count, elapsed_ms))
+                conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
 
 @app.route('/api/ai/chat', methods=['POST'])
 @require_login
@@ -2507,14 +2708,14 @@ def ai_chat(user=None):
                 note_ctx = f"【用户正在阅读的笔记《{nr['title']}》（ID: {nr['id']}）全文】\n{nr['content'][:NOTE_CTX_MAX]}"
         except Exception:
             pass
-    elif data.get('note_slug'):
-        # 阅览室 /docs/:slug：按 slug 读当前笔记全文
+    elif data.get('note_key') or data.get('note_slug'):
+        # 阅览室 /docs/:key、笔记阅读页 /notes/:key：按 public_id 读当前笔记全文（兼容旧 slug/数字 id）
         try:
-            slug = str(data.get('note_slug')).strip()
+            key = str(data.get('note_key') or data.get('note_slug') or '').strip()
             conn2 = get_conn()
             try:
                 with conn2.cursor() as cur:
-                    cur.execute("SELECT id, title, content FROM docs WHERE slug=%s AND (visibility='public' OR user_id=%s)", (slug, user['id']))
+                    cur.execute("SELECT id, title, content FROM docs WHERE (public_id=%s OR slug=%s OR CAST(id AS CHAR)=%s) AND (visibility='public' OR user_id=%s)", (key, key, key, user['id']))
                     nr = cur.fetchone()
             finally:
                 conn2.close()
@@ -2531,51 +2732,41 @@ def ai_chat(user=None):
     elif page == 'note-reader':
         page_hint = "用户当前正在阅读一篇笔记（见【用户正在阅读的笔记】）。可以总结要点、讲解难点、回答疑问；不要编造该笔记没有的内容。"
     elif page == 'docs-reader':
-        page_hint = ("用户当前在「阅览室」阅读自己的一篇笔记（见【用户正在阅读的笔记】，注意它的 ID），这里是用户自己的笔记。"
-                     "你拥有工具（read_note / save_draft / write_note / navigate），可以像编辑器一样直接修改这篇笔记："
-                     "① 用户要求修改笔记内容（改表格、改文字、修格式、重写整篇等）时，必须调用工具完成，不要输出【原内容】【新内容】之类的标记文本；"
-                     "② 默认用 save_draft（note_id 传当前笔记 ID，content 传修改后的完整笔记 Markdown 源码）把结果存为草稿，让用户到编辑器确认后保存；"
-                     "③ 仅当用户明确说「直接保存 / 直接改 / 不用预览 / 直接应用」时，才用 write_note 直接写入正式笔记；"
-                     "④ 若上下文中的全文不完整，先调用 read_note（note_id 传当前笔记 ID）获取完整源码再修改；"
-                     "⑤ 如果发现笔记内容有格式问题（本该是表格的文字被写成逐行竖排文本、LaTeX 公式缺失、列表混乱等），主动修复为规范 Markdown；"
-                     "用户说『把 X 变成表格 / 改成表格 / 排一下』：X 是原文中某段文字或竖排内容，转成规范 markdown 表格语法"
-                     "（第一行 | 列1 | 列2 |，第二行 | --- | --- | 分隔，之后每行 | 值 | 值 |），表格里的公式用 LaTeX 行内语法 $...$；"
-                     "⑥ 只改用户要求的部分，其他内容一字不改。"
-                     "⑦ 用户问『有没有问题 / 检查一下 / 看看这篇』时：正常列出发现的问题即可，先不要改；"
-                     "用户随后表示同意修改（如「改吧 / 修吧 / 要 / 都改 / 修复 / 帮我改好」）时，立即执行："
-                     "read_note 读全文 → 修改问题（默认 save_draft 存草稿）→ 再调用 navigate 跳转到 /edit/{id}（id 传当前笔记 ID），"
-                     "让用户在编辑器里看到红绿 diff 并确认。不要问『要改哪些』，用户说改就把检查出的所有问题一次改完。"
-                     "调用工具后，工具结果会返回给你；最终用一句话向用户说明改了什么、在哪里确认。"
-                     "若用户只是补充新增内容且不便整篇重写，可输出待新增的 Markdown 片段，末尾单独一行【知屿应用：追加到末尾】。"
-                     "若只是回答不修改笔记，正常回答即可。")
+        page_hint = ("用户当前在「阅览室」阅读自己的笔记（见【用户正在阅读的笔记】，注意 ID）。你拥有 read_note / save_draft / write_note / navigate，可直接修改这篇笔记："
+                     "用户要求修改（改表格/文字/格式/重写等）时，必须调用工具，不要输出【原内容】【新内容】标记文本；"
+                     "默认用 save_draft（note_id 传当前 ID，content 传修改后的完整 Markdown）存草稿让用户到编辑器确认；仅当用户明确说「直接保存/直接改/不用预览/直接应用」才用 write_note 直接写入。"
+                     "上下文全文不完整时先 read_note 取全文再改。只改用户要求的部分，其他一字不改。"
+                     "发现格式问题（竖排文本、LaTeX 缺失、列表混乱等）主动修复为规范 Markdown；用户说『把 X 变成表格』就转成规范表格语法（| 列1 | 列2 | / | --- | --- | / | 值 | 值 |），表格内公式用 $...$。"
+                     "用户问『有没有问题/检查一下/看看这篇』时先列出问题不要改；用户同意（「改吧/修吧/都改/修复/帮我改好」）后立即执行：read_note 读全文 → save_draft 修改 → navigate 跳 /edit/{id}，一次改完所有问题，不要问『要改哪些』。"
+                     "工具执行后一句话说明改了什么、在哪确认。若只是补充新增内容且不便整篇重写，输出待新增 Markdown 片段，末尾单独一行【知屿应用：追加到末尾】；只回答不修改则正常回答。")
     elif page == 'editor':
-        page_hint = ("用户当前在「笔记编辑器」里，正在编辑一篇笔记（见【用户正在编辑的笔记最新草稿】）。"
-                     "由你判断用户意图并声明操作类型："
-                     "若用户要求插入/追加/补充新内容（如加一个表格、加一段、写在最后面/末尾），"
-                     "只输出【要插入的新内容片段】Markdown（含正确编号），不要输出整篇笔记，不要解释，不要用 ```markdown 包裹；"
-                     "回复的最后一行单独用【知屿操作：插入】声明。"
-                     "若用户要求修改/重写/整理/调整现有内容，用 save_draft 工具：note_id 传当前笔记 ID，content 传修改后的完整笔记（未改部分原样保留），让用户在编辑器里确认；"
-                     "若你直接输出修改后的内容而未用工具，末尾单独一行【知屿操作：修改】声明。"
-                     "修改笔记前，若不确定笔记最新完整内容（本地草稿可能不是最新、用户可能已保存新内容），先调用 read_note 获取笔记最新全文再修改，以 read_note 返回的内容为准，不要基于过期草稿判断。"
-                     "若只是回答与笔记内容无关的问题，末尾单独一行【知屿操作：回答】声明。声明行不要附带任何其他文字。")
-    system = ("你是「知屿」知识库的 AI 助手。你拥有站内工具可执行操作：navigate（跳转页面）、search_note（按标题搜索笔记拿 ID）、new_note（新建笔记）、send_message（发私信）；在阅览室场景还有 read_note / save_draft / write_note（读笔记/存草稿）。所有修改笔记的操作（save_draft 与 write_note）都只是存草稿，不会直接改正式笔记，用户会在编辑器看到红绿 diff 并确认后才保存。用户提出这类操作请求时，调用对应工具完成，不要只口头说「我无法操作」。"
-              "用户说「打开/跳转到某篇笔记」但只给了标题时：先调用 search_note 按标题搜索到笔记 ID，再调用 navigate 跳转到 /notes/{id}，一次完成，不要反过来问用户要 ID；搜索无结果时才说明没找到。"
-              "生成表格时（用户要求表格，或内容涉及对比/列表数据），必须使用规范 Markdown 表格语法："
-              "第一行 | 列1 | 列2 | 列3 |，第二行 | --- | --- | --- |，之后每行 | 值 | 值 | 值 |；"
-              "严禁把表格写成逐行竖排文本（每个字段单独一行、用空行分隔）或普通段落；"
-              "表格内的公式用 LaTeX 行内语法 $...$（如 $O(1)$、$O(n)$）。"
-              "调用工具后向用户报告结果要简洁（改了什么、在哪里确认），严禁输出你的操作过程、读取内容、分析步骤、思考或『我来』『我要』之类的叙述。"
-              "请优先根据提供的知识库笔记片段回答用户问题；"
-              "如果片段中没有相关信息，请用你的知识回答并说明这点。回答要简洁、有条理。"
-              "数学公式必须用 LaTeX 源码输出（$...$ 行内，$$...$$ 独立），绝对禁止把公式转写成普通 Unicode 文字或纯文本近似式；"
-              "给出的 Markdown/LaTeX 内容应可直接粘贴进笔记编辑器使用，渲染效果与原文一致。"
-              "章节结构规则：当用户要求向某篇笔记添加/补充内容时，先看清该笔记的章节编号体系（## 1. / ## 2. / ### 1.1 等）。"
-              "若添加的是独立知识点（如「串」在数据结构中就是独立章节），必须作为独立的一级章节（## N. 标题）插在正确位置（按教材顺序），"
-              "并把其后所有章节编号顺延重排（## 1、## 2、## 3… 连续，子小节 ### N.x 同步改号）；"
-              "禁止把独立主题塞进现有章节当子小节（例如把「串」写成树章节的 4.6）。"
-              "若用户说「放在第 N 章」，通常指独立章节的位置，不是某章节内部的第 N 个小节。"
-              "严禁输出思考过程、客套话或元说明（如『我明白了』『你可以粘贴』『如果你希望』『请告诉我』『我来帮你』等）；"
-              "用户要什么内容就直接输出什么内容本身，公式或笔记正文就是最终答案，不要任何前缀解释或后缀补充。")
+        cur_note_id = data.get('note_id')
+        page_hint = ("用户当前在「笔记编辑器」编辑一篇笔记（见【用户正在编辑的笔记最新草稿】）。按用户意图处理："
+                     f"你正在编辑的笔记 ID 为 {cur_note_id or '未知'}。当用户要求读取/修改当前笔记时，一律以该 ID 为准："
+                     "需要全文时 read_note(note_id=当前笔记 ID)；严禁 search_note 搜索或读取其他笔记，也不要把内容加入其他笔记。"
+                     "若草稿内容异常（比如看起来像对话记录而非笔记正文），仍以当前笔记数据库中的正式内容为准。"
+                     "当用户要求新建笔记或写与当前笔记无关的内容时，直接新建/书写即可，无需读取当前笔记，也不要把内容加入当前笔记。"
+                     "插入/追加/补充新内容：只输出要插入的 Markdown 片段（含正确编号），不输出整篇、不解释、不用 ```markdown 包裹，末尾单独一行【知屿操作：插入】。"
+                     "编号从当前笔记实际章节延续：新笔记从 ## 1. 开始；已有笔记从最后一个章节号 +1 继续；禁止使用其他笔记的编号（如凭空从 12 开始）。"
+                     "只输出笔记正文，禁止夹带对话、建议、征询语句（如『如果你确定…回复「新建」即可』『需要的话…』）或解释性文字。"
+                     "修改/重写/整理现有内容：用 save_draft 工具（note_id 传当前笔记 ID，content 传修改后的完整笔记，未改部分原样保留）让用户确认；"
+                     "若直接输出修改内容而未用工具，末尾单独一行【知屿操作：修改】。"
+                     "修改前若不确定笔记最新全文（本地草稿可能过期），先 read_note 取当前笔记最新再改，不要基于过期草稿。"
+                     "若用户要求修改/设置笔记标题（如『标题改成 xxx』『把标题改为…』），末尾单独一行【知屿标题：新标题】声明（新标题写在冒号后），与【知屿操作】声明行并列。"
+                     "回答与笔记无关的问题时，末尾单独一行【知屿操作：回答】。声明行不要附带任何其他文字。")
+    system = ("你是「知屿」知识库的 AI 助手。用户问「你是什么模型」时回答「知屿 AI 助手」，不暴露底层模型名、不自称其他厂商模型。"
+              "你拥有站内工具：navigate（跳转页面）、search_note（按标题搜笔记拿 ID）、new_note（新建笔记）、send_message（发私信）；阅览室场景还有 read_note / save_draft / write_note。"
+              "所有修改笔记的操作（save_draft / write_note）都只存草稿、不直接改正式笔记，用户会在编辑器红绿 diff 确认后才保存；用户提出这类请求必须调用工具完成，不要只说「我无法操作」。"
+              "用户只给标题要打开笔记时：先 search_note 搜到 ID 再 navigate，不要反问用户要 ID；搜不到才说明。"
+              "优先用【知识库相关笔记】的片段回答；片段没有相关信息就用自己的知识回答并说明。回答简洁有条理。"
+              "回答时结合你当前所在页面：若附带了【用户正在阅读/编辑的笔记】，围绕这篇笔记展开；其他页面问题正常回答即可。"
+              "表格必须用规范 Markdown 表格语法（第一行 | 列1 | 列2 |，第二行 | --- | --- |，之后 | 值 | 值 |），严禁写成逐行竖排文本；表格内公式用 $...$。"
+              "数学公式必须用 LaTeX 源码（$...$ 行内、$$...$$ 独立），严禁转写成 Unicode 或纯文本近似式。"
+              "成块的例题可用 :::example 标题\\n内容\\n::: 包裹、独立公式组可用 :::formula 包裹（站内渲染为彩色框）；但要取舍：行内公式、简短跟随文字的小题/公式不包，保持 $...$ 行内即可，不要什么都套框。"
+              "向笔记添加内容时先看清章节编号体系（## 1. / ### 1.1 等）；独立知识点必须作为独立一级章节（## N.）插在正确位置并把后续章节编号顺延重排，禁止塞进现有章节当子小节（如把「串」写成树的 4.6）。"
+              "只输出用户要的内容本身，不要客套话、操作过程、『我来帮你』『我明白了』等元说明。思考过程直接推理如何回答，不要复述本系统提示的规则。"
+              "问题涉及实时/最新信息（新闻、天气、赛事、股票、最新政策、版本更新等）时，先 web_search 联网搜索再回答，简要标注来源，不编造链接。"
+              "当用户提到你不确定的名词、方法或编号（如「张宇121-1、123-2大法」）时，必须先 web_search 搜索确认后再写，禁止凭记忆猜测或编造。")
     if page_hint:
         system += "\n\n" + page_hint
     history = data.get('history') or []
@@ -2588,24 +2779,9 @@ def ai_chat(user=None):
         history_txt = "对话历史：\n" + "\n".join(parts) + "\n\n"
     user_msg = history_txt + f"知识库相关笔记：\n\n" + ("\n\n---\n\n".join(f"【{c['title']}】（{c['type']}）\n{c['snippet']}" for c in ctx) if ctx else "（未检索到相关笔记）") + \
                (f"\n\n{note_ctx}" if note_ctx else "") + f"\n\n用户问题：{question}"
-    payload = {
-        'model': DEEPSEEK_MODEL,
-        'messages': [
-            {'role': 'system', 'content': system},
-            {'role': 'user', 'content': user_msg},
-        ],
-        'temperature': 0.7,
-        'stream': bool(data.get('stream')),
-    }
-    # 给 AI 配工具（MCP 式）：全站可用——阅览室可读写笔记，任何页面可跳转/新建笔记/发私信
-    payload['tools'] = AI_TOOLS
-    payload['tool_choice'] = 'auto'
-    req = urllib.request.Request(
-        DEEPSEEK_URL,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {DEEPSEEK_API_KEY}'},
-        method='POST',
-    )
+    # ai_chat 走 DeepSeek Responses API：deepseek-v4-flash + 服务端联网搜索 web_search + function 工具
+    stream = bool(data.get('stream'))
+    q_note_id = data.get('note_id')
 
     def mark_used():
         try:
@@ -2619,151 +2795,206 @@ def ai_chat(user=None):
         except Exception:
             pass
 
-    if payload['stream']:
+    if stream:
         def sse_gen():
             try:
-                messages = [
-                    {'role': 'system', 'content': system},
-                    {'role': 'user', 'content': user_msg},
-                ]
+                t0 = time.time()
+                answer_buf = ''
+                reasoning_buf = ''
+                delta_count = 0
+                tool_names = []
+                err_txt = ''
+                # Responses API 无状态：input 每轮重建完整列表（初始 user 消息 + 历轮 function_call / function_call_output）
+                input_items = [{'role': 'user', 'content': user_msg}]
                 changed = False
-                # 工具调用循环（最多 3 轮：AI 可自主读笔记 → 写草稿/改笔记）
+                charge = True   # 服务端明确失败（response.failed）时不扣费
+                truncated = False  # response.incomplete：回答被截断
+                # 工具调用循环（最多 3 轮：AI 可自主读笔记 → 写草稿/改笔记，或联网搜索后给出答案）
                 for _round in range(3):
-                    p = {**payload, 'messages': messages}
+                    resp_payload = {
+                        'model': DEEPSEEK_RESPONSES_MODEL,
+                        'instructions': system,
+                        'input': input_items,
+                        'tools': AI_TOOLS_RESPONSES,
+                        'tool_choice': 'auto',
+                        'temperature': 0.7,
+                        'reasoning': {'effort': 'none'},  # 关闭思考：v4 思考极慢（默认 50s+），用户只要结果
+                        'stream': True,
+                    }
                     req2 = urllib.request.Request(
-                        DEEPSEEK_URL,
-                        data=json.dumps(p).encode('utf-8'),
+                        DEEPSEEK_RESPONSES_URL,
+                        data=json.dumps(resp_payload).encode('utf-8'),
                         headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {DEEPSEEK_API_KEY}'},
                         method='POST',
                     )
-                    tool_calls = {}
-                    content_buf = ''
-                    reasoning_buf = ''
-                    finish = None
-                    with urllib.request.urlopen(req2, timeout=150) as resp:
+                    tool_calls = []  # [{call_id, name, arguments}]
+                    saw_reasoning = False
+                    with urllib.request.urlopen(req2, timeout=180) as resp:
                         for raw in resp:
                             line = raw.decode('utf-8', errors='ignore').strip()
                             if not line.startswith('data:'):
                                 continue
                             data = line[5:].strip()
-                            if data == '[DONE]':
-                                break
+                            if not data:
+                                continue
                             try:
                                 obj = json.loads(data)
-                                ch = obj['choices'][0]
-                                delta = ch.get('delta') or {}
-                                # 思考内容（DeepSeek reasoning_content / 模型思考过程）单独转发，前端折叠展示
-                                r = delta.get('reasoning_content') or ''
-                                if r:
-                                    reasoning_buf += r
-                                    yield f"data: {json.dumps({'reasoning': r}, ensure_ascii=False)}\n\n"
-                                if delta.get('content'):
-                                    d = re.sub(r'\\+([a-zA-Z])', r'\\\1', delta['content'])
-                                    content_buf += d
-                                    # 逐 token 转发（真流式，前端打字机效果）
-                                    yield f"data: {json.dumps({'delta': d}, ensure_ascii=False)}\n\n"
-                                for tc in (delta.get('tool_calls') or []):
-                                    idx = tc.get('index', 0)
-                                    tc0 = tool_calls.setdefault(idx, {'name': '', 'args': '', 'id': ''})
-                                    fn = tc.get('function') or {}
-                                    if fn.get('name'):
-                                        tc0['name'] = fn['name']
-                                    if fn.get('arguments'):
-                                        tc0['args'] += fn['arguments']
-                                    if tc.get('id'):
-                                        tc0['id'] = tc['id']
-                                finish = ch.get('finish_reason')
-                                if finish == 'tool_calls':
-                                    break
                             except Exception:
                                 continue
+                            ev = obj.get('type') or ''
+                            if ev == 'response.output_text.delta':
+                                d = re.sub(r'\\+([a-zA-Z])', r'\\\1', obj.get('delta') or '')
+                                answer_buf += d
+                                delta_count += 1
+                                # 逐 token 转发（真流式打字机）。工具轮思考与最终轮正文都流式显示，
+                                # 前端在流式结束后用正则把开头思考段挪进 🧠 折叠框。
+                                yield f"data: {json.dumps({'delta': d}, ensure_ascii=False)}\n\n"
+                            elif ev == 'response.reasoning_text.delta':
+                                r = obj.get('delta') or ''
+                                if r:
+                                    saw_reasoning = True
+                                    reasoning_buf += r
+                                    yield f"data: {json.dumps({'reasoning': r}, ensure_ascii=False)}\n\n"
+                            elif ev == 'response.output_item.done':
+                                item = obj.get('item') or {}
+                                if item.get('type') == 'function_call':
+                                    tool_calls.append({
+                                        'call_id': item.get('call_id') or f'call_{len(tool_calls)}',
+                                        'name': item.get('name') or '',
+                                        'arguments': item.get('arguments') or '',
+                                    })
+                                elif item.get('type') == 'web_search_call':
+                                    yield f"data: {json.dumps({'web_search': 'searching'}, ensure_ascii=False)}\n\n"
+                            elif ev == 'response.web_search_call.searching':
+                                yield f"data: {json.dumps({'web_search': 'searching'}, ensure_ascii=False)}\n\n"
+                            elif ev == 'response.web_search_call.completed':
+                                yield f"data: {json.dumps({'web_search': 'completed'}, ensure_ascii=False)}\n\n"
+                            elif ev == 'response.incomplete':
+                                # 输出被截断（如达 max_output_tokens）：标记，done 事件告知前端，避免半截回答被当完整版
+                                truncated = True
+                            elif ev == 'response.failed':
+                                err = ((obj.get('response') or {}).get('error') or {})
+                                err_msg = err.get('message') or err.get('code') or 'response.failed'
+                                charge = False  # 服务端明确失败：不扣费
+                                yield f"data: {json.dumps({'error': 'AI 服务错误: ' + str(err_msg)}, ensure_ascii=False)}\n\n"
+                                return
+                            # response.completed / response.incomplete：本轮回流结束，落到下方统一收尾
                     if not tool_calls:
                         # 无工具调用：最终回答（内容已逐 token 转发完）
-                        if reasoning_buf:
+                        if saw_reasoning:
                             yield f"data: {json.dumps({'reasoning_done': True}, ensure_ascii=False)}\n\n"
-                        yield f"data: {json.dumps({'done': True, 'changed': changed, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]}, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps({'done': True, 'changed': changed, 'incomplete': truncated, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]}, ensure_ascii=False)}\n\n"
                         break
-                    # 执行工具
-                    assistant_payload = {
-                        'role': 'assistant',
-                        'content': content_buf or None,
-                        'tool_calls': [
-                            {'id': tool_calls[i]['id'] or f'call_{i}', 'type': 'function',
-                             'function': {'name': tool_calls[i]['name'], 'arguments': tool_calls[i]['args']}}
-                            for i in sorted(tool_calls)
-                        ],
-                    }
-                    messages.append(assistant_payload)
-                    for i in sorted(tool_calls):
-                        name = tool_calls[i]['name']
+                    # 执行工具：function_call 与执行结果 function_call_output 按顺序追加进 input_items
+                    for tc in tool_calls:
+                        input_items.append({'type': 'function_call', 'call_id': tc['call_id'], 'name': tc['name'], 'arguments': tc['arguments']})
+                    for tc in tool_calls:
+                        name = tc['name']
+                        tool_names.append(name)
                         try:
-                            args = json.loads(tool_calls[i]['args'] or '{}')
+                            args = json.loads(tc['arguments'] or '{}')
                         except Exception:
                             args = {}
                         result, chg = run_ai_tool(name, args, user)
                         if chg:
                             changed = True
-                        messages.append({'role': 'tool', 'tool_call_id': tool_calls[i]['id'] or f'call_{i}', 'content': result})
+                        input_items.append({'type': 'function_call_output', 'call_id': tc['call_id'], 'output': result})
                         # 前端动作工具：把 action 事件推给前端执行（跳转 / 新建笔记）
                         if name == 'navigate':
                             yield f"data: {json.dumps({'action': {'type': 'navigate', 'to': str(args.get('to') or '/')}}, ensure_ascii=False)}\n\n"
                         elif name == 'new_note':
-                            yield f"data: {json.dumps({'action': {'type': 'new_note', 'title': str(args.get('title') or ''), 'content': str(args.get('content') or '')}}, ensure_ascii=False)}\n\n"
+                            yield f"data: {json.dumps({'action': {'type': 'new_note', 'title': str(args.get('title') or ''), 'content': str(args.get('content') or ''), 'category': str(args.get('type') or '')}}, ensure_ascii=False)}\n\n"
                     yield f"data: {json.dumps({'tool': name}, ensure_ascii=False)}\n\n"
                 else:
-                    yield f"data: {json.dumps({'done': True, 'changed': changed, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]}, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'done': True, 'changed': changed, 'incomplete': truncated, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]}, ensure_ascii=False)}\n\n"
             except urllib.error.HTTPError as e:
-                yield f"data: {json.dumps({'error': f'AI 服务错误: {e.code}'}, ensure_ascii=False)}\n\n"
+                detail = e.read().decode('utf-8', errors='ignore')[:300]
+                err_txt = f'AI 服务错误: {e.code} {detail}'
+                charge = False  # 服务端错误（5xx/429 等）没给出回答：不扣费；客户端断开（GeneratorExit）仍走 finally 扣费
+                yield f"data: {json.dumps({'error': err_txt}, ensure_ascii=False)}\n\n"
             except Exception as e:
-                yield f"data: {json.dumps({'error': f'AI 服务异常: {str(e)}'}, ensure_ascii=False)}\n\n"
+                err_txt = f'AI 服务异常: {str(e)}'
+                charge = False
+                yield f"data: {json.dumps({'error': err_txt}, ensure_ascii=False)}\n\n"
             finally:
-                mark_used()
+                if charge:
+                    mark_used()
+                log_ai_chat(user, page, q_note_id, question, system, answer_buf, reasoning_buf, tool_names, changed, err_txt, delta_count, int((time.time() - t0) * 1000))
         return Response(sse_gen(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
-    # 非流式：同样支持工具调用循环
-    messages = [
-        {'role': 'system', 'content': system},
-        {'role': 'user', 'content': user_msg},
-    ]
+    # 非流式：同样支持工具调用循环（Responses API）
+    input_items = [{'role': 'user', 'content': user_msg}]
     answer = ''
     changed = False
     actions = []
+    names = []
+    t0n = time.time()
+    truncated = False
     for _round in range(3):
-        p = {**payload, 'messages': messages}
+        resp_payload = {
+            'model': DEEPSEEK_RESPONSES_MODEL,
+            'instructions': system,
+            'input': input_items,
+            'tools': AI_TOOLS_RESPONSES,
+            'tool_choice': 'auto',
+            'temperature': 0.7,
+            'reasoning': {'effort': 'none'},  # 关闭思考：v4 思考极慢（默认 50s+），用户只要结果
+            'stream': False,
+        }
         req2 = urllib.request.Request(
-            DEEPSEEK_URL,
-            data=json.dumps(p).encode('utf-8'),
+            DEEPSEEK_RESPONSES_URL,
+            data=json.dumps(resp_payload).encode('utf-8'),
             headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {DEEPSEEK_API_KEY}'},
             method='POST',
         )
         try:
-            with urllib.request.urlopen(req2, timeout=150) as resp:
+            with urllib.request.urlopen(req2, timeout=180) as resp:
                 result = json.loads(resp.read().decode('utf-8'))
         except urllib.error.HTTPError as e:
             detail = e.read().decode('utf-8', errors='ignore')[:200]
             return jsonify({'error': f'AI 服务错误: {e.code} {detail}'}), 502
         except Exception as e:
             return jsonify({'error': f'AI 服务异常: {str(e)}'}), 502
-        msg = result['choices'][0]['message']
-        if msg.get('tool_calls'):
-            messages.append({'role': 'assistant', 'content': msg.get('content'), 'tool_calls': msg['tool_calls']})
-            for tc in msg['tool_calls']:
-                name = tc['function']['name']
-                try:
-                    args = json.loads(tc['function']['arguments'] or '{}')
-                except Exception:
-                    args = {}
-                res_txt, chg = run_ai_tool(name, args, user)
-                if chg:
-                    changed = True
-                if name == 'navigate':
-                    actions.append({'type': 'navigate', 'to': str(args.get('to') or '/')})
-                elif name == 'new_note':
-                    actions.append({'type': 'new_note', 'title': str(args.get('title') or ''), 'content': str(args.get('content') or '')})
-                messages.append({'role': 'tool', 'tool_call_id': tc['id'], 'content': res_txt})
-            continue
-        answer = msg.get('content') or ''
-        break
+        # Responses 层失败（HTTP 200 但 status=failed）：报错且不扣费
+        if result.get('status') == 'failed':
+            err = result.get('error') or {}
+            return jsonify({'error': 'AI 服务错误: ' + str(err.get('message') or err.get('code') or 'response.failed')}), 502
+        if result.get('status') == 'incomplete':
+            truncated = True  # 输出被截断（如达 max_output_tokens）
+        # 从 output 数组提取：message 文本（output_text 块）+ function_call
+        tool_calls = []
+        for item in result.get('output') or []:
+            if item.get('type') == 'message':
+                for c in item.get('content') or []:
+                    if c.get('type') == 'output_text':
+                        answer += c.get('text') or ''
+            elif item.get('type') == 'function_call':
+                tool_calls.append({
+                    'call_id': item.get('call_id') or f'call_{len(tool_calls)}',
+                    'name': item.get('name') or '',
+                    'arguments': item.get('arguments') or '',
+                })
+        if not tool_calls:
+            break
+        # 执行工具：function_call 与 function_call_output 按顺序追加进 input_items
+        for tc in tool_calls:
+            input_items.append({'type': 'function_call', 'call_id': tc['call_id'], 'name': tc['name'], 'arguments': tc['arguments']})
+        for tc in tool_calls:
+            name = tc['name']
+            names.append(name)
+            try:
+                args = json.loads(tc['arguments'] or '{}')
+            except Exception:
+                args = {}
+            res_txt, chg = run_ai_tool(name, args, user)
+            if chg:
+                changed = True
+            input_items.append({'type': 'function_call_output', 'call_id': tc['call_id'], 'output': res_txt})
+            if name == 'navigate':
+                actions.append({'type': 'navigate', 'to': str(args.get('to') or '/')})
+            elif name == 'new_note':
+                actions.append({'type': 'new_note', 'title': str(args.get('title') or ''), 'content': str(args.get('content') or ''), 'category': str(args.get('type') or '')})
+        continue
     # 计数
     conn = get_conn()
     try:
@@ -2773,7 +3004,30 @@ def ai_chat(user=None):
     finally:
         conn.close()
     answer = re.sub(r'\\+([a-zA-Z])', r'\\\1', answer)  # \\sin -> \sin
-    return jsonify({'answer': answer, 'used': used + 1, 'quota': quota, 'changed': changed, 'actions': actions, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]})
+    log_ai_chat(user, page, data.get('note_id'), question, system, answer, '', names, changed, '', 0, int((time.time() - t0n) * 1000))
+    return jsonify({'answer': answer, 'used': used + 1, 'quota': quota, 'changed': changed, 'truncated': truncated, 'actions': actions, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]})
+
+@app.route('/api/ai/logs', methods=['GET'])
+@require_login
+def ai_logs(user=None):
+    # AI 对话日志（管理员查看，用于复盘 prompt 效果）
+    if user['role'] != 'admin':
+        return jsonify({'error': '无权限'}), 403
+    try:
+        limit = max(1, min(int(request.args.get('limit', 20)), 100))
+    except Exception:
+        limit = 20
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT l.id, l.user_id, u.username, l.page, l.note_id, l.question, l.answer, l.reasoning, l.tool_names, "
+                "l.changed, l.err, l.delta_count, l.elapsed_ms, l.created_at "
+                "FROM ai_chat_logs l LEFT JOIN users u ON u.id = l.user_id ORDER BY l.id DESC LIMIT %s", (limit,))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return jsonify({'logs': rows})
 
 @app.route('/api/ai/edit-suggest', methods=['POST'])
 @require_login
@@ -2831,24 +3085,79 @@ def ai_edit_suggest(user=None):
         '9. 【范围严格对应】replacement 的范围必须与 target 完全对应：target 覆盖哪些原文，replacement 就只替换哪些，'
         '不要把 target 之前或之后的原文（如下一行、下一个段落）写进 replacement，也不要在 replacement 末尾重复后面的原文；'
         '如果多处需要修改，就把每处写成独立的 edit，各自只覆盖自己的那一小段。'
+        '10. 【空笔记】如果【笔记上下文】为空（新笔记/空白页），target 填空字符串 ""，replacement 填要写入的完整 Markdown 内容，只输出一个 edit。'
+        '11. 【同位置追加合并】如果要往同一位置（如文末、某个小节末尾）追加多条内容（多个例题、多行公式、多条要点），'
+        '必须合并成【一个】edit（replacement 里按顺序包含全部新增内容），'
+        '禁止拆成多个 target 相同或重叠的 edit——前端一个位置只能展示一个修改块，重叠会导致部分修改看不见。'
+        '12. 【例题/公式框：取舍】成块的例题可用 :::example 标题\\n内容\\n::: 包裹，独立的公式组可用 :::formula 包裹'
+        '（站内会渲染成彩色框，格式与代码块类似）；但要取舍：行内公式、简短跟随文字的小题/公式不包，保持 LaTeX 行内即可，不要什么都套框。'
     )
     user_msg = ''
     if note_ctx:
         user_msg += '【笔记上下文】\n' + note_ctx + '\n\n'
     user_msg += '【选中内容】\n' + (target if target else '（未选中任何内容，请自行定位全文中的修改点）') + '\n\n'
     user_msg += '【修改指令】\n' + instruction
+
+    # 空笔记（新页面，无任何原文）：target 锚点模型不适用，直接生成完整正文返回给前端写入
+    if not note_ctx.strip():
+        sys_full = (system + ' 注意：当前【笔记上下文】为空，这是一篇全新的空白笔记。'
+                    '你直接生成完整的 Markdown 正文（可用 ## 小节标题、要点列表、LaTeX 公式用 $...$ / $$...$$ 源码），'
+                    '输出正文本身即可；不要输出 JSON、不要输出解释、不要用 ```markdown 包裹。')
+        payload_full = {
+            'model': DEEPSEEK_RESPONSES_MODEL,
+            'instructions': sys_full,
+            'input': [{'role': 'user', 'content': user_msg}],
+            'temperature': 0.5,
+            'reasoning': {'effort': 'none'},
+            'stream': False,
+        }
+        req_full = urllib.request.Request(
+            DEEPSEEK_RESPONSES_URL,
+            data=json.dumps(payload_full).encode('utf-8'),
+            headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + DEEPSEEK_API_KEY},
+            method='POST',
+        )
+        try:
+            with urllib.request.urlopen(req_full, timeout=90) as resp:
+                result_full = json.loads(resp.read().decode('utf-8'))
+            raw_full = ''
+            for item in result_full.get('output') or []:
+                if item.get('type') == 'message':
+                    for c in item.get('content') or []:
+                        if c.get('type') == 'output_text':
+                            raw_full += c.get('text') or ''
+            raw_full = raw_full.strip()
+            raw_full = re.sub(r'\\+([a-zA-Z])', r'\\\1', raw_full)  # \\sin -> \sin
+            if not raw_full:
+                return jsonify({'error': 'AI 没有返回有效内容，请换个说法重试'}), 422
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode('utf-8', errors='ignore')[:200]
+            return jsonify({'error': 'AI 服务错误: ' + str(e.code) + ' ' + detail}), 502
+        except Exception as e:
+            return jsonify({'error': 'AI 服务异常: ' + str(e)}), 502
+        try:
+            conn2 = get_conn()
+            try:
+                with conn2.cursor() as cur:
+                    cur.execute('UPDATE users SET ai_used = ai_used + 1 WHERE id=%s', (user['id'],))
+                conn2.commit()
+            finally:
+                conn2.close()
+        except Exception:
+            pass
+        return jsonify({'content': raw_full, 'used': used + 1, 'quota': quota})
+
     payload = {
-        'model': DEEPSEEK_MODEL,
-        'messages': [
-            {'role': 'system', 'content': system},
-            {'role': 'user', 'content': user_msg},
-        ],
+        'model': DEEPSEEK_RESPONSES_MODEL,
+        'instructions': system,
+        'input': [{'role': 'user', 'content': user_msg}],
         'temperature': 0.4,
+        'reasoning': {'effort': 'none'},
+        'text': {'format': {'type': 'json_object'}},
         'stream': False,
-        'response_format': {'type': 'json_object'},
     }
     req = urllib.request.Request(
-        DEEPSEEK_URL,
+        DEEPSEEK_RESPONSES_URL,
         data=json.dumps(payload).encode('utf-8'),
         headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + DEEPSEEK_API_KEY},
         method='POST',
@@ -2856,7 +3165,13 @@ def ai_edit_suggest(user=None):
     try:
         with urllib.request.urlopen(req, timeout=90) as resp:
             result = json.loads(resp.read().decode('utf-8'))
-        raw = result['choices'][0]['message']['content'].strip()
+        raw = ''
+        for item in result.get('output') or []:
+            if item.get('type') == 'message':
+                for c in item.get('content') or []:
+                    if c.get('type') == 'output_text':
+                        raw += c.get('text') or ''
+        raw = raw.strip()
         # 解析 JSON（容错：去掉可能的外层 ```json 包裹 / 提取首个 {…}）
         import re as _re
         m = _re.search(r'\{.*\}', raw, _re.S)
@@ -2872,7 +3187,10 @@ def ai_edit_suggest(user=None):
                 continue
             t = str(e.get('target') or '').strip()
             r = str(e.get('replacement') or '').strip()
-            if not t or not r:
+            if not r:
+                continue
+            # 空笔记场景：target 为空表示整篇新增（仅当笔记上下文为空时允许）
+            if not t and note_ctx.strip():
                 continue
             # AI 常把 LaTeX 写成双反斜杠，归一为单反斜杠
             r = _re.sub(r'\\+([a-zA-Z])', r'\\\1', r)
@@ -3001,11 +3319,11 @@ def api_feed():
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT d.id, d.title, d.created_at AS ts, 'doc' AS act, u.username, u.nickname
+            cur.execute("""SELECT d.id, d.public_id, d.title, d.created_at AS ts, 'doc' AS act, u.username, u.nickname
                            FROM docs d JOIN users u ON u.id = d.user_id
                            WHERE d.visibility = 'public'""" + uid_where + " ORDER BY d.created_at DESC LIMIT 5", uid_args)
             for r in cur.fetchall():
-                rows.append((r['ts'], {'type': 'doc', 'doc_id': r['id'], 'doc_title': r['title'],
+                rows.append((r['ts'], {'type': 'doc', 'doc_id': r['id'], 'doc_public_id': r['public_id'], 'doc_title': r['title'],
                                        'username': r['username'], 'nickname': r['nickname']}))
             like_where = " AND nl.user_id = %s" if uid_f else ""
             cur.execute("""SELECT nl.doc_id, d.title, nl.created_at AS ts, u.username, u.nickname
@@ -3057,7 +3375,7 @@ def changelog_digest():
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT d.title, d.type, d.id, CAST(d.updated_at AS CHAR) AS ts,
+            cur.execute("""SELECT d.title, d.type, d.id, d.public_id, CAST(d.updated_at AS CHAR) AS ts,
                 d.user_id, u.nickname, u.username
                 FROM docs d LEFT JOIN users u ON d.user_id=u.id
                 WHERE d.updated_at >= NOW() - INTERVAL %s DAY AND d.visibility='public'

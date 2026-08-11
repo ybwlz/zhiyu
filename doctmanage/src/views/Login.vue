@@ -181,7 +181,6 @@ const doRegister = () => {
         </template>
       </el-form>
 
-      <p class="login-tip" v-if="tab === 'register'">首个注册用户将自动成为知识库管理员</p>
     </div>
   </div>
 </template>

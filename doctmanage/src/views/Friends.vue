@@ -12,16 +12,16 @@
     <div v-if="tab === 'following'" class="f-list">
       <div v-if="!following.length" class="center empty">还没有关注任何人，去「发现用户」找找吧</div>
       <div v-for="u in following" :key="u.id" class="f-row">
-        <div class="f-avatar" @click="goUser(u.id)">
+        <div class="f-avatar" @click="goUser(u.other_public_id || u.other_id || u.id)">
           <img v-if="u.avatar" :src="u.avatar" alt="" />
           <span v-else>{{ (u.nickname || u.username || '?').slice(0, 1) }}</span>
         </div>
-        <div class="f-info" @click="goUser(u.id)">
+        <div class="f-info" @click="goUser(u.other_public_id || u.other_id || u.id)">
           <div class="f-name">{{ u.nickname || u.username }}</div>
           <div class="f-id">@{{ u.username }} · 积分 {{ u.points }}</div>
         </div>
         <div class="f-acts">
-          <button class="msg-btn sm" data-tip="私信" @click="openChat(u.id)">✉️</button>
+          <button class="msg-btn sm" data-tip="私信" @click="openChat(u.other_public_id || u.other_id || u.id)">✉️</button>
           <button class="follow-btn sm on" @click="toggle(u)">已关注</button>
         </div>
       </div>
@@ -31,16 +31,16 @@
     <div v-else-if="tab === 'followers'" class="f-list">
       <div v-if="!followers.length" class="center empty">还没有粉丝</div>
       <div v-for="u in followers" :key="u.id" class="f-row">
-        <div class="f-avatar" @click="goUser(u.id)">
+        <div class="f-avatar" @click="goUser(u.other_public_id || u.other_id || u.id)">
           <img v-if="u.avatar" :src="u.avatar" alt="" />
           <span v-else>{{ (u.nickname || u.username || '?').slice(0, 1) }}</span>
         </div>
-        <div class="f-info" @click="goUser(u.id)">
+        <div class="f-info" @click="goUser(u.other_public_id || u.other_id || u.id)">
           <div class="f-name">{{ u.nickname || u.username }}</div>
           <div class="f-id">@{{ u.username }} · 积分 {{ u.points }}</div>
         </div>
         <div class="f-acts">
-          <button class="msg-btn sm" data-tip="私信" @click="openChat(u.id)">✉️</button>
+          <button class="msg-btn sm" data-tip="私信" @click="openChat(u.other_public_id || u.other_id || u.id)">✉️</button>
           <button v-if="!u.is_me" class="follow-btn sm" :class="{ on: u.is_following }" @click="toggle(u)">{{ u.is_following ? '已关注' : '回关' }}</button>
         </div>
       </div>
@@ -55,16 +55,16 @@
       <div v-if="searched" class="f-list">
         <div v-if="!results.length" class="center empty">没有找到相关用户</div>
         <div v-for="u in results" :key="u.id" class="f-row">
-          <div class="f-avatar" @click="goUser(u.id)">
+          <div class="f-avatar" @click="goUser(u.other_public_id || u.other_id || u.id)">
             <img v-if="u.avatar" :src="u.avatar" alt="" />
             <span v-else>{{ (u.nickname || u.username || '?').slice(0, 1) }}</span>
           </div>
-          <div class="f-info" @click="goUser(u.id)">
+          <div class="f-info" @click="goUser(u.other_public_id || u.other_id || u.id)">
             <div class="f-name">{{ u.nickname || u.username }}</div>
             <div class="f-id">@{{ u.username }} · 积分 {{ u.points }}</div>
           </div>
           <div class="f-acts">
-            <button class="msg-btn sm" data-tip="私信" @click="openChat(u.id)">✉️</button>
+            <button class="msg-btn sm" data-tip="私信" @click="openChat(u.other_public_id || u.other_id || u.id)">✉️</button>
             <button v-if="!u.is_me" class="follow-btn sm" :class="{ on: u.is_following }" @click="toggle(u)">{{ u.is_following ? '已关注' : '+ 关注' }}</button>
           </div>
         </div>

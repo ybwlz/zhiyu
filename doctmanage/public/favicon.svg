@@ -1,0 +1,15 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="64" height="64" rx="14" fill="url(#g)"/>
+  <!-- 与导航栏 logo 同款：白色线条（8字去右上弧 + 底部胖 + 蒂右弯） -->
+  <path d="M31 7 C 37 7, 39 11, 34 16
+           A 10 10 0 0 0 34 36
+           A 16 16 0 0 0 34 58
+           A 16 16 0 0 0 34 26"
+        fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

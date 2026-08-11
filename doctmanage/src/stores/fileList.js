@@ -44,9 +44,9 @@ export const useFileListStore = defineStore('fileList', () => {
             throw e;
         }
     }
-    const fetchDocBySlug = async (slug) => {
+    const fetchDocByKey = async (key) => {
         try {
-            const res = await api.get(`/docs/by-slug/${slug}`);
+            const res = await api.get(`/docs/by-key/${key}`);
             currentDoc.value = res.data;
             return currentDoc.value;
         } catch (e) {
@@ -70,7 +70,7 @@ export const useFileListStore = defineStore('fileList', () => {
         dataRefresh,
         fetchDocs,
         fetchDoc,
-        fetchDocBySlug,
+        fetchDocByKey,
         getData,
         getLoading,
     };

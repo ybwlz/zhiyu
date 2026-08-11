@@ -1,4 +1,6 @@
 <script setup>
+import { onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth.js'
 import NavBar from '@/components/NavBar.vue'
 import { themeState } from '@/utils/theme.js'
 import StarfieldBackground from '@/components/StarfieldBackground.vue'
@@ -7,6 +9,9 @@ import MinimalBackground from '@/components/MinimalBackground.vue'
 import AIAssistant from '@/components/AIAssistant.vue'
 import ToolBall from '@/components/ToolBall.vue'
 
+const auth = useAuthStore()
+// 启动时用最新 /auth/me 刷新登录用户信息（后端字段有更新时，localStorage 旧缓存也能补上 public_id 等新字段）
+onMounted(() => { auth.fetchMe() })
 
 </script>
 
@@ -31,9 +36,60 @@ import ToolBall from '@/components/ToolBall.vue'
 body.immersive .kb-navbar {
   display: none !important;
 }
+body.immersive .ai-assistant,
+body.immersive .tball {
+  display: none !important;
+}
+/* 沉浸时隐藏选中文字的「引用」定位浮层（Teleport 到 body，需全局规则） */
+body.immersive .sel-tip {
+  display: none !important;
+}
+/* 沉浸时：导航栏隐藏，Menu/大纲 浮空按钮移到顶部导航栏位置，内容占位相应减小（docs / 笔记阅读 / 笔记广场 全部向上补齐） */
+body.immersive .mobile-header-sub {
+  top: 10px;
+}
+body.immersive .docs-layout,
+body.immersive .reader-page,
+body.immersive .square-page {
+  padding-top: 52px !important;
+}
+/* 移动端聊天页：进入具体会话时隐藏顶部导航栏，全屏聊天（QQ 式） */
+@media (max-width: 900px) {
+  body.chatting .kb-navbar {
+    display: none !important;
+  }
+}
+/* 移动端编辑页：页面自带「← 返回」，隐藏顶部导航栏，顶部更精简 */
+@media (max-width: 860px) {
+  body.editing .kb-navbar {
+    display: none !important;
+  }
+}
+/* 移动端 docs 菜单抽屉 + 大纲浮层：毛玻璃半透明（两者都 teleport 到 body，需全局规则） */
+@media (max-width: 860px) {
+  body .el-drawer.mobile-menu-drawer {
+    --el-drawer-bg-color: color-mix(in srgb, var(--bg-soft) 80%, transparent) !important;
+    background: color-mix(in srgb, var(--bg-soft) 80%, transparent) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .outline-popover {
+    background: color-mix(in srgb, var(--bg-soft) 82%, transparent) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+}
 body.immersive {
   background: var(--bg);
 }
+/* 沉浸按钮：无背景纯图标（⛶），hover 提示用站内统一 data-tip 气泡（0.5s 向下浮现）；位置由各页面 scoped 指定：阅览室左侧、笔记页右侧 */
+.immersive-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: none; color: var(--text2);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 6px;
+  transition: color .2s;
+}
+.immersive-btn:hover { color: var(--brand-1); }
 
 /* 手绘删除确认弹窗（DoodleBall） */
 .el-message-box.zhy-doodle-confirm {

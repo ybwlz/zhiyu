@@ -10,7 +10,7 @@
       <button class="refresh-btn" @click="load">刷新</button>
     </div>
 
-    <div class="square-layout">
+    <div ref="layout" class="square-layout">
       <!-- ── 左栏：科目导航 + 快捷入口 ── -->
       <aside class="sq-left">
         <div class="panel">
@@ -44,13 +44,13 @@
 
         <div class="feed">
           <div v-for="n in visibleNotes" :key="n.id" class="feed-row">
-            <div class="row-avatar-wrap" @click="goUser(n.user_id)">
+            <div class="row-avatar-wrap" @click="goUser(n.author_public_id || n.user_id)">
               <img v-if="n.author_avatar" class="row-avatar" :src="n.author_avatar" alt="" />
               <span v-else class="row-avatar row-avatar-ph">{{ (n.author_nickname || n.author_username || '?').slice(0, 1) }}</span>
             </div>
             <div class="row-body">
               <div class="row-author">
-                <span class="row-author-name" @click="goUser(n.user_id)">{{ n.author_nickname || n.author_username || '系统' }}</span>
+                <span class="row-author-name" @click="goUser(n.author_public_id || n.user_id)">{{ n.author_nickname || n.author_username || '系统' }}</span>
                 <span class="type-badge">{{ n.type }}</span>
                 <span v-if="n.pinned_until && new Date(n.pinned_until) > new Date()" class="pin-badge">📌</span>
                 <span v-if="n.price > 0" class="coin-badge">💎 {{ n.price }}</span>
@@ -58,19 +58,19 @@
                 <span v-if="n.downloadable === 0" class="no-dl">📵 不可下载</span>
                 <span class="row-time">{{ timeAgo(n.updated_at) }}</span>
               </div>
-              <h3 class="row-title" @click="openNote(n.id)">{{ n.title }}</h3>
-              <p class="row-preview" @click="openNote(n.id)">{{ previewText(n) }}</p>
-              <div v-if="imagesOf(n).length" class="row-imgs" @click="openNote(n.id)">
+              <h3 class="row-title" @click="openNote(n.public_id || n.id)">{{ n.title }}</h3>
+              <p class="row-preview" @click="openNote(n.public_id || n.id)">{{ previewText(n) }}</p>
+              <div v-if="imagesOf(n).length" class="row-imgs" @click="openNote(n.public_id || n.id)">
                 <img v-for="(img, i) in imagesOf(n)" :key="i" :src="img" alt="" loading="lazy" />
               </div>
               <div class="row-actions">
                 <button class="fa-btn" :class="{ on: liked[n.id] }" @click="toggleLike(n)">
-                  {{ liked[n.id] ? '❤️' : '🤍' }} {{ (n.likes_count || 0) + (liked[n.id] ? 1 : 0) }}
+                  {{ liked[n.id] ? '❤️' : '🤍' }} {{ n.likes_count || 0 }}
                 </button>
                 <button class="fa-btn" :class="{ on: faved[n.id] }" @click="toggleFav(n)">
                   {{ faved[n.id] ? '⭐' : '☆' }} {{ (n.favorites_count || 0) + (faved[n.id] ? 1 : 0) }}
                 </button>
-                <button class="fa-btn" @click="openNote(n.id)">💬 {{ n.comments_count || 0 }}</button>
+                <button class="fa-btn" @click="openNoteComment(n.public_id || n.id)">💬 {{ n.comments_count || 0 }}</button>
                 <button class="fa-btn" @click="downloadNote(n)">⬇ {{ n.downloads_count || 0 }}</button>
                 <button class="fa-btn add" :class="{ in: isCollected(n) }" :data-tip="isCollected(n) ? '已在你的书房（归你所有，可编辑）' : '加入书房（复制一份归你所有）'" @click="toggleCollect(n)">
                   {{ isCollected(n) ? '✓ 已在书房' : '📥 加入书房' }}
@@ -89,7 +89,7 @@
       <aside class="sq-right">
         <div class="panel">
           <div class="panel-title">🔥 热门榜</div>
-          <div v-for="(n, i) in hotNotes" :key="n.id" class="rank-item" @click="openNote(n.id)">
+          <div v-for="(n, i) in hotNotes" :key="n.id" class="rank-item" @click="openNote(n.public_id || n.id)">
             <span class="rank-no" :class="{ top: i < 3 }">{{ i + 1 }}</span>
             <span class="rank-title">{{ n.title }}</span>
             <span class="rank-meta">👍 {{ n.likes_count || 0 }}</span>
@@ -97,7 +97,7 @@
         </div>
         <div class="panel">
           <div class="panel-title">✨ 最新收录</div>
-          <div v-for="n in recentNotes" :key="n.id" class="rank-item" @click="openNote(n.id)">
+          <div v-for="n in recentNotes" :key="n.id" class="rank-item" @click="openNote(n.public_id || n.id)">
             <span class="rank-dot"></span>
             <span class="rank-title">{{ n.title }}</span>
             <span class="rank-meta">{{ timeAgo(n.updated_at) }}</span>
@@ -191,18 +191,30 @@ export default {
       } catch (e) { /* 忽略 */ }
     },
     async toggleLike(n) {
-      try {
-        const res = await api.post('/notes/' + n.id + '/like')
-        if (res.data && res.data.liked !== undefined) this.liked[n.id] = !!res.data.liked
-        else this.liked[n.id] = !this.liked[n.id]
-      } catch (e) { /* 未登录或失败 */ }
+      if (this.liked[n.id]) {
+        // 已赞 → 取消点赞（DELETE）
+        try { await api.delete('/notes/' + n.id + '/like') } catch (e) { /* 忽略 */ }
+        this.liked[n.id] = false
+        if (typeof n.likes_count === 'number') n.likes_count = Math.max(0, n.likes_count - 1)
+      } else {
+        try {
+          const res = await api.post('/notes/' + n.id + '/like')
+          this.liked[n.id] = true
+          if (res.data && typeof res.data.likes_count === 'number') n.likes_count = res.data.likes_count
+          else if (typeof n.likes_count === 'number') n.likes_count += 1
+        } catch (e) { /* 未登录或失败 */ }
+      }
     },
     async toggleFav(n) {
-      try {
-        const res = await api.post('/notes/' + n.id + '/favorite')
-        if (res.data && res.data.faved !== undefined) this.faved[n.id] = !!res.data.faved
-        else this.faved[n.id] = !this.faved[n.id]
-      } catch (e) { /* 未登录或失败 */ }
+      if (this.faved[n.id]) {
+        try { await api.delete('/notes/' + n.id + '/favorite') } catch (e) { /* 忽略 */ }
+        this.faved[n.id] = false
+      } else {
+        try {
+          const res = await api.post('/notes/' + n.id + '/favorite')
+          this.faved[n.id] = true
+        } catch (e) { /* 未登录或失败 */ }
+      }
     },
     // 加入/移出阅览室：临时引用，不复制
     async toggleRoom(n) {
@@ -250,6 +262,8 @@ export default {
       }
     },
     openNote(id) { this.$router.push('/notes/' + id) },
+    // 打开笔记并滚动到评论区（?focus=comment）
+    openNoteComment(id) { this.$router.push('/notes/' + id + '?focus=comment') },
     goUser(uid) { if (uid) this.$router.push('/user/' + uid) },
     setType(t) { this.typeFilter = t; this.load() },
     showMore() { this.visibleCount += this.PAGE_STEP },
@@ -379,5 +393,20 @@ export default {
   .sq-left, .sq-right { display: none; }
   .feed-row { padding: 18px 6px; gap: 12px; }
   .row-avatar { width: 40px; height: 40px; }
+}
+/* 手机端：单列铺满、头部与操作适配 */
+@media (max-width: 720px) {
+  .square-page { padding: 82px 12px 48px; }
+  .square-head { margin-bottom: 16px; }
+  .square-title { font-size: 24px; }
+  .toolbar { flex-wrap: nowrap; }
+  .search-input { flex: 1 1 auto; width: auto; max-width: none; min-width: 0; }
+  .sq-main { flex: 1 1 100%; width: 100%; max-width: 100%; }
+  .feed-row { padding: 16px 4px; gap: 10px; }
+  .row-avatar { width: 36px; height: 36px; }
+  .row-title { font-size: 17px; }
+  .row-imgs { overflow-x: auto; }
+  .row-imgs img { width: 120px; height: 82px; }
+  .more-btn { width: 100%; }
 }
 </style>
