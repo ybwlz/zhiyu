@@ -122,14 +122,13 @@
         <div class="modal-row"><label>科目</label><input v-model="uploadType" class="modal-input" placeholder="如：高等数学" /></div>
         <div class="modal-row">
           <label>公开</label>
-          <select v-model="uploadVis" class="modal-input vis-select">
-            <option value="private">私密（仅自己）</option>
-            <option value="public">公开（上笔记广场）</option>
-          </select>
+          <VisibilitySelect v-model="uploadVis" :options="uploadVisOptions" />
         </div>
         <div class="modal-row">
           <label>开放下载</label><input type="checkbox" v-model="uploadDL" />
-          <label class="ml">收费（知屿币）</label><input v-model.number="uploadPrice" type="number" min="0" class="modal-input w60" />
+          <label class="ml">收费（知屿币）</label><input v-model.number="uploadPrice" type="number" min="0" class="modal-input w60" :class="{ 'input-err': uploadPriceErr }" :disabled="uploadVis === 'private'" />
+          <span v-if="uploadPriceErr" class="price-err">价格不能为负数</span>
+          <span v-else-if="uploadVis === 'private'" class="hint">私密笔记不可购买，无需定价</span>
         </div>
         <div class="modal-row">
           <label>仅预览</label><input type="checkbox" v-model="uploadPreview" />
@@ -160,9 +159,10 @@
           <div class="modal-row"><label>科目</label><input v-model="aiType" class="modal-input" /></div>
           <div class="modal-row">
             <label>公开</label>
-            <select v-model="aiVis" class="modal-input vis-select"><option value="private">私密</option><option value="public">公开</option></select>
+            <VisibilitySelect v-model="aiVis" :options="aiVisOptions" />
             <label class="ml">开放下载</label><input type="checkbox" v-model="aiDL" />
-            <label class="ml">收费</label><input v-model.number="aiPrice" type="number" min="0" class="modal-input w60" />
+            <label class="ml">收费</label><input v-model.number="aiPrice" type="number" min="0" class="modal-input w60" :class="{ 'input-err': aiPriceErr }" :disabled="aiVis === 'private'" />
+            <span v-if="aiPriceErr" class="price-err">价格不能为负数</span>
             <label class="ml">仅预览</label><input type="checkbox" v-model="aiPreview" />
           </div>
           <div class="ai-preview"><pre class="ai-gen">{{ aiGen }}</pre></div>
@@ -179,9 +179,11 @@
 <script>
 import api from '@/utils/api.js'
 import { ElMessage } from 'element-plus'
+import VisibilitySelect from '@/components/VisibilitySelect.vue'
 
 export default {
   name: 'AdminStudy',
+  components: { VisibilitySelect },
   data() {
     return {
       myNotes: [],
@@ -190,6 +192,8 @@ export default {
       activeType: '',
       uploadOpen: false, uploadFiles: [], uploadType: '数学', uploadVis: 'private',
       uploadDL: true, uploadPrice: 0, uploadPreview: false, uploading: false,
+      uploadVisOptions: [{ value: 'private', label: '私密（仅自己）' }, { value: 'public', label: '公开（上笔记广场）' }],
+      aiVisOptions: [{ value: 'private', label: '私密' }, { value: 'public', label: '公开' }],
       aiOpen: false, aiTopic: '', aiTitle: '', aiType: '数学', aiVis: 'private',
       aiDL: true, aiPrice: 0, aiPreview: false, aiGen: '', aiBusy: false, aiMode: 'draft',
       sideCollapsed: false,
@@ -201,6 +205,9 @@ export default {
     }
   },
   computed: {
+    // 价格负数提示（私密时价格已禁用，无需提示）
+    uploadPriceErr() { return this.uploadVis !== 'private' && this.uploadPrice < 0 },
+    aiPriceErr() { return this.aiVis !== 'private' && this.aiPrice < 0 },
     grouped() {
       const map = new Map()
       for (const n of this.myNotes) {
@@ -517,6 +524,10 @@ export default {
 .modal-row label.ml { width: auto; }
 .modal-input { flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text1); font-size: 13.5px; }
 .modal-input.w60 { width: 70px; flex: none; }
+.modal-input:disabled { opacity: .5; cursor: not-allowed; }
+/* 价格负数错误提示（登录框同款红色） */
+.input-err { border-color: var(--danger, #e5484d) !important; }
+.price-err { font-size: 12px; color: var(--danger, #e5484d); font-weight: 600; flex-shrink: 0; }
 /* 公开/私密下拉：跟随深色主题（含展开的选项列表），星空背景下不再是白色 */
 .vis-select { flex: 1; min-width: 0; }
 html[data-theme="starlight"] .vis-select {
