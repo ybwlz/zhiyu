@@ -43,6 +43,19 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true, highlight:
   return hljs.highlightAuto(code).value
 }}).use(emoji).use(mathjax3).use(mdImgSize)
 setupAnnotation(md)
+// 代码块包裹：与 Docs/NoteReader 阅读页一致（容器 + 语言标签 + 复制按钮），保存时 .code-header 不落正文
+md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+  const token = tokens[idx]
+  const langName = token.info ? String(token.info).trim().split(/\s+/)[0] : ''
+  let code = options.highlight ? options.highlight(token.content, langName) : ''
+  if (!code) code = md.utils.escapeHtml(token.content)
+  const label = langName ? `<span class="code-lang">${langName}</span>` : ''
+  const copyBtn = `<button class="copy-code-btn" contenteditable="false" data-code="${encodeURIComponent(token.content)}"></button>`
+  return `<div class="code-block-wrapper">` +
+         `<div class="code-header">${label}${copyBtn}</div>` +
+         `<pre class="language-${langName}"><code class="language-${langName}">${code}</code></pre>` +
+         `</div>`
+}
 // 自定义块容器：例题 / 公式 / 提示 / 信息 / 警告 / 注意（:::example / :::formula / :::tip …）
 const createBlock = (klass, defaultTitle) => [Container, klass, {
   render(tokens, idx) {
@@ -103,6 +116,11 @@ const ensureAnnCanvases = (root) => {
 
 // ── 所见即所得反向：HTML -> markdown（公式还原为 $...$ / $$...$$） ──
 const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-' })
+// 代码块头部（语言标签 + 复制按钮）是渲染装饰，保存时不进正文
+td.addRule('codeHeader', {
+  filter: (node) => node.classList && node.classList.contains('code-header'),
+  replacement: () => '',
+})
 // 图片尺寸：编辑器调整大小后保存为 markdown 的 =WxH 语法（addRule 会插到最前优先匹配）
 td.addRule('imgSize', {
   filter: 'img',
@@ -357,6 +375,17 @@ const locateInsertInContent = (inst) => {
 // 编辑区右键（批注已由徽章直接绑定处理）
 const onEditorCtx = (e) => { /* 批注右键删除在徽章上直接绑定 */ }
 const onEditorClick = (e) => {
+  // 代码块复制按钮（与 Docs/NoteReader 阅读页一致）：复制 + copied 反馈，不进入编辑
+  if (e.target.classList.contains('copy-code-btn')) {
+    e.preventDefault()
+    e.stopPropagation()
+    const code = decodeURIComponent(e.target.getAttribute('data-code') || '')
+    navigator.clipboard.writeText(code).then(() => {
+      e.target.classList.add('copied')
+      setTimeout(() => e.target.classList.remove('copied'), 2000)
+    }).catch(() => {})
+    return
+  }
   // 批注由全局委托处理（capture 阶段已拦截），这里不再重复
   lastClickPos = { x: e.clientX, y: e.clientY }
   lastClickTime = Date.now()
