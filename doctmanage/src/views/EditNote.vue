@@ -1795,13 +1795,15 @@ onBeforeUnmount(() => {
     <div class="edit-topbar">
       <button class="back-btn" @click="goBack">← 返回</button>
       <input v-model="title" class="title-input" :placeholder="isEdit ? '笔记标题' : '新笔记标题'" />
-      <input v-model="type" class="type-input" placeholder="分类（如：高等数学）" />
-      <div class="vis-seg">
-        <button class="vis-opt" :class="{ on: visibility === 'private' }" @click="visibility = 'private'">私密</button>
-        <button class="vis-opt" :class="{ on: visibility === 'public' }" @click="visibility = 'public'">公开</button>
-      </div>
       <span v-if="draftTs && !showDraftRestore" class="draft-badge" data-tip="内容已自动暂存到本机，防刷新丢失">● 已暂存 {{ draftTime }}</span>
       <button class="save-btn" :disabled="busy" @click="save">{{ busy ? '保存中…' : '保存' }}</button>
+      <div class="edit-meta-row">
+        <input v-model="type" class="type-input" placeholder="分类（如：高等数学）" />
+        <div class="vis-seg">
+          <button class="vis-opt" :class="{ on: visibility === 'private' }" @click="visibility = 'private'">私密</button>
+          <button class="vis-opt" :class="{ on: visibility === 'public' }" @click="visibility = 'public'">公开</button>
+        </div>
+      </div>
     </div>
 
     <div v-if="showDraftRestore" class="draft-restore">
@@ -2021,6 +2023,8 @@ onBeforeUnmount(() => {
   background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
   color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
 }
+/* 分类+可见性 组合行（桌面端内联，移动端整行换行） */
+.edit-meta-row { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .save-btn:disabled { opacity: .5; cursor: not-allowed; }
 .modal-mask {
   position: fixed; inset: 0; z-index: 200;
@@ -2268,8 +2272,8 @@ body.resizing-nesw, body.resizing-nesw * { cursor: nesw-resize !important; }
   .back-btn { order: 1; padding: 7px 12px; font-size: 12.5px; flex-shrink: 0; }
   .title-input { order: 1; flex: 1; min-width: 0; padding: 10px 14px; font-size: 20px; font-weight: 700; }
   .save-btn { order: 1; margin-left: auto; padding: 8px 18px; font-size: 13px; flex-shrink: 0; }
-  .type-input { order: 3; flex: 1 1 40%; min-width: 0; }
-  .vis-seg { order: 3; }
+  .edit-meta-row { order: 2; flex: 1 0 100%; width: 100%; gap: 8px; }
+  .edit-meta-row .type-input { flex: 1; min-width: 0; }
   .draft-badge { display: none; }
   /* 工具栏：单行横滑，不再换行留空；源码按钮固定最右同一行 */
   .tb-row { padding: 6px 8px; gap: 6px; flex-wrap: nowrap; }
