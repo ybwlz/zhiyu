@@ -1,76 +1,67 @@
-# 考研笔记平台 (DocManager)
+# 知屿 · 个人知识库
 
-这是一个基于 Markdown 的文档管理与展示平台，支持文档的上传、分类管理、在线预览以及基于 Slug 的路由访问。
+> 把散落的笔记、截图与灵感，收进一座自己的知识库。支持网页端与 Windows 桌面版。
 
-## 项目结构
+## ✨ 功能特性
 
-本项目采用前后端分离架构。
+- 📚 **笔记管理**：文章/笔记的创建、编辑、版本历史、草稿自动保存
+- 🖼 **富内容**：Markdown、代码高亮（行号/高亮行）、公式（MathJax）、图片、表格、自定义容器
+- 🤖 **AI 助手**：DeepSeek 驱动的问答、总结、改写，内置免费额度
+- 🏷 **知识组织**：科目/分类、标签、收藏、阅读列表、目录大纲
+- 👥 **社交**：关注、好友、私信、群聊、评论、点赞、评分
+- 🪙 **知屿币**：积分体系 + 商城兑换 AI 次数
+- 🖌 **批注涂鸦**：笔记内的划线批注与手绘涂鸦
+- 🖥 **桌面版**：Electron Windows 客户端，本地渲染、云端同步、服务器可切换
+
+## 🛠 技术栈
+
+| 层 | 技术 |
+|---|---|
+| 前端 | Vite + Vue 3 + Element Plus + Pinia + Vue Router |
+| 后端 | Python Flask + Gunicorn + MySQL (PyMySQL) |
+| 桌面 | Electron + electron-packager |
+| 其他 | Markdown-it（渲染）、MathJax（公式）、highlight.js（高亮）、DeepSeek API（AI） |
+
+## 📁 目录结构
 
 ```
-文档后台/
-├── backend/                # 后端服务 (Python Flask)
-│   ├── app.py              # 主应用程序入口
-│   ├── requirements.txt    # Python 依赖列表
-│   ├── .env                # 环境变量配置文件 (需自行创建)
-│   └── uploads/            # 临时文件上传目录
-│
-├── doctmanage/             # 前端项目 (Vue 3 + Vite)
-│   ├── src/
-│   │   ├── views/          # 页面组件 (Home, Docs, Admin, Login)
-│   │   ├── components/     # 功能组件 (Upload, Delete)
-│   │   ├── router/         # 路由配置
-│   │   ├── stores/         # Pinia 状态管理
-│   │   └── utils/          # 工具函数 (API 封装等)
-│   ├── public/             # 静态资源
-│   └── package.json        # Node.js 依赖配置
-│
-├── API.md                  # API 接口文档
-├── DEPLOY.md               # 部署文档
-└── README.md               # 项目说明 (本文件)
+├── backend/            # Flask 后端（config/db/auth/utils + routes 蓝图）
+├── doctmanage/         # 前端（Vite + Vue）与 Electron 桌面版
+│   ├── src/            # 前端源码
+│   ├── electron/       # Electron 主进程（main.cjs）
+│   └── public/         # 静态资源（含 MathJax 运行时）
+├── docs/               # 文档
+└── .env.example        # 环境变量示例
 ```
 
-## 技术栈
+## 🚀 本地开发
 
-### 后端
-- **框架**: Flask 3.0
-- **数据库**: MySQL (PyMySQL)
-- **其他**: Flask-Cors (跨域支持), python-dotenv (环境配置)
+```bash
+# 后端（Python 3.11+）
+cd backend
+python -m venv venv
+venv\Scripts\pip install -r requirements.txt   # Windows
+source venv/bin/pip install -r requirements.txt # Linux
+cp .env.example .env    # 按需配置数据库/SMTP/DeepSeek
+venv\Scripts\python app.py                      # 启动，默认 5000
 
-### 前端
-- **框架**: Vue 3 (Composition API)
-- **构建工具**: Vite
-- **UI 组件库**: Element Plus
-- **路由**: Vue Router 4
-- **状态管理**: Pinia
-- **Markdown 渲染**: markdown-it, highlight.js
-- **HTTP 客户端**: Axios
+# 前端
+cd doctmanage
+npm install
+npm run dev             # http://localhost:5173/zhiyu/
+```
 
-## 快速开始
+## ☁️ 部署
 
-请参考 [DEPLOY.md](./DEPLOY.md) 进行环境配置与部署。
+- 服务器：Nginx + Gunicorn + MySQL（详见 `DEPLOY.md`）
+- 前端构建：`npm run build`，产物在 `dist/`（base 为 `/zhiyu/`）
 
-## 功能特性
+## 🖥 桌面版
 
-- **文档管理**: 支持 Markdown 文件的上传、更新和删除。
-- **分类展示**: 首页自动根据文档类型聚合展示。
-- **在线预览**: 支持 Markdown 实时渲染、代码高亮、锚点跳转。
-- **响应式设计**: 适配桌面端与移动端访问。
-- **后台管理**: 独立的后台管理界面，需登录访问。
+- 打包：`npm run pack:win`（electron-packager）
+- 后端地址可配置：exe 同目录 `config.json` 写 `{"backend": "http://服务器地址"}`，
+  默认已连接云端；环境变量 `ZHIYU_BACKEND` 优先级最高
 
-## 使用指南
+## 📄 License
 
-### 1. 文档更新（日常使用）
-**不需要重新部署代码**。
-本系统是动态文档管理系统，文档内容存储在 MySQL 数据库中。
-- 访问 `/login` 登录后台。
-- 在“上传”标签页：上传新的 Markdown 文件，系统会自动解析并保存到数据库。
-- 在“删除”标签页：管理已有的文档。
-- 前端页面会实时读取数据库内容进行展示。
-
-### 2. 系统升级（代码更新）
-如果是修改了 Vue 前端样式或 Flask 后端逻辑，则需要：
-- **前端**: 修改代码 -> `npm run build` -> 替换服务器 `dist` 目录。
-- **后端**: 修改代码 -> 替换服务器 `app.py` -> 重启 Flask 服务。
-
-## 其他说明
-- 左侧导航栏文字背景颜色在 `doctmanage/src/views/Docs.vue` 的 1240 行。
+[MIT](./LICENSE)
