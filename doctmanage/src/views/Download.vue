@@ -73,8 +73,7 @@
     <div class="dl-steps" v-if="!isDesktop">
       <h3 class="dl-sec-title">⚠️ 被 Windows「智能应用控制」拦截？</h3>
       <p class="dl-text">新版 Windows 的「智能应用控制」会直接阻止无法验证发布者的应用（包括知屿下载器/客户端）。</p>
-      <button class="sacl-toggle" type="button" @click="showSacl = !showSacl">{{ showSacl ? '收起步骤 ▲' : '查看关闭步骤 ▼' }}</button>
-      <div v-show="showSacl" class="sacl-steps">
+      <div class="sacl-steps">
         <div class="sacl-step" v-for="(s, i) in saclSteps" :key="i">
           <div class="sacl-no">{{ i + 1 }}</div>
           <div class="sacl-body">
@@ -96,12 +95,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-
 const downloadUrl = 'http://182.254.209.123/downloads/zhiyu-win32-x64.zip'
 // Electron 桌面版：隐藏下载入口，显示已安装提示
 const isDesktop = typeof document !== 'undefined' && document.documentElement.classList.contains('desktop-electron')
-const showSacl = ref(true) // 默认展开，用户打开即可看到关闭步骤
 // 智能应用控制关闭步骤（图片来自 public/sacl-guide/）
 const saclSteps = [
   { text: '打开 Windows 安全中心', img: './sacl-guide/sacl-1.webp' },

@@ -23,6 +23,7 @@ export default defineConfig({
         // import 它，入口又动态 import 它们 → 模块图循环死锁/黑屏。
         // 解决：按 npm 包分组，所有 node_modules 依赖独立成 vendor chunk，入口只留应用代码；
         // MathJax 组件（含 xmldom）文件级独立（顶层 await 动态自加载需跨 chunk 避免 TDZ）。
+        // 注：曾尝试按大类合并 vendor（减少请求数），但引发动态 import 循环加载失败，回滚按包分组。
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
           // 用完整 id 判断（xmldom-sre 可能是嵌套依赖，包名正则取不到）
