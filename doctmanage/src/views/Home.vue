@@ -46,13 +46,13 @@
             </div>
             <!-- 移动端专属：开始探索 -->
             <button class="hero-explore-btn" type="button" @click="goExplore">开始探索知屿 →</button>
-
-            <!-- 移动端专属：最近更新跑马灯上移到 hero 下方 -->
-            <div class="recent-mobile">
-              <RecentMarquee v-if="!loading && recentDocs.length > 0" :docs="recentDocs" />
-            </div>
           </div>
         </section>
+
+        <!-- 移动端专属：最近更新跑马灯（hero 下方独立延伸，不挤上方文字） -->
+        <div class="recent-mobile">
+          <RecentMarquee v-if="!loading && recentDocs.length > 0" :docs="recentDocs" />
+        </div>
 
         <!-- ═══════ 精选笔记轮播 ═══════ -->
         <SpotlightCarousel :docs="recentDocs" />
@@ -958,11 +958,12 @@ const updateSubjectsProgress = () => {
     transition: transform .25s, box-shadow .25s;
   }
   .hero-explore-btn:active { transform: scale(0.96); }
-  /* 移动端：最近更新跑马灯上移到 hero 下方（再靠下一点） */
+  /* 移动端：最近更新跑马灯自然接在 hero 内容下方（首屏露出，往下延伸）；与精选笔记拉开间距 */
   .recent-mobile {
     display: block;
     width: 100%;
-    margin-top: 44px;
+    margin-top: 20px;
+    margin-bottom: 44px;
   }
   /* 移动端隐藏桌面版底部最近更新区块（已上移） */
   .kb-recent.desktop-only { display: none; }
@@ -990,8 +991,8 @@ const updateSubjectsProgress = () => {
     justify-content: center;
   }
   /* 手机端 hero：居中布局，竖高占满一页，卡片内部 padding 收紧 */
-  /* 手机端 hero：文字区固定顶部（不因跑马灯变大而上移），跑马灯向下延伸 */
-  .kb-hero { min-height: calc(100vh - 56px); align-items: center; padding: 40px 20px 32px; }
+  /* 手机端 hero：顶部自适应留白让按钮落在视口中部，跑马灯紧接其下自然延伸（首屏露出大半） */
+  .kb-hero { align-items: center; padding: clamp(140px, 22vh, 220px) 20px 16px; }
   .hero-inner { width: 100%; max-width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .hero-kicker { margin-bottom: 16px; }
   .hero-title { font-size: 30px; line-height: 1.22; margin-bottom: 14px; }
