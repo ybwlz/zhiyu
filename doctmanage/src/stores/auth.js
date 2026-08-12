@@ -29,6 +29,13 @@ export const useAuthStore = defineStore('auth', () => {
     return res.data.user
   }
 
+  // 验证码登录即注册：首次使用自动建号（须同意条款）
+  const codeLogin = async ({ email, code, agree }) => {
+    const res = await api.post('/auth/code-login', { email, code, agree })
+    setAuth(res.data.token, res.data.user)
+    return res.data.user
+  }
+
   const sendCode = async (email) => {
     const res = await api.post('/auth/send-code', { email })
     return res.data
@@ -80,5 +87,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, isLogin, login, register, sendCode, logout, fetchMe, updateProfile, uploadAvatar, setAuth, clearAuth }
+  return { token, user, isLogin, login, codeLogin, register, sendCode, logout, fetchMe, updateProfile, uploadAvatar, setAuth, clearAuth }
 })

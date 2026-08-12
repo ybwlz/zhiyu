@@ -1,7 +1,6 @@
 <!-- 服务条款 / 隐私协议（PC 端独立页面，移动端由登录页弹窗承载） -->
 <template>
   <div class="legal-page">
-    <button class="page-back" @click="pageBack">← BACK</button>
     <div class="legal-container">
       <div class="legal-head">
         <div class="legal-head-main">
@@ -44,10 +43,10 @@ const pageBack = () => {
   padding: 100px 24px 60px;
   box-sizing: border-box;
 }
-/* 标题区：左标题 + 右侧返回按钮（与标题垂直居中，略靠下） */
+/* 标题区：左标题 + 右侧返回按钮（与标题区底部对齐，更靠下） */
 .legal-head {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;

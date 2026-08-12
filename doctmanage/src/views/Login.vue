@@ -8,8 +8,17 @@ import { TERMS_SECTIONS, PRIVACY_SECTIONS } from '@/constants/legal.js'
 const router = useRouter()
 const auth = useAuthStore()
 
-// 服务条款 / 隐私协议
-const agree = ref(true) // 默认已勾选，可取消
+// 登录方式：email = 邮箱登录（验证码，首次自动建号）/ pwd = 密码登录
+const tab = ref('email')
+const loading = ref(false)
+const sending = ref(false)
+const countdown = ref(0)
+
+const emailForm = ref({ email: '', code: '' })
+const pwdForm = ref({ account: '', password: '' })
+
+// 条款：默认不勾选，首次登录（自动建号）必须勾选
+const agree = ref(false)
 const legalOpen = ref(false)
 const legalType = ref('terms')
 const legalSections = computed(() => (legalType.value === 'terms' ? TERMS_SECTIONS : PRIVACY_SECTIONS))
@@ -20,64 +29,12 @@ const openLegal = (type) => {
   else router.push(type === 'terms' ? '/terms' : '/privacy')
 }
 
-const tab = ref('login') // login | register
-const formRef = ref()
-const loading = ref(false)
-const sending = ref(false)
-const countdown = ref(0)
-
-const loginForm = ref({ email: '', password: '' })
-const regForm = ref({ email: '', code: '', password: '', password2: '', nickname: '' })
-
-const emailRule = { pattern: /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/, message: '邮箱格式不正确', trigger: 'blur' }
-// 登录账号：邮箱或老用户名均可
-const accountRule = {
-  validator: (rule, value, cb) => {
-    if (!value) return cb(new Error('请输入邮箱或用户名'))
-    if (emailRule.pattern.test(value) || /^[A-Za-z0-9_\u4e00-\u9fa5]{2,20}$/.test(value)) cb()
-    else cb(new Error('邮箱格式不正确或用户名无效'))
-  },
-  trigger: 'blur',
-}
-
-const loginRules = {
-  email: [
-    { required: true, message: '请输入邮箱或用户名', trigger: 'blur' },
-    accountRule,
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-  ],
-}
-const regRules = {
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    emailRule,
-  ],
-  code: [
-    { required: true, message: '请输入验证码', trigger: 'blur' },
-    { pattern: /^\d{6}$/, message: '6 位数字验证码', trigger: 'blur' },
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码至少 6 位', trigger: 'blur' },
-  ],
-  password2: [
-    { required: true, message: '请再次输入密码', trigger: 'blur' },
-    {
-      validator: (rule, value, cb) => {
-        if (value !== regForm.value.password) cb(new Error('两次密码不一致'))
-        else cb()
-      },
-      trigger: 'blur',
-    },
-  ],
-}
+const emailRule = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
 // 发送验证码：60s 倒计时；开发模式（后端未配 SMTP）自动填充 dev_code 方便本地调试
 const sendCode = async () => {
-  const email = tab.value === 'register' ? regForm.value.email : loginForm.value.email
-  if (!email || !emailRule.pattern.test(email)) {
+  const email = emailForm.value.email.trim()
+  if (!email || !emailRule.test(email)) {
     ElMessage.warning('请先输入正确的邮箱')
     return
   }
@@ -85,7 +42,7 @@ const sendCode = async () => {
   try {
     const res = await auth.sendCode(email)
     if (res.dev_code) {
-      regForm.value.code = res.dev_code
+      emailForm.value.code = res.dev_code
       ElMessage.success('开发模式：验证码已自动填入（' + res.dev_code + '）')
     } else {
       ElMessage.success('验证码已发送到 ' + email + '，10 分钟内有效')
@@ -102,47 +59,58 @@ const sendCode = async () => {
   }
 }
 
-const doLogin = () => {
-  formRef.value.validate(async (valid) => {
-    if (!valid) return
-    loading.value = true
-    try {
-      const u = await auth.login(loginForm.value.email, loginForm.value.password)
-      ElMessage.success(`欢迎回来，${u.nickname || u.username}`)
-      router.replace('/admin')
-    } catch (e) {
-      ElMessage.error(e?.response?.data?.error || '登录失败')
-    } finally {
-      loading.value = false
-    }
-  })
-}
-
-const doRegister = () => {
+// 邮箱登录（首次自动建号）
+const doEmailLogin = () => {
   if (!agree.value) {
     ElMessage.warning('请先阅读并同意《服务条款》和《隐私协议》')
     return
   }
-  formRef.value.validate(async (valid) => {
-    if (!valid) return
-    loading.value = true
-    try {
-      const res = await auth.register({
-        email: regForm.value.email,
-        code: regForm.value.code,
-        password: regForm.value.password,
-        nickname: regForm.value.nickname,
-      })
-      ElMessage.success(res.role === 'admin' ? '注册成功，你已成为知识库管理员' : '注册成功，请登录')
-      tab.value = 'login'
-      loginForm.value.email = regForm.value.email
-      regForm.value = { email: '', code: '', password: '', password2: '', nickname: '' }
-    } catch (e) {
-      ElMessage.error(e?.response?.data?.error || '注册失败')
-    } finally {
-      loading.value = false
-    }
-  })
+  const email = emailForm.value.email.trim()
+  if (!email || !emailRule.test(email)) {
+    ElMessage.warning('请输入正确的邮箱')
+    return
+  }
+  if (!emailForm.value.code) {
+    ElMessage.warning('请输入验证码')
+    return
+  }
+  loading.value = true
+  try {
+    auth.codeLogin({ email, code: emailForm.value.code, agree: agree.value }).then((u) => {
+      ElMessage.success(`欢迎来到知屿，${u.nickname || u.username}`)
+      router.replace('/admin')
+    }).catch((e) => {
+      ElMessage.error(e?.response?.data?.error || '登录失败')
+    }).finally(() => { loading.value = false })
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || '登录失败')
+    loading.value = false
+  }
+}
+
+// 密码登录（邮箱或用户名）
+const doPwdLogin = () => {
+  const account = pwdForm.value.account.trim()
+  if (!account) {
+    ElMessage.warning('请输入邮箱或用户名')
+    return
+  }
+  if (!pwdForm.value.password) {
+    ElMessage.warning('请输入密码')
+    return
+  }
+  loading.value = true
+  try {
+    auth.login(account, pwdForm.value.password).then((u) => {
+      ElMessage.success(`欢迎回来，${u.nickname || u.username}`)
+      router.replace('/admin')
+    }).catch((e) => {
+      ElMessage.error(e?.response?.data?.error || '登录失败')
+    }).finally(() => { loading.value = false })
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || '登录失败')
+    loading.value = false
+  }
 }
 </script>
 
@@ -156,55 +124,48 @@ const doRegister = () => {
       </div>
 
       <div class="login-tabs">
-        <button class="tab-btn" :class="{ on: tab === 'login' }" @click="tab = 'login'">登录</button>
-        <button class="tab-btn" :class="{ on: tab === 'register' }" @click="tab = 'register'">注册</button>
+        <button class="tab-btn" :class="{ on: tab === 'email' }" @click="tab = 'email'">邮箱登录</button>
+        <button class="tab-btn" :class="{ on: tab === 'pwd' }" @click="tab = 'pwd'">密码登录</button>
       </div>
 
-      <el-form ref="formRef" :model="tab === 'login' ? loginForm : regForm" :rules="tab === 'login' ? loginRules : regRules" label-position="top" size="large">
-        <!-- 登录 -->
-        <template v-if="tab === 'login'">
-          <el-form-item label="邮箱" prop="email">
-            <el-input v-model="loginForm.email" placeholder="邮箱（老用户也可用原用户名）" clearable @keyup.enter="doLogin" />
-          </el-form-item>
-          <el-form-item label="密码" prop="password">
-            <el-input v-model="loginForm.password" type="password" placeholder="密码" show-password @keyup.enter="doLogin" />
-          </el-form-item>
-          <el-button class="submit-btn" type="primary" :loading="loading" @click="doLogin">登 录</el-button>
-        </template>
+      <!-- 邮箱登录（首次自动建号） -->
+      <div v-if="tab === 'email'" class="login-fields">
+        <div class="field">
+          <label class="field-label">邮箱</label>
+          <el-input v-model="emailForm.email" placeholder="用于接收验证码" clearable @keyup.enter="doEmailLogin" />
+        </div>
+        <div class="field">
+          <label class="field-label">验证码</label>
+          <div class="code-row">
+            <el-input v-model="emailForm.code" placeholder="6 位验证码" clearable @keyup.enter="doEmailLogin" />
+            <el-button class="code-btn" :disabled="countdown > 0 || sending" @click="sendCode">
+              {{ countdown > 0 ? countdown + 's 后重发' : (sending ? '发送中…' : '获取验证码') }}
+            </el-button>
+          </div>
+        </div>
+        <label class="agree-row">
+          <input v-model="agree" type="checkbox" class="agree-check" />
+          <span class="agree-text">我已阅读并同意
+            <a class="agree-link" @click.prevent="openLegal('terms')">《服务条款》</a> 和
+            <a class="agree-link" @click.prevent="openLegal('privacy')">《隐私协议》</a>
+          </span>
+        </label>
+        <el-button class="submit-btn" type="primary" :loading="loading" @click="doEmailLogin">登录 / 注册</el-button>
+      </div>
 
-        <!-- 注册 -->
-        <template v-else>
-          <el-form-item label="昵称（可选）" prop="nickname">
-            <el-input v-model="regForm.nickname" placeholder="大家怎么称呼你" clearable />
-          </el-form-item>
-          <el-form-item label="邮箱" prop="email">
-            <el-input v-model="regForm.email" placeholder="用于登录与接收验证码" clearable />
-          </el-form-item>
-          <el-form-item label="验证码" prop="code">
-            <div class="code-row">
-              <el-input v-model="regForm.code" placeholder="6 位验证码" clearable />
-              <el-button class="code-btn" :disabled="countdown > 0 || sending" @click="sendCode">
-                {{ countdown > 0 ? countdown + 's 后重发' : (sending ? '发送中…' : '发送验证码') }}
-              </el-button>
-            </div>
-          </el-form-item>
-          <el-form-item label="密码" prop="password">
-            <el-input v-model="regForm.password" type="password" placeholder="至少 6 位" show-password />
-          </el-form-item>
-          <el-form-item label="确认密码" prop="password2">
-            <el-input v-model="regForm.password2" type="password" placeholder="再次输入密码" show-password @keyup.enter="doRegister" />
-          </el-form-item>
-          <label class="agree-row">
-            <input v-model="agree" type="checkbox" class="agree-check" />
-            <span class="agree-text">我已阅读并同意
-              <a class="agree-link" @click.prevent="openLegal('terms')">《服务条款》</a> 和
-              <a class="agree-link" @click.prevent="openLegal('privacy')">《隐私协议》</a>
-            </span>
-          </label>
-          <el-button class="submit-btn" type="primary" :loading="loading" @click="doRegister">注 册</el-button>
-        </template>
-      </el-form>
-
+      <!-- 密码登录 -->
+      <div v-else class="login-fields">
+        <div class="field">
+          <label class="field-label">邮箱或用户名</label>
+          <el-input v-model="pwdForm.account" placeholder="邮箱（老用户也可用原用户名）" clearable @keyup.enter="doPwdLogin" />
+        </div>
+        <div class="field">
+          <label class="field-label">密码</label>
+          <el-input v-model="pwdForm.password" type="password" placeholder="密码" show-password @keyup.enter="doPwdLogin" />
+        </div>
+        <el-button class="submit-btn" type="primary" :loading="loading" @click="doPwdLogin">登 录</el-button>
+        <p class="login-hint">没有密码？<a class="hint-link" @click="tab = 'email'">用邮箱验证码登录</a></p>
+      </div>
     </div>
 
     <!-- 条款 / 协议弹窗（移动端） -->
@@ -240,11 +201,10 @@ const doRegister = () => {
   justify-content: center;
   padding: 90px 20px 40px;
   box-sizing: border-box;
-  /* 背景透明：透出全局主题背景 */
   background: transparent;
 }
 .login-card {
-  width: 380px;
+  width: 400px;
   max-width: 100%;
   padding: 34px 34px 26px;
   border-radius: 22px;
@@ -253,7 +213,7 @@ const doRegister = () => {
   box-shadow: var(--shadow-1);
   backdrop-filter: blur(16px);
 }
-.login-brand { text-align: center; margin-bottom: 20px; }
+.login-brand { text-align: center; margin-bottom: 22px; }
 .brand-mark {
   display: inline-flex;
   width: 46px; height: 46px;
@@ -296,14 +256,16 @@ const doRegister = () => {
   font-weight: 600;
 }
 
+.login-fields { display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 13px; color: var(--text2); }
+
 .code-row {
   display: flex;
   gap: 8px;
   width: 100%;
 }
-.code-row .el-input {
-  flex: 1;
-}
+.code-row .el-input { flex: 1; }
 .code-btn {
   flex-shrink: 0;
   border-radius: 999px;
@@ -327,9 +289,13 @@ const doRegister = () => {
 }
 .submit-btn:hover { opacity: .92; }
 
-.login-tip { text-align: center; font-size: 12px; color: var(--text2); margin: 14px 0 0; }
-
-:deep(.el-form-item__label) { color: var(--text2); font-size: 13px; }
+.login-hint { text-align: center; font-size: 12.5px; color: var(--text2); margin: 14px 0 0; }
+.hint-link {
+  color: var(--brand-1);
+  font-weight: 600;
+  cursor: pointer;
+}
+.hint-link:hover { text-decoration: underline; }
 
 /* ── 条款勾选 ── */
 .agree-row {

@@ -85,6 +85,69 @@ def auth_register():
         conn.close()
     return jsonify({'success': True, 'role': role})
 
+@bp.route('/api/auth/code-login', methods=['POST'])
+def auth_code_login():
+    """验证码登录即注册：邮箱+验证码。首次使用自动创建账号（须同意条款）；老用户直接登录"""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    code = (data.get('code') or '').strip()
+    agree = data.get('agree') is True
+    if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', email):
+        return jsonify({'error': '邮箱格式不正确'}), 400
+    rec = EMAIL_CODES.get(email)
+    if not rec or rec['expires'] < datetime.now():
+        return jsonify({'error': '验证码已过期，请重新获取'}), 400
+    if rec['code'] != code:
+        rec['tries'] = rec.get('tries', 0) + 1
+        if rec['tries'] >= CODE_MAX_TRIES:
+            EMAIL_CODES.pop(email, None)
+            return jsonify({'error': '验证码错误次数过多，请重新获取'}), 400
+        return jsonify({'error': '验证码错误'}), 400
+    # 先查用户、校验条款（此时不消费验证码，未勾选可重试）
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, username, password_hash, role, nickname, email, avatar, cover, public_id FROM users WHERE email=%s",
+                (email,)
+            )
+            user = cur.fetchone()
+            if not user:
+                # 首次使用：自动创建账号（需已同意条款）；无密码，登录后可在设置中设置密码
+                if not agree:
+                    return jsonify({'error': '请先阅读并同意《服务条款》和《隐私协议》'}), 400
+                base = email.split('@')[0]
+                username = re.sub(r'[^A-Za-z0-9_]', '_', base[:40]) or 'user'
+                cur.execute("SELECT COUNT(*) AS cnt FROM users")
+                is_first = cur.fetchone()['cnt'] == 0
+                role = 'admin' if is_first else 'user'
+                final_user = username
+                if not is_first:
+                    cur.execute("SELECT COUNT(*) AS cnt FROM users WHERE username=%s", (final_user,))
+                    if cur.fetchone()['cnt'] > 0:
+                        final_user = f'{username[:32]}_{secrets.token_hex(3)}'
+                cur.execute(
+                    "INSERT INTO users (username, password_hash, role, nickname, email, email_verified, public_id) VALUES (%s, %s, %s, %s, %s, 1, %s)",
+                    (final_user, '', role, base[:20] or None, email, gen_public_id())
+                )
+                new_id = cur.lastrowid
+                # AI 官方账号自动关注新用户
+                cur.execute("INSERT IGNORE INTO follows (follower_id, followee_id) SELECT id, %s FROM users WHERE username='ai'", (new_id,))
+                conn.commit()
+                cur.execute(
+                    "SELECT id, username, password_hash, role, nickname, email, avatar, cover, public_id FROM users WHERE id=%s",
+                    (new_id,)
+                )
+                user = cur.fetchone()
+    finally:
+        conn.close()
+    # 登录/建号成功后才消费验证码
+    EMAIL_CODES.pop(email, None)
+    token = issue_token(user['username'])
+    return jsonify({'token': token, 'user': {
+        'id': user['id'], 'username': user['username'], 'role': user['role'], 'nickname': user['nickname'], 'email': user['email'], 'avatar': user['avatar'], 'cover': user['cover'], 'public_id': user['public_id']
+    }})
+
 @bp.route('/api/auth/login', methods=['POST'])
 def auth_login():
     data = request.get_json(silent=True) or {}
@@ -101,7 +164,7 @@ def auth_login():
     finally:
         conn.close()
 
-    if not user or not check_password_hash(user['password_hash'], password):
+    if not user or not user['password_hash'] or not check_password_hash(user['password_hash'], password):
         return jsonify({'error': '账号或密码错误'}), 401
     token = issue_token(user['username'])
     return jsonify({'token': token, 'user': {
@@ -122,7 +185,10 @@ def auth_change_password(user=None):
         with conn.cursor() as cur:
             cur.execute('SELECT password_hash FROM users WHERE id=%s', (user['id'],))
             row = cur.fetchone()
-            if not row or not check_password_hash(row['password_hash'], old_pw):
+            if not row:
+                return jsonify({'error': '账号不存在'}), 400
+            # 未设置过密码（验证码注册用户）：免旧密码直接设置
+            if row['password_hash'] and not check_password_hash(row['password_hash'], old_pw):
                 return jsonify({'error': '旧密码不正确'}), 400
             cur.execute('UPDATE users SET password_hash=%s WHERE id=%s',
                         (generate_password_hash(new_pw), user['id']))
