@@ -3,19 +3,20 @@
   <div class="legal-page">
     <button class="page-back" @click="pageBack">← BACK</button>
     <div class="legal-container">
-      <p class="legal-kicker">{{ isTerms ? 'TERMS OF SERVICE' : 'PRIVACY POLICY' }}</p>
-      <h1 class="legal-title">{{ isTerms ? '知屿 · 服务条款' : '知屿 · 隐私协议' }}</h1>
-      <p class="legal-meta">最后更新：2026-08-12 · 适用于知屿全部服务</p>
+      <div class="legal-head">
+        <div class="legal-head-main">
+          <p class="legal-kicker">{{ isTerms ? 'TERMS OF SERVICE' : 'PRIVACY POLICY' }}</p>
+          <h1 class="legal-title">{{ isTerms ? '知屿 · 服务条款' : '知屿 · 隐私协议' }}</h1>
+          <p class="legal-meta">最后更新：2026-08-12 · 适用于知屿全部服务</p>
+        </div>
+        <button class="page-back" @click="pageBack">← BACK</button>
+      </div>
 
       <div class="legal-body">
         <section v-for="sec in sections" :key="sec.title" class="legal-sec">
           <h2 class="legal-sec-title">{{ sec.title }}</h2>
           <p v-for="(p, i) in sec.paras" :key="i" class="legal-para" :class="{ 'is-bold': p.includes('加粗') || i === 0 }">{{ p }}</p>
         </section>
-      </div>
-
-      <div class="legal-back">
-        <button class="legal-back-btn" @click="pageBack">← 返回</button>
       </div>
     </div>
   </div>
@@ -43,7 +44,17 @@ const pageBack = () => {
   padding: 100px 24px 60px;
   box-sizing: border-box;
 }
-/* 与设置页同款返回按钮 */
+/* 标题区：左标题 + 右侧返回按钮 */
+.legal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+.legal-head-main { min-width: 0; }
+/* 与设置页同款返回按钮（位于标题右侧） */
 .page-back {
   background: transparent;
   border: none;
@@ -51,13 +62,11 @@ const pageBack = () => {
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 2px;
-  padding: 12px 10px;
+  padding: 10px 12px;
   line-height: 1.6;
   cursor: pointer;
   transition: color .15s;
-  position: absolute;
-  top: 72px;
-  left: 24px;
+  flex-shrink: 0;
 }
 .page-back:hover { color: var(--brand-1); }
 .legal-container {
@@ -81,7 +90,7 @@ const pageBack = () => {
 .legal-meta {
   font-size: 13px;
   color: var(--text2);
-  margin: 0 0 30px;
+  margin: 0;
 }
 .legal-body {
   display: flex;
@@ -111,23 +120,4 @@ const pageBack = () => {
 }
 .legal-para:last-child { margin-bottom: 0; }
 .legal-para.is-bold { color: var(--text1); }
-.legal-back {
-  margin-top: 28px;
-  text-align: center;
-}
-.legal-back-btn {
-  display: inline-block;
-  padding: 10px 26px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text2);
-  text-decoration: none;
-  font-size: 14px;
-  transition: all .25s;
-}
-.legal-back-btn:hover {
-  color: var(--brand-1);
-  border-color: color-mix(in srgb, var(--brand-1) 45%, var(--border));
-}
 </style>
