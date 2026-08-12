@@ -12,11 +12,34 @@ export default defineConfig({
   ],
   optimizeDeps: {
     esbuildOptions: {
-      target: 'esnext'
+      target: 'chrome120'
     }
   },
   build: {
-    target: 'esnext'
+    target: 'chrome120',
+    rollupOptions: {
+      output: {
+        // 入口 chunk 若承载共享模块（vue/commonjs helpers），动态 chunk（MathJax/路由）反向
+        // import 它，入口又动态 import 它们 → 模块图循环死锁/黑屏。
+        // 解决：按 npm 包分组，所有 node_modules 依赖独立成 vendor chunk，入口只留应用代码；
+        // MathJax 组件（含 xmldom）文件级独立（顶层 await 动态自加载需跨 chunk 避免 TDZ）。
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          // 用完整 id 判断（xmldom-sre 可能是嵌套依赖，包名正则取不到）
+          const isMjx = id.includes('mathjax') || id.includes('tex-svg') || id.includes('xypic') ||
+                        id.includes('wgxpath') || id.includes('lite-dom') || id.includes('xmldom')
+          if (isMjx) {
+            const fn = id.split(/[\\/]/).pop().replace(/[^a-zA-Z0-9]/g, '_')
+            let h = 0
+            for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+            return 'mjx-' + h.toString(36) + '-' + fn.slice(0, 40)
+          }
+          const m = id.match(/node_modules[\\/]([^\\/]+)/)
+          if (!m) return undefined
+          return 'vendor-' + m[1].replace(/[^a-zA-Z0-9]/g, '_')
+        }
+      }
+    }
   },
   base: '/zhiyu/',
   resolve: {

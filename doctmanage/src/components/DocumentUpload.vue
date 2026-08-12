@@ -94,7 +94,7 @@ import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import { full as emoji } from 'markdown-it-emoji'
 import container from 'markdown-it-container'
-import mathjax3 from 'markdown-it-mathjax3'
+import { mathInlinePlugin } from '@/utils/mathjax-render.js'
 import alerts from 'markdown-it-github-alerts'
 import toc from 'markdown-it-toc-done-right'
 
@@ -131,7 +131,7 @@ md.use(anchor, {
 
 // --- 扩展 ---
 md.use(emoji)
-md.use(mathjax3)
+md.use(mathInlinePlugin)
 md.use(alerts)
 // 目录: [[toc]]
 md.use(toc, {

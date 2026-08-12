@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>知屿</title>
+    <!-- MathJax 运行时加载（不参与打包：组件化加载与 vite 构建不兼容） -->
+    <script>
+      window.MathJax = {
+        tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] },
+        svg: { fontCache: 'global' },
+        options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] }
+      }
+    </script>
+    <script src="./mathjax/tex-svg.js" defer></script>
   </head>
   <body style="margin: 0; padding: 0;">
     <div id="app"></div>

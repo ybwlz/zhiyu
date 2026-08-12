@@ -6,7 +6,7 @@ import Container from 'markdown-it-container'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import { full as emoji } from 'markdown-it-emoji'
-import mathjax3 from 'markdown-it-mathjax3'
+import { mathInlinePlugin } from '@/utils/mathjax-render.js'
 import alerts from 'markdown-it-github-alerts'
 import mdImgSize from '@/utils/mdImgSize.js'
 import anchor from 'markdown-it-anchor'
@@ -235,7 +235,7 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true, highlight:
   level: [1, 2, 3],
   slugify,
   permalink: anchor.permalink.linkInsideHeader({ symbol: '§', class: 'header-anchor', placement: 'before' }),
-}).use(emoji).use(mathjax3).use(mdImgSize)
+}).use(emoji).use(mathInlinePlugin).use(mdImgSize)
 setupAnnotation(md)
 // 自定义块容器：例题 / 公式 / 提示 / 信息 / 警告 / 注意（:::example / :::formula / :::tip …）
 const createBlock = (klass, defaultTitle) => [Container, klass, {

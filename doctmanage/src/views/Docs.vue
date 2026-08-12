@@ -9,7 +9,7 @@ import { full as emoji } from 'markdown-it-emoji'
 import container from 'markdown-it-container'
 // import mathjax3 from 'markdown-it-mathjax3'
 import mdImgSize from '@/utils/mdImgSize.js'
-import mathjax3 from 'markdown-it-mathjax3'
+import { mathInlinePlugin } from '@/utils/mathjax-render.js'
 import alerts from 'markdown-it-github-alerts'
 import toc from 'markdown-it-toc-done-right'
 import { useFileListStore } from '@/stores/fileList.js'
@@ -541,7 +541,7 @@ md.use(anchor, {
 
 // --- 扩展 ---
 md.use(emoji)
-md.use(mathjax3)
+md.use(mathInlinePlugin)
 md.use(mdImgSize)
 md.use(alerts)
 setupAnnotation(md)

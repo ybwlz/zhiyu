@@ -6,7 +6,7 @@ import Container from 'markdown-it-container'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import { full as emoji } from 'markdown-it-emoji'
-import mathjax3 from 'markdown-it-mathjax3'
+import { mathInlinePlugin } from '@/utils/mathjax-render.js'
 import alerts from 'markdown-it-github-alerts'
 import mdImgSize from '@/utils/mdImgSize.js'
 import { ElMessage } from 'element-plus'
@@ -42,7 +42,7 @@ const notFound = ref(false)
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true, highlight: (code, lang) => {
   if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value
   return hljs.highlightAuto(code).value
-}}).use(emoji).use(mathjax3).use(mdImgSize)
+}}).use(emoji).use(mathInlinePlugin).use(mdImgSize)
 setupAnnotation(md)
 // ── 代码块：容器包裹 + 行高亮 {n} + 行号 :line-numbers（与 Docs 阅读一致）；[title] 存 data-title 供保存还原 ──
 md.renderer.rules.fence = function (tokens, idx, options, env, self) {
