@@ -47,8 +47,8 @@ const row1 = computed(() => props.docs.filter((_, i) => i % 2 === 0))
 const row2 = computed(() => props.docs.filter((_, i) => i % 2 === 1))
 // 无缝循环：每行渲染两份（动画位移 50% 恰好一份宽度）
 const doubled = (arr) => [...arr, ...arr]
-// 滚动速度随卡片数自适应（再放慢，持续滚动）
-const marqueeDur = (arr) => Math.max(36, arr.length * 8.5) + 's'
+// 滚动速度随卡片数自适应（偏慢，持续滚动）
+const marqueeDur = (arr) => Math.max(40, arr.length * 12) + 's'
 
 const TYPE_EMOJI = {
   高等数学: '∫', 中学公式: '∑', 线性代数: '🧮', 概率论: '🎲', 数据结构: '🌳',
@@ -100,13 +100,13 @@ const goDoc = (doc) => router.push(`/docs/${doc.public_id}`)
 .marquee-item {
   flex-shrink: 0;
   position: relative;
-  width: 300px;
-  height: 185px;
+  width: 320px;
+  height: 340px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 22px 22px 18px;
-  border-radius: 20px;
+  padding: 26px 26px 22px;
+  border-radius: 24px;
   overflow: hidden;
   cursor: pointer;
   /* 与精选笔记卡片同款渐变底 */
@@ -129,14 +129,14 @@ const goDoc = (doc) => router.push(`/docs/${doc.public_id}`)
   color: var(--c1);
   background: color-mix(in srgb, var(--c1) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--c1) 35%, transparent);
-  padding: 3px 11px;
+  padding: 4px 12px;
   border-radius: 999px;
 }
 .marquee-emoji {
   position: absolute;
-  right: 18px;
-  top: 12px;
-  font-size: 64px;
+  right: 20px;
+  top: 14px;
+  font-size: 72px;
   font-weight: 800;
   opacity: 0.14;
   line-height: 1;
@@ -144,9 +144,9 @@ const goDoc = (doc) => router.push(`/docs/${doc.public_id}`)
   pointer-events: none;
 }
 .marquee-title {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
-  margin: 16px 0 8px;
+  margin: 22px 0 12px;
   color: var(--text1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -154,19 +154,32 @@ const goDoc = (doc) => router.push(`/docs/${doc.public_id}`)
 }
 .marquee-desc {
   flex: 1;
-  font-size: 12.5px;
-  line-height: 1.6;
+  font-size: 13.5px;
+  line-height: 1.75;
   color: var(--text2);
   margin: 0;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
 .marquee-date {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text2);
-  margin-top: 10px;
+  margin-top: 14px;
+}
+
+/* 移动端：卡片适度收窄，避免撑爆首屏 */
+@media (max-width: 720px) {
+  .marquee-item {
+    width: 250px;
+    height: 250px;
+    padding: 20px 20px 16px;
+    border-radius: 18px;
+  }
+  .marquee-title { font-size: 17px; margin: 18px 0 8px; }
+  .marquee-desc { -webkit-line-clamp: 2; }
+  .marquee-emoji { font-size: 56px; }
 }
 
 /* ── 少量数据：垂直列表 ── */
