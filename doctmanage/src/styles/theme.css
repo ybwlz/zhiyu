@@ -216,3 +216,6 @@ html.desktop-electron #titlebar-drag {
   position: fixed; top: 0; left: 0; right: 0; height: 40px;
   -webkit-app-region: drag; z-index: 2147483000;
 }
+
+/* Electron 桌面版：不显示「下载桌面版」按钮（客户端无需下载自身） */
+html.desktop-electron .hero-dl-btn { display: none !important; }

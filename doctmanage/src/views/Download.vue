@@ -7,7 +7,14 @@
       <p class="desc">Windows 客户端 · 本地渲染 · 一键连接云端知识库</p>
     </div>
 
-    <div class="dl-card">
+    <!-- 桌面版：已安装，无需下载（Electron 中隐藏下载区） -->
+    <div v-if="isDesktop" class="dl-card dl-card-installed">
+      <div class="dl-ok">✅</div>
+      <h2 class="dl-name">你正在使用知屿桌面版</h2>
+      <p class="dl-hint">无需下载安装包，直接使用即可；网页版与桌面版数据实时同步。</p>
+    </div>
+
+    <div v-else class="dl-card">
       <div class="dl-logo">
         <svg viewBox="0 0 64 64" width="56" height="56">
           <defs>
@@ -63,7 +70,23 @@
       </ol>
     </div>
 
-    <div class="dl-steps">
+    <div class="dl-steps" v-if="!isDesktop">
+      <h3 class="dl-sec-title">⚠️ 被 Windows「智能应用控制」拦截？</h3>
+      <p class="dl-text">新版 Windows 的「智能应用控制」会直接阻止无法验证发布者的应用（包括知屿下载器/客户端）。</p>
+      <button class="sacl-toggle" type="button" @click="showSacl = !showSacl">{{ showSacl ? '收起步骤 ▲' : '查看关闭步骤 ▼' }}</button>
+      <div v-show="showSacl" class="sacl-steps">
+        <div class="sacl-step" v-for="(s, i) in saclSteps" :key="i">
+          <div class="sacl-no">{{ i + 1 }}</div>
+          <div class="sacl-body">
+            <p class="sacl-text">{{ s.text }}</p>
+            <img class="sacl-img" :src="s.img" :alt="s.text" loading="lazy" />
+          </div>
+        </div>
+        <p class="dl-warn">⚠️ 智能应用控制一旦关闭将无法重新开启（除非重装系统）。关闭后下载器/客户端即可正常运行。</p>
+      </div>
+    </div>
+
+    <div class="dl-steps" v-if="!isDesktop">
       <h3 class="dl-sec-title">🛠 服务器配置（可选）</h3>
       <p class="dl-text">默认已连接知屿云端服务器，无需任何配置。如需切换服务器，在 exe 同目录新建 <code>config.json</code>：</p>
       <pre class="dl-code">{ "backend": "http://182.254.209.123" }</pre>
@@ -73,7 +96,19 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
+
 const downloadUrl = 'http://182.254.209.123/downloads/zhiyu-win32-x64.zip'
+// Electron 桌面版：隐藏下载入口，显示已安装提示
+const isDesktop = typeof document !== 'undefined' && document.documentElement.classList.contains('desktop-electron')
+const showSacl = ref(false)
+// 智能应用控制关闭步骤（图片来自 public/sacl-guide/）
+const saclSteps = [
+  { text: '打开 Windows 安全中心', img: './sacl-guide/sacl-1.png' },
+  { text: '进入「应用和浏览器控制」页面', img: './sacl-guide/sacl-2.png' },
+  { text: '打开「智能应用控制」设置', img: './sacl-guide/sacl-3.png' },
+  { text: '点击「关闭」按钮', img: './sacl-guide/sacl-4.png' },
+]
 </script>
 
 <style scoped>
@@ -144,3 +179,35 @@ const downloadUrl = 'http://182.254.209.123/downloads/zhiyu-win32-x64.zip'
   .title { font-size: 28px; }
 }
 </style>
+
+/* ── 桌面版已安装提示 ── */
+.dl-card-installed { padding: 40px 24px; }
+.dl-ok { font-size: 34px; margin-bottom: 10px; }
+
+/* ── 智能应用控制说明 ── */
+.sacl-toggle {
+  display: inline-block; margin: 4px 0 14px; padding: 9px 20px;
+  border-radius: 8px; border: 1px solid rgba(59, 130, 246, .4);
+  background: rgba(59, 130, 246, .08); color: var(--c-text-1, #e8ecf8);
+  font-size: 14px; cursor: pointer; transition: all .2s;
+}
+.sacl-toggle:hover { background: rgba(59, 130, 246, .16); }
+.sacl-steps { margin-top: 6px; }
+.sacl-step { display: flex; gap: 14px; margin-bottom: 18px; }
+.sacl-no {
+  flex: 0 0 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(120deg, var(--brand-1, #3b82f6), var(--brand-2, #2563eb));
+  color: #fff; font-weight: 700; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sacl-body { flex: 1; min-width: 0; }
+.sacl-text { color: var(--c-text-1, #e8ecf8); font-size: 14px; margin: 2px 0 8px; }
+.sacl-img {
+  max-width: 100%; border-radius: 10px;
+  border: 1px solid var(--c-border, rgba(255, 255, 255, .12));
+}
+.dl-warn {
+  color: #f59e0b; font-size: 13px; line-height: 1.7;
+  padding: 10px 14px; border-radius: 8px;
+  background: rgba(245, 158, 11, .08); border: 1px solid rgba(245, 158, 11, .25);
+}
