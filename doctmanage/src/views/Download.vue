@@ -101,7 +101,7 @@ import { ref } from 'vue'
 const downloadUrl = 'http://182.254.209.123/downloads/zhiyu-win32-x64.zip'
 // Electron 桌面版：隐藏下载入口，显示已安装提示
 const isDesktop = typeof document !== 'undefined' && document.documentElement.classList.contains('desktop-electron')
-const showSacl = ref(false)
+const showSacl = ref(true) // 默认展开，用户打开即可看到关闭步骤
 // 智能应用控制关闭步骤（图片来自 public/sacl-guide/）
 const saclSteps = [
   { text: '打开 Windows 安全中心', img: './sacl-guide/sacl-1.png' },
