@@ -61,7 +61,7 @@
               <h3 class="row-title" @click="openNote(n.public_id || n.id)">{{ n.title }}</h3>
               <p class="row-preview" @click="openNote(n.public_id || n.id)">{{ previewText(n) }}</p>
               <div v-if="imagesOf(n).length" class="row-imgs" @click="openNote(n.public_id || n.id)">
-                <img v-for="(img, i) in imagesOf(n)" :key="i" :src="img" alt="" loading="lazy" />
+                <img v-for="(img, i) in imagesOf(n)" :key="i" :src="img" alt="" />
               </div>
               <div class="row-actions">
                 <button class="fa-btn" :class="{ on: liked[n.id] }" @click="toggleLike(n)">
@@ -385,7 +385,7 @@ export default {
 .row-title:hover { color: var(--brand-1); }
 .row-preview { font-size: 13.5px; color: var(--text2); margin: 0 0 10px; line-height: 1.75; height: calc(1.75em * 2); overflow: hidden; cursor: pointer; }
 .row-imgs { display: flex; flex-wrap: nowrap; gap: 8px; margin: 2px 0 12px; cursor: pointer; overflow: hidden; }
-.row-imgs img { width: 148px; height: 100px; object-fit: cover; border-radius: 8px; flex-shrink: 0; display: block; }
+.row-imgs img { width: 148px; height: 100px; object-fit: cover; border-radius: 8px; flex-shrink: 0; display: block; background: var(--btn-bg); }
 .row-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .fa-btn { border: none; background: none; color: var(--text2); font-size: 12.5px; padding: 6px 10px; border-radius: 999px; cursor: pointer; transition: all .15s; }
 .fa-btn:hover { background: color-mix(in srgb, var(--brand-1) 8%, transparent); color: var(--brand-1); transform: translateY(-1px); }
