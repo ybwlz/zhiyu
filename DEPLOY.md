@@ -162,6 +162,22 @@ export default defineConfig({
     }
     ```
 
+### 关于路径前缀 `/zhiyu/`
+
+前端 `vite.config.js` 配置了 `base: '/zhiyu/'`（与站点子路径部署保持一致），因此：
+
+- 本地开发访问地址为 `http://localhost:5173/zhiyu/`（不是根路径）；登录/条款等路由均带 `/zhiyu` 前缀
+- 构建产物（`dist/`）也需挂载在 `/zhiyu/` 子路径下：`http://your_domain.com/zhiyu/`
+- 若部署在站点根路径，可去掉 `vite.config.js` 中的 `base` 配置后重新构建；保持 `/zhiyu/` 时 Nginx 子路径部署示例：
+
+```nginx
+location /zhiyu/ {
+    alias /path/to/doctmanage/dist/;
+    index index.html;
+    try_files $uri $uri/ /zhiyu/index.html; # 支持 Vue Router History 模式
+}
+```
+
 ## 注意事项
 
 - **防火墙**: 确保防火墙允许相应的端口访问（后端 5000，前端 80/443）。
