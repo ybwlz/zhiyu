@@ -1,6 +1,7 @@
 <!-- 服务条款 / 隐私协议（PC 端独立页面，移动端由登录页弹窗承载） -->
 <template>
   <div class="legal-page">
+    <button class="page-back" @click="pageBack">← BACK</button>
     <div class="legal-container">
       <p class="legal-kicker">{{ isTerms ? 'TERMS OF SERVICE' : 'PRIVACY POLICY' }}</p>
       <h1 class="legal-title">{{ isTerms ? '知屿 · 服务条款' : '知屿 · 隐私协议' }}</h1>
@@ -14,7 +15,7 @@
       </div>
 
       <div class="legal-back">
-        <router-link to="/login" class="legal-back-btn">← 返回登录</router-link>
+        <button class="legal-back-btn" @click="pageBack">← 返回</button>
       </div>
     </div>
   </div>
@@ -22,12 +23,18 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { TERMS_SECTIONS, PRIVACY_SECTIONS } from '@/constants/legal.js'
 
 const route = useRoute()
+const router = useRouter()
 const isTerms = computed(() => route.path === '/terms')
 const sections = computed(() => (isTerms.value ? TERMS_SECTIONS : PRIVACY_SECTIONS))
+// 与设置页同款返回：回上一页，无历史时回首页
+const pageBack = () => {
+  if (window.history.length > 1) router.back()
+  else router.push('/')
+}
 </script>
 
 <style scoped>
@@ -36,6 +43,23 @@ const sections = computed(() => (isTerms.value ? TERMS_SECTIONS : PRIVACY_SECTIO
   padding: 100px 24px 60px;
   box-sizing: border-box;
 }
+/* 与设置页同款返回按钮 */
+.page-back {
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 12px 10px;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: color .15s;
+  position: absolute;
+  top: 72px;
+  left: 24px;
+}
+.page-back:hover { color: var(--brand-1); }
 .legal-container {
   max-width: 760px;
   margin: 0 auto;
