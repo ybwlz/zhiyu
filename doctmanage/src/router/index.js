@@ -14,6 +14,7 @@ import Messages from "@/views/Messages.vue";
 import Mall from "@/views/Mall.vue";
 import EditNote from "@/views/EditNote.vue";
 import Settings from "@/views/Settings.vue";
+import LegalPage from "@/views/LegalPage.vue";
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -43,6 +44,8 @@ const router = createRouter({
             component: Admin,
         },
         { path: '/login', component: Login },
+        { path: '/terms', component: LegalPage },
+        { path: '/privacy', component: LegalPage },
         { path: '/:pathMatch(.*)*', component: () => import('@/views/NotFound.vue') },
     ],
     // 路由切换默认回到页面顶部；浏览器前进/后退时恢复原滚动位置

@@ -286,8 +286,8 @@ const doSearch = async () => {
 }
 const goSubject = (name) => router.push({ path: '/notes', query: { type: name } })
 const goDoc = (doc) => router.push(`/docs/${doc.public_id}`)
-// 移动端「开始探索知屿」→ 笔记广场
-const goExplore = () => router.push('/notes')
+// 移动端「开始探索知屿」：未登录去登录页，已登录去笔记广场
+const goExplore = () => router.push(auth.isLogin ? '/notes' : '/login')
 
 const onFeatureClick = (feat) => {
   if (feat.title === 'AI 助手') { aiOpen.value = true; return }
