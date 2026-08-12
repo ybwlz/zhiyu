@@ -26,4 +26,13 @@ app.use(router)
 app.use(ElementPlus)
 app.use(pinia)
 initTheme()
+
+// Electron 桌面版：自定义深色标题栏适配（顶部 40px 拖拽区 + body 下移）
+if (navigator.userAgent.includes('Electron')) {
+  document.documentElement.classList.add('desktop-electron')
+  const bar = document.createElement('div')
+  bar.id = 'titlebar-drag'
+  document.body.appendChild(bar)
+}
+
 app.mount('#app')

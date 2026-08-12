@@ -103,6 +103,13 @@ app.whenReady().then(() => {
       autoHideMenuBar: true,
       title: '知屿',
       backgroundColor: '#070b16',
+      // 自定义深色标题栏（跟随知屿星空主题，Windows 10+ 生效）
+      titleBarStyle: 'hidden',
+      titleBarOverlay: {
+        color: '#070b16',
+        symbolColor: '#e8ecf8',
+        height: 40,
+      },
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,

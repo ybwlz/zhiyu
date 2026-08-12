@@ -46,8 +46,14 @@
             </div>
             <!-- 移动端专属：开始探索 -->
             <button class="hero-explore-btn" type="button" @click="goExplore">开始探索知屿 →</button>
-            <!-- 桌面版下载入口 -->
-            <router-link to="/download" class="hero-dl-link">💻 下载桌面版</router-link>
+            <!-- 桌面版下载入口（移动端隐藏） -->
+            <router-link to="/download" class="hero-dl-btn mobile-hidden">
+              <span class="dl-ico">⬇</span>
+              <span class="dl-txt">
+                <b>下载桌面版</b>
+                <i>Windows 客户端 · 云端同步</i>
+              </span>
+            </router-link>
           </div>
         </section>
 
@@ -972,19 +978,26 @@ const updateSubjectsProgress = () => {
     transition: transform .25s, box-shadow .25s;
   }
   .hero-explore-btn:active { transform: scale(0.96); }
-  /* 桌面版下载入口 */
-  .hero-dl-link {
-    display: inline-block;
-    margin: 18px auto 0;
-    padding: 10px 28px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, .2);
-    color: var(--c-text-1, #e8ecf8);
-    font-size: 14px;
+  /* 桌面版下载入口（大按钮风格） */
+  .hero-dl-btn {
+    display: inline-flex; align-items: center; gap: 12px;
+    margin: 22px auto 0;
+    padding: 13px 30px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, .18), rgba(37, 99, 235, .08));
+    border: 1px solid rgba(59, 130, 246, .45);
     text-decoration: none;
-    transition: all .2s;
+    transition: all .25s;
   }
-  .hero-dl-link:hover { border-color: var(--brand-1); color: var(--brand-1); transform: translateY(-1px); }
+  .hero-dl-btn:hover {
+    border-color: var(--brand-1);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(59, 130, 246, .28);
+  }
+  .dl-ico { font-size: 22px; line-height: 1; }
+  .dl-txt { text-align: left; }
+  .dl-txt b { display: block; font-size: 15px; color: var(--c-text-1, #e8ecf8); font-weight: 700; }
+  .dl-txt i { display: block; font-size: 12px; color: var(--c-text-2, #9aa4bd); font-style: normal; margin-top: 2px; letter-spacing: .3px; }
   /* 移动端：最近更新跑马灯自然接在 hero 内容下方（首屏露出，往下延伸）；与精选笔记拉开间距 */
   .recent-mobile {
     display: block;

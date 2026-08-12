@@ -23,10 +23,15 @@
       </div>
       <h2 class="dl-name">知屿 · Windows 客户端</h2>
       <p class="dl-meta">版本 v1.2.0 · 2026-08-12 · 约 200MB</p>
-      <a class="dl-btn" :href="downloadUrl" download>
+      <a class="dl-btn desktop-only" :href="downloadUrl" download>
         ⬇ 下载 Windows 版
       </a>
-      <p class="dl-hint">下载后解压，双击「知屿.exe」即可使用</p>
+      <p class="dl-hint desktop-only">下载后解压，双击「知屿.exe」即可使用</p>
+      <!-- 移动端提示：不提供客户端下载，引导用网页版 -->
+      <div class="dl-mobile-tip">
+        📱 移动端无需下载客户端<br />
+        直接用浏览器访问网页版即可，功能与桌面版完全一致。
+      </div>
     </div>
 
     <div class="dl-grid">
@@ -103,6 +108,15 @@ const downloadUrl = 'http://182.254.209.123/downloads/zhiyu-win32-x64.zip'
 }
 .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(59, 130, 246, .45); }
 .dl-hint { color: var(--c-text-2, #9aa4bd); font-size: 13px; margin: 14px 0 0; }
+.dl-mobile-tip { display: none; }
+@media (max-width: 720px) {
+  .desktop-only { display: none !important; }
+  .dl-mobile-tip {
+    display: block; padding: 14px; border-radius: 10px; font-size: 14px; line-height: 1.8;
+    color: var(--c-text-2, #9aa4bd);
+    background: rgba(59, 130, 246, .08); border: 1px dashed rgba(59, 130, 246, .3);
+  }
+}
 
 .dl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
 .dl-item {

@@ -46,3 +46,4 @@ coverage
 dist-electron
 release
 doctmanage/public/mathjax/
+*.syso

@@ -208,3 +208,11 @@ html[data-theme="minimal"] {
 }
 /* 平板/触屏：点击按钮/链接时不闪浏览器默认高亮（保留各组件自定义 hover/active 反馈） */
 button, a, [role='button'] { -webkit-tap-highlight-color: transparent; }
+
+/* ── Electron 桌面版：自定义深色标题栏适配 ── */
+html.desktop-electron body { padding-top: 40px; }
+html.desktop-electron .kb-navbar { top: 40px; }
+html.desktop-electron #titlebar-drag {
+  position: fixed; top: 0; left: 0; right: 0; height: 40px;
+  -webkit-app-region: drag; z-index: 2147483000;
+}
