@@ -192,7 +192,31 @@ const renderMd = (src) => {
   })
   return html
 }
-const renderRight = () => { if (rightEl.value) { rightEl.value.innerHTML = renderMd(content.value); bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText }); ensureAnnCanvases(rightEl.value) } window.dispatchEvent(new Event('zhiyu:doodle-reflow')) }
+const renderRight = () => {
+  if (rightEl.value) {
+    rightEl.value.innerHTML = renderMd(content.value)
+    upgradeImgs() // 普通图片（粘贴/附件/markdown 引用）也包成可拉伸的 img-zone
+    bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText })
+    ensureAnnCanvases(rightEl.value)
+  }
+  window.dispatchEvent(new Event('zhiyu:doodle-reflow'))
+}
+// 编辑区所有裸 <img>（非 img-zone）自动升级为可拉伸图片：包 span.img-zone + 8 个拉伸手柄，
+// 让粘贴/附件/复制的图片也有与「插入图片」一致的拉伸能力（光标与拖拽自动生效）
+const upgradeImgs = () => {
+  const root = rightEl.value
+  if (!root) return
+  const RZ = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+  root.querySelectorAll('.markdown-body img').forEach((img) => {
+    if (img.closest('.img-zone')) return
+    const zone = document.createElement('span')
+    zone.className = 'img-zone'
+    zone.setAttribute('contenteditable', 'false')
+    img.parentNode.insertBefore(zone, img)
+    zone.appendChild(img)
+    zone.insertAdjacentHTML('beforeend', RZ.map(d => `<span class="rz rz-${d}"></span>`).join(''))
+  })
+}
 // 给编辑区里 markdown 渲染的批注框补齐手绘画布（插入的批注框自带；渲染重建后缺失则补）
 const ensureAnnCanvases = (root) => {
   if (!root) return
@@ -689,7 +713,11 @@ const onImgZoneDown = (e) => {
   const img = zone ? zone.querySelector('img') : null
   if (!img) return
   const m = rz.className.match(/rz-(\w+)/)
-  imgDrag = { dir: m ? m[1] : 'se', img, startX: e.clientX, startY: e.clientY, w: img.offsetWidth, h: img.offsetHeight }
+  const dir = m ? m[1] : 'se'
+  imgDrag = { dir, img, startX: e.clientX, startY: e.clientY, w: img.offsetWidth, h: img.offsetHeight }
+  // 拉伸期间全局保持对应方向的拉伸光标（鼠标移出图片到正文文本区也不变回 I 形）
+  const C = { e: 'ew', w: 'ew', n: 'ns', s: 'ns', nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw' }[dir] || 'nwse'
+  document.body.classList.add('resizing-' + C)
   window.addEventListener('mousemove', onResizeMove)
   window.addEventListener('mouseup', onResizeEnd)
 }
@@ -710,6 +738,7 @@ const onResizeMove = (e) => {
 const onResizeEnd = () => {
   window.removeEventListener('mousemove', onResizeMove)
   window.removeEventListener('mouseup', onResizeEnd)
+  document.body.classList.remove('resizing-ew', 'resizing-ns', 'resizing-nwse', 'resizing-nesw')
   if (imgDrag) { if (imgDrag.img) onEdit(); imgDrag = null }
 }
 const eqInsertDisplay = ref(false)
@@ -2090,16 +2119,25 @@ onBeforeUnmount(() => {
 }
 .editable-area :deep(.img-zone) {
   position: relative; display: inline-block; line-height: 0;
+  /* 图片本体给「移动」箭头光标（可拖动）；边缘 rz 手柄的 resize 光标优先级更高会覆盖，
+     不再显示 contenteditable 的 I 形文字光标 */
+  cursor: move;
 }
+/* 拉伸手柄：透明热区，仅提供拉伸光标（四角斜向 nwse/nesw、四边上下 ns / 左右 ew） */
 .editable-area :deep(.rz) { position: absolute; }
 .editable-area :deep(.rz-nw) { left: -4px; top: -4px; width: 16px; height: 16px; cursor: nwse-resize; }
-.editable-area :deep(.rz-n)  { left: 50%; top: -4px; width: 26px; height: 14px; margin-left: -13px; cursor: ns-resize; }
+.editable-area :deep(.rz-n)  { left: 50%; top: -5px; width: 48px; height: 20px; margin-left: -24px; cursor: ns-resize; }
 .editable-area :deep(.rz-ne) { right: -4px; top: -4px; width: 16px; height: 16px; cursor: nesw-resize; }
-.editable-area :deep(.rz-e)  { right: -4px; top: 50%; width: 14px; height: 26px; margin-top: -13px; cursor: ew-resize; }
+.editable-area :deep(.rz-e)  { right: -5px; top: 50%; width: 20px; height: 48px; margin-top: -24px; cursor: ew-resize; }
 .editable-area :deep(.rz-se) { right: -4px; bottom: -4px; width: 16px; height: 16px; cursor: nwse-resize; }
-.editable-area :deep(.rz-s)  { left: 50%; bottom: -4px; width: 26px; height: 14px; margin-left: -13px; cursor: ns-resize; }
+.editable-area :deep(.rz-s)  { left: 50%; bottom: -5px; width: 48px; height: 20px; margin-left: -24px; cursor: ns-resize; }
 .editable-area :deep(.rz-sw) { left: -4px; bottom: -4px; width: 16px; height: 16px; cursor: nesw-resize; }
-.editable-area :deep(.rz-w)  { left: -4px; top: 50%; width: 14px; height: 26px; margin-top: -13px; cursor: ew-resize; }
+.editable-area :deep(.rz-w)  { left: -5px; top: 50%; width: 20px; height: 48px; margin-top: -24px; cursor: ew-resize; }
+/* 图片拉伸期间：全局保持拉伸光标（鼠标移出图片到正文也不变回 I 形文字光标） */
+body.resizing-ew, body.resizing-ew * { cursor: ew-resize !important; }
+body.resizing-ns, body.resizing-ns * { cursor: ns-resize !important; }
+body.resizing-nwse, body.resizing-nwse * { cursor: nwse-resize !important; }
+body.resizing-nesw, body.resizing-nesw * { cursor: nesw-resize !important; }
 .editable-area eq-wrap {
   display: inline-block; padding: 1px 8px; margin: 0 2px;
   border: 1px dashed color-mix(in srgb, var(--brand-1) 55%, transparent);

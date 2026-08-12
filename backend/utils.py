@@ -66,7 +66,8 @@ def can_view_doc(user, doc):
             return True
     return False
 
-IMG_RE = re.compile(r'!\[[^\]]*\]\(([^)\s]+)\)')
+# 图片引用：支持 ![alt](url)、![alt](url "=宽x高")(带 title 尺寸参数，空格+引号，不截断 URL)
+IMG_RE = re.compile(r'!\[[^\]]*\]\(([^)\s]+)(?:\s+["\'][^"\']*["\'])?\)')
 DOC_SELECT = """SELECT d.id, d.type, d.title, d.slug, d.public_id, d.visibility,
     d.likes_count, d.favorites_count, d.comments_count, d.downloads_count, d.pinned_until,
     d.downloadable, d.price, d.preview_only, d.format, d.attachment,

@@ -391,7 +391,8 @@ const activeId = ref('')
 const collectOutline = () => {
   const mb = document.querySelector('.markdown-body')
   const hs = mb ? [...mb.querySelectorAll('h1, h2, h3')] : []
-  outline.value = hs.map(h => ({ id: h.id, title: h.innerText.trim().slice(0, 40), level: Number(h.tagName[1]) }))
+  // 同时缓存标题位置，滚动时不再逐个 getBoundingClientRect（避免强制同步布局卡顿）
+  outline.value = hs.map(h => ({ id: h.id, title: h.innerText.trim().slice(0, 40), level: Number(h.tagName[1]), top: h.getBoundingClientRect().top + window.scrollY }))
 }
 const scrollToHeading = (id) => {
   const el = document.getElementById(id)
@@ -411,10 +412,19 @@ const onScrollOutline = () => {
   const mid = window.scrollY + window.innerHeight * 0.3
   let cur = ''
   for (const h of outline.value) {
-    const el = document.getElementById(h.id)
-    if (el && el.getBoundingClientRect().top + window.scrollY <= mid) cur = h.id
+    if (h.top <= mid) cur = h.id
   }
   activeId.value = cur
+}
+// 滚动处理统一 rAF 节流：一次滚动帧内只执行一次，避免高频 getBoundingClientRect 卡顿
+let scrollRaf = 0
+const onScroll = () => {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0
+    onScrollProgress()
+    onScrollOutline()
+  })
 }
 const outlineWatch = watch(rendered, () => {
   collectOutline()
@@ -508,16 +518,14 @@ onMounted(() => {
   bindAnnGlobal({ onDel: onDelAnn })
   load()
   readTimer = setInterval(reportRead, 60000)
-  window.addEventListener('scroll', onScrollOutline, { passive: true })
-  window.addEventListener('scroll', onScrollProgress, { passive: true })
+  window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('zhiyu:ai-comment', onAiComment)
   window.addEventListener('zhiyu:ai-insert', onAiInsert)
   document.addEventListener('selectionchange', onSelChange)
   document.addEventListener('click', onCodeGroupClick)
 })
 onBeforeUnmount(() => {
-  window.removeEventListener('scroll', onScrollOutline)
-  window.removeEventListener('scroll', onScrollProgress)
+  window.removeEventListener('scroll', onScroll)
   window.removeEventListener('zhiyu:ai-comment', onAiComment)
   window.removeEventListener('zhiyu:ai-insert', onAiInsert)
   document.removeEventListener('selectionchange', onSelChange)
@@ -1129,6 +1137,7 @@ const sendFriendReq = async () => {
   box-shadow: var(--shadow-1);
   padding: 40px 48px;
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .reader-head { margin-bottom: 26px; }
 .reader-title { font-size: 27px; font-weight: 800; margin: 0 0 12px; color: var(--text1); }

@@ -519,7 +519,12 @@ const md = new MarkdownIt({
         return hljs.highlight(str, { language: lang, ignoreIllegals: true }).value;
       } catch (__) {}
     }
-    return ''; // 使用外部默认转义
+    // 无语言（或语言未知）：自动检测高亮，与笔记阅读页一致，避免星空背景下白字不清
+    try {
+      return hljs.highlightAuto(str).value;
+    } catch (__) {
+      return '';
+    }
   }
 })
 
@@ -2016,9 +2021,9 @@ const nextDoc = computed(() => {
   border-radius: 20px;
   border: 1px solid var(--c-border);
   box-shadow: var(--shadow-1);
+  /* 保持 82% 半透明原观感；去掉 backdrop-filter（快速拖动滚动条时整卡重采样导致白屏/卡片消失）。
+     82% 已接近实色，去掉模糊视觉几乎无差异，但滚动流畅 */
   background: color-mix(in srgb, var(--c-bg) 82%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   padding: 34px 40px 40px;
   overflow: hidden;
 }

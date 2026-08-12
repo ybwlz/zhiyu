@@ -61,7 +61,7 @@
               <h3 class="row-title" @click="openNote(n.public_id || n.id)">{{ n.title }}</h3>
               <p class="row-preview" @click="openNote(n.public_id || n.id)">{{ previewText(n) }}</p>
               <div v-if="imagesOf(n).length" class="row-imgs" @click="openNote(n.public_id || n.id)">
-                <img v-for="(img, i) in imagesOf(n)" :key="i" :src="img" alt="" />
+                <img v-for="(img, i) in imagesOf(n)" :key="i" :src="img" alt="" @error="onImgError" />
               </div>
               <div class="row-actions">
                 <button class="fa-btn" :class="{ on: liked[n.id] }" @click="toggleLike(n)">
@@ -159,6 +159,8 @@ export default {
     },
   },
   methods: {
+    // 图片加载失败（404/坏图）自动隐藏，避免广场显示白屏破图
+    onImgError(e) { e.target.style.display = 'none' },
     // 置顶优先：pinned_until 未过期的笔记排最前（次级排序保持原序）
     pinnedFirst(list) {
       const now = Date.now()
@@ -285,7 +287,7 @@ export default {
     imagesOf(n) {
       if (n.preview_imgs && n.preview_imgs.length) return n.preview_imgs.slice(0, 5)
       const urls = []
-      const re = /!\[[^\]]*\]\(([^)\s]+)\)/g
+      const re = /!\[[^\]]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g
       let m
       const c = n.content || ''
       while ((m = re.exec(c)) && urls.length < 5) {
