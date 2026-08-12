@@ -1985,11 +1985,13 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 .back-btn {
+  order: 1;
   padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border);
   background: var(--btn-bg); color: var(--text2); font-size: 13px; cursor: pointer;
 }
 .back-btn:hover { color: var(--brand-1); }
 .title-input {
+  order: 1;
   flex: 1; min-width: 220px;
   padding: 9px 16px; border-radius: 12px;
   border: 1px solid var(--border); background: var(--btn-bg);
@@ -1997,11 +1999,13 @@ onBeforeUnmount(() => {
 }
 .title-input:focus { border-color: color-mix(in srgb, var(--brand-1) 55%, transparent); }
 .type-input {
+  order: 2;
   width: 150px; padding: 9px 14px; border-radius: 12px;
   border: 1px solid var(--border); background: var(--btn-bg);
   color: var(--text1); font-size: 13.5px; outline: none;
 }
 .vis-seg {
+  order: 2;
   display: inline-flex; padding: 3px; border-radius: 999px;
   background: var(--btn-bg); border: 1px solid var(--border);
   flex-shrink: 0;
@@ -2017,6 +2021,7 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--brand-1) 14%, transparent);
 }
 .save-btn {
+  order: 1;
   padding: 9px 26px; border: none; border-radius: 999px;
   background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
   color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
