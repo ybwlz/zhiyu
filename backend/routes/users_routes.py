@@ -159,10 +159,17 @@ def upload_avatar(user=None):
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
         return jsonify({'error': '仅支持图片格式'}), 400
+    # 头像大小限制 2MB（先读流校验再落盘，防超大文件）
+    data = file.read()
+    if len(data) > 2 * 1024 * 1024:
+        return jsonify({'error': '头像图片不能超过 2MB'}), 400
+    if not data:
+        return jsonify({'error': 'bad_request'}), 400
     avatar_dir = os.path.join(UPLOAD_FOLDER, 'avatars')
     os.makedirs(avatar_dir, exist_ok=True)
     fname = f"u{user['id']}_{secrets.token_hex(6)}{ext}"
-    file.save(os.path.join(avatar_dir, fname))
+    with open(os.path.join(avatar_dir, fname), 'wb') as f:
+        f.write(data)
     path = f"/uploads/avatars/{fname}"
     conn = get_conn()
     try:
@@ -183,10 +190,17 @@ def upload_cover(user=None):
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
         return jsonify({'error': '仅支持图片格式'}), 400
+    # 封面大小限制 5MB（先读流校验再落盘，防超大文件）
+    data = file.read()
+    if len(data) > 5 * 1024 * 1024:
+        return jsonify({'error': '封面图片不能超过 5MB'}), 400
+    if not data:
+        return jsonify({'error': 'bad_request'}), 400
     cover_dir = os.path.join(UPLOAD_FOLDER, 'covers')
     os.makedirs(cover_dir, exist_ok=True)
     fname = "u" + str(user['id']) + "_" + secrets.token_hex(6) + ext
-    file.save(os.path.join(cover_dir, fname))
+    with open(os.path.join(cover_dir, fname), 'wb') as f:
+        f.write(data)
     path = "/uploads/covers/" + fname
     conn = get_conn()
     try:
@@ -294,11 +308,12 @@ def user_points(user=None):
         conn.close()
     return jsonify({'points': total, 'logs': logs})
 
-# ── 学习热力图：最近 N 天阅读时长（仅本人） ──
+# ── 学习热力图：最近 N 天阅读时长（本人及他人主页展示，需登录） ──
 @bp.route('/api/user/heatmap', methods=['GET'])
 @require_login
 def user_heatmap(user=None):
-    uid = request.args.get('uid', type=int) or user['id']   # 支持查看他人热力图（默认自己）
+    # 他人主页也展示热力图（产品需求）；登录即可查看任意用户阅读热力图
+    uid = request.args.get('uid', type=int) or user['id']
     days = 90
     conn = get_conn()
     try:
