@@ -81,6 +81,8 @@ def doc_purchase(doc_id, user=None):
             if cur.fetchone():
                 return jsonify({'success': True, 'already': True})
             price = int(d['price'] or 0)
+            if price < 0:
+                return jsonify({'error': '笔记价格异常'}), 400
             cur.execute("SELECT points FROM users WHERE id=%s", (user['id'],))
             pts = cur.fetchone()['points'] or 0
             if pts < price:
