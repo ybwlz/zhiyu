@@ -83,8 +83,10 @@ const versions = [
         { title: '首页最近更新改双行跑马灯', desc: '笔记较多时「最近更新」升级为精选笔记同款卡片墙：双行反向循环滚动（第一行向右、第二行向左）、持续滚动不因悬停暂停、左右淡出遮罩、速度随卡片数自适应（偏慢）；卡片不足 8 篇时保留原列表。' },
         { title: '首页移动端改版', desc: '手机端 hero 精简：删除搜索框与统计卡，改为「开始探索知屿」按钮（未登录跳登录页、已登录直达笔记广场）；副标题加长文案；最近更新跑马灯上移到 hero 文字下方；桌面端布局保持不变。' },
         { title: '登录页新增条款勾选与协议页面', desc: '注册时需勾选「我已阅读并同意《服务条款》和《隐私协议》」，条款文字加粗高亮；移动端点按弹出全屏条款弹窗，PC 端跳转独立页面（/terms 与 /privacy），正文完整丰富，覆盖账号、内容、AI 助手、知屿币、隐私等条款。' },
+        { title: '首页页脚新增条款链接', desc: '首页底部新增「服务条款」「隐私协议」链接，直达 /terms 与 /privacy 页面。' },
       ],
       fixed: [
+        { title: '修复更新日志移动端文字溢出', desc: '更新日志详情条目在窄屏下长文本撑破卡片边框、页面横向溢出；修复 flex 子项收缩与长文本断行（min-width/overflow-wrap），移动端卡片与页面间距同步适配。' },
         { title: '修复平板端科目图谱与能力版图间距过大', desc: '平板宽度下科目图谱仍占用桌面版 280vh 滚动漫游空间，导致与下方能力版图之间隔出大片空白；平板断点改为普通区块，图谱与能力版图紧邻，桌面端下滑漫游不受影响。' },
       ],
     },
@@ -446,14 +448,16 @@ const versionGroups = computed(() => {
   display: flex; gap: 16px; padding: 14px 16px;
   border-radius: 14px;
   transition: background .2s;
+  min-width: 0;
 }
 .section-item:hover { background: var(--btn-bg); }
 .item-no {
   font-size: 12px; font-weight: 700; color: var(--brand-1);
   padding-top: 3px; flex-shrink: 0;
 }
+.item-body { min-width: 0; flex: 1; }
 .item-body h4 { font-size: 15px; margin: 0 0 5px; color: var(--text1); }
-.item-body p { font-size: 13.5px; color: var(--text2); margin: 0; line-height: 1.7; }
+.item-body p { font-size: 13.5px; color: var(--text2); margin: 0; line-height: 1.7; overflow-wrap: break-word; word-break: break-word; }
 
 @keyframes grad-flow {
   0% { background-position: 0% 50%; filter: hue-rotate(0deg); }
@@ -472,6 +476,10 @@ const versionGroups = computed(() => {
 .arch-toggle:hover { color: var(--brand-1); }
 
 @media (max-width: 860px) {
+  .changelog-page { padding: 100px 16px 60px; }
+  .page-header { margin-bottom: 28px; }
+  .detail-card { padding: 20px 18px; }
+  .section-item { gap: 12px; padding: 12px 12px; }
   .cl-layout { grid-template-columns: 1fr; gap: 16px; }
   .arch-wrap { display: flex; flex-direction: column; }
   .arch-toggle { display: flex; margin-bottom: 0; box-shadow: none; }

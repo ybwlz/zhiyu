@@ -166,6 +166,10 @@
         <footer class="kb-footer">
           <div class="footer-inner">
             <span class="footer-brand">✦ {{ site.fullName }}</span>
+            <span class="footer-links">
+              <router-link to="/terms" class="footer-link">服务条款</router-link>
+              <router-link to="/privacy" class="footer-link">隐私协议</router-link>
+            </span>
             <span class="footer-tip">用 知屿 沉淀每一份知识 ✨</span>
           </div>
         </footer>
@@ -871,6 +875,14 @@ const updateSubjectsProgress = () => {
   border-top: 1px solid var(--border);
 }
 .footer-brand { font-weight: 600; font-size: 14px; }
+.footer-links { display: flex; gap: 14px; }
+.footer-link {
+  font-size: 13px;
+  color: var(--text2);
+  text-decoration: none;
+  transition: color .2s;
+}
+.footer-link:hover { color: var(--brand-1); }
 .footer-tip { color: var(--text2); font-size: 13px; }
 
 /* ═══════════ 响应式 ═══════════ */

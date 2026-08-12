@@ -334,8 +334,10 @@ onMounted(() => {
   const docsP = store.fetchDocs()
   loadRoom()
   const key = route.params.key
-  if (key) {
+  if (auth.isLogin && key) {
     store.fetchDocByKey(key)
+  } else if (!auth.isLogin) {
+    // 未登录：阅览室不加载任何文档（左侧与正文均提示登录）
   } else {
     // 无 key（顶部导航进 /docs）：等列表加载后自动跳到第一篇，让 URL 带正确 key（AI 据此感知当前笔记）
     docsP.then(() => {
@@ -1039,9 +1041,8 @@ const nextDoc = computed(() => {
              </span>
           </div>
           <div class="sidebar-scroll">
-            <div v-if="!auth.isLogin" class="side-empty">登录后使用你的阅览室</div>
-            <div v-else-if="roomLoading" class="side-empty">加载中…</div>
-            <div v-else-if="!grouped.length" class="side-empty">阅览室还没有笔记<br /><span class="side-empty-sub">去笔记广场或书房把笔记加入阅览室</span></div>
+            <div v-if="auth.isLogin && roomLoading" class="side-empty">加载中…</div>
+            <div v-else-if="auth.isLogin && !grouped.length" class="side-empty">阅览室还没有笔记<br /><span class="side-empty-sub">去笔记广场或书房把笔记加入阅览室</span></div>
             <div class="group" v-for="g in grouped" :key="g.type">
               <div class="group-title" @click="toggleGroup(g.type)" :class="{ active: openTypes.has(g.type) }">
                 {{ g.type }}
@@ -2000,6 +2001,7 @@ const nextDoc = computed(() => {
   color: var(--text2);
   font-size: 14px;
 }
+/* 未登录访问阅览室：不显示登录引导，直接空白（左侧与正文都空，正文显示未选中文档的占位文案） */
 .doc-card {
   position: relative;
   border-radius: 20px;
