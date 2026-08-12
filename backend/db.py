@@ -182,9 +182,6 @@ def init_db():
             cur.execute("INSERT INTO users (username, password_hash, role, nickname, email, email_verified) VALUES (%s, %s, 'ai', %s, NULL, 1)",
                         ('ai', generate_password_hash(secrets.token_hex(24)), 'AI 助手'))
             ai_id = cur.lastrowid
-        if ai_id:
-            cur.execute("INSERT IGNORE INTO follows (follower_id, followee_id) SELECT %s, id FROM users WHERE id<>%s", (ai_id, ai_id))
-
         # ── 互动新表 ──
         cur.execute("""CREATE TABLE IF NOT EXISTS note_likes (
             id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -281,6 +278,9 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_follow (follower_id, followee_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
+        # AI 官方账号默认关注所有用户（follows 表创建后再建立关系，避免建表顺序问题）
+        if ai_id:
+            cur.execute("INSERT IGNORE INTO follows (follower_id, followee_id) SELECT %s, id FROM users WHERE id<>%s", (ai_id, ai_id))
         cur.execute("""CREATE TABLE IF NOT EXISTS messages (
             id BIGINT PRIMARY KEY AUTO_INCREMENT,
             sender_id BIGINT NOT NULL,
