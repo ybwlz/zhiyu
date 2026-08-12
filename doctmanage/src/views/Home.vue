@@ -958,11 +958,11 @@ const updateSubjectsProgress = () => {
     transition: transform .25s, box-shadow .25s;
   }
   .hero-explore-btn:active { transform: scale(0.96); }
-  /* 移动端：最近更新跑马灯上移到 hero 下方 */
+  /* 移动端：最近更新跑马灯上移到 hero 下方（再靠下一点） */
   .recent-mobile {
     display: block;
     width: 100%;
-    margin-top: 26px;
+    margin-top: 44px;
   }
   /* 移动端隐藏桌面版底部最近更新区块（已上移） */
   .kb-recent.desktop-only { display: none; }

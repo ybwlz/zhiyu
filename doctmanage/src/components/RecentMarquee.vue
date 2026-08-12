@@ -47,8 +47,8 @@ const row1 = computed(() => props.docs.filter((_, i) => i % 2 === 0))
 const row2 = computed(() => props.docs.filter((_, i) => i % 2 === 1))
 // 无缝循环：每行渲染两份（动画位移 50% 恰好一份宽度）
 const doubled = (arr) => [...arr, ...arr]
-// 滚动速度随卡片数自适应（偏慢，持续滚动）
-const marqueeDur = (arr) => Math.max(30, arr.length * 7) + 's'
+// 滚动速度随卡片数自适应（再放慢，持续滚动）
+const marqueeDur = (arr) => Math.max(36, arr.length * 8.5) + 's'
 
 const TYPE_EMOJI = {
   高等数学: '∫', 中学公式: '∑', 线性代数: '🧮', 概率论: '🎲', 数据结构: '🌳',
