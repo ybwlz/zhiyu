@@ -990,8 +990,9 @@ const updateSubjectsProgress = () => {
     justify-content: center;
   }
   /* 手机端 hero：居中布局，竖高占满一页，卡片内部 padding 收紧 */
-  .kb-hero { min-height: calc(100vh - 56px); align-items: center; justify-content: center; padding: 40px 20px 32px; }
-  .hero-inner { width: 100%; max-width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; }
+  /* 手机端 hero：文字区固定顶部（不因跑马灯变大而上移），跑马灯向下延伸 */
+  .kb-hero { min-height: calc(100vh - 56px); align-items: center; padding: 40px 20px 32px; }
+  .hero-inner { width: 100%; max-width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .hero-kicker { margin-bottom: 16px; }
   .hero-title { font-size: 30px; line-height: 1.22; margin-bottom: 14px; }
   .hero-tagline { font-size: 14.5px; margin-bottom: 10px; }
