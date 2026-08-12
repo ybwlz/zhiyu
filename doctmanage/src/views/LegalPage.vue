@@ -44,10 +44,10 @@ const pageBack = () => {
   padding: 100px 24px 60px;
   box-sizing: border-box;
 }
-/* 标题区：左标题 + 右侧返回按钮 */
+/* 标题区：左标题 + 右侧返回按钮（与标题垂直居中，略靠下） */
 .legal-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
