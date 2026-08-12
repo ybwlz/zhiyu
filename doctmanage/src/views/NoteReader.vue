@@ -706,6 +706,7 @@ const sendFriendReq = async () => {
           </button>
           <button class="act-btn" :class="{ on: interact.shared }" @click="share">↗ 转发</button>
           <button class="act-btn" @click="download">⬇ 下载 {{ doc.downloads_count }}</button>
+          <a v-if="doc.attachment" class="act-btn att-link" :href="'/uploads/' + doc.attachment" target="_blank" rel="noopener">📎 附件</a>
           <button class="act-btn" :class="{ on: summaryOpen }" @click="aiSummary">🤖 AI 总结</button>
         </div>
 
@@ -1069,6 +1070,13 @@ const sendFriendReq = async () => {
   transition: all .2s;
 }
 .act-btn:hover { color: var(--brand-1); border-color: color-mix(in srgb, var(--brand-1) 45%, transparent); }
+/* 附件下载按钮（<a> 伪装成按钮） */
+.act-btn.att-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.act-btn.att-link:hover { text-decoration: none; }
 .act-btn.on {
   color: var(--brand-1);
   background: color-mix(in srgb, var(--brand-1) 12%, transparent);
