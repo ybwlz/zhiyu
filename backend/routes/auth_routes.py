@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import pymysql
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from config import DEV_MODE
+from config import DEV_MODE, SMTP_HOST, SMTP_USER
 from db import get_conn
 from auth import (EMAIL_CODES, CODE_TTL, CODE_RESEND, CODE_MAX_TRIES,
                   send_email_code, issue_token, get_current_user, require_login)
@@ -58,7 +58,8 @@ def auth_send_code():
     EMAIL_CODES[email] = {'code': code, 'expires': now + CODE_TTL, 'last_sent': now}
     sent = send_email_code(email, code)
     resp = {'success': True, 'sent': sent}
-    if not sent and DEV_MODE:
+    # 仅「开发模式 + 未配置 SMTP（本地发不出信）」才回显验证码；配了 SMTP（生产）即使 DEV_MODE=1 也严格不返回
+    if not sent and DEV_MODE and not (SMTP_HOST and SMTP_USER):
         print(f'[DEV] 验证码 for {email}: {code}')
         resp['dev_code'] = code  # 仅开发模式返回，方便本地测试
     return jsonify(resp)
