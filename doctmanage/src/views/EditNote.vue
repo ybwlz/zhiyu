@@ -2266,7 +2266,7 @@ body.resizing-nesw, body.resizing-nesw * { cursor: nesw-resize !important; }
   .edit-topbar { gap: 8px; margin-bottom: 10px; }
   /* 第一行：返回 + 标题 + 保存；第二行：分类 + 私密/公开 */
   .back-btn { order: 1; padding: 7px 12px; font-size: 12.5px; flex-shrink: 0; }
-  .title-input { order: 1; flex: 1; min-width: 0; padding: 10px 14px; font-size: 18px; }
+  .title-input { order: 1; flex: 1; min-width: 0; padding: 10px 14px; font-size: 20px; font-weight: 700; }
   .save-btn { order: 1; margin-left: auto; padding: 8px 18px; font-size: 13px; flex-shrink: 0; }
   .type-input { order: 3; flex: 1 1 40%; min-width: 0; }
   .vis-seg { order: 3; }
