@@ -44,6 +44,22 @@ def notifications_read(user=None):
         conn.close()
     return jsonify({'success': True})
 
+@bp.route('/api/notifications/<int:nid>', methods=['DELETE'])
+@require_login
+def notification_delete(nid, user=None):
+    """删除单条通知（仅本人）"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM notifications WHERE id=%s AND user_id=%s", (nid, user['id']))
+            deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    if not deleted:
+        return jsonify({'error': '消息不存在'}), 404
+    return jsonify({'success': True})
+
 # ── 好友系统 ──
 @bp.route('/api/friends/request', methods=['POST'])
 @require_login

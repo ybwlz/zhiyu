@@ -52,10 +52,12 @@
                 class="bell-item"
                 :class="{ unread: !n.is_read }"
                 @click="openNoti(n)"
+                @contextmenu.prevent="delNoti(n)"
               >
                 <span class="bell-icon">{{ notiIcon(n.type) }}</span>
                 <span class="bell-text">{{ notiText(n) }}</span>
                 <span class="bell-time">{{ n.created_at?.slice(5, 16) }}</span>
+                <button class="bell-del" data-tip="删除" @click.stop="delNoti(n)">✕</button>
                 <div v-if="n.type === 'digest' && expandedDigest === n.id" class="bell-digest">{{ n.extra }}</div>
               </div>
             </div>
@@ -142,6 +144,11 @@ const readAll = async () => {
   notifications.value.forEach(n => (n.is_read = 1))
 }
 const expandedDigest = ref(null)
+const delNoti = async (n) => {
+  try { await api.delete('/notifications/' + n.id) } catch (e) { /* 忽略 */ }
+  notifications.value = notifications.value.filter(x => x.id !== n.id)
+  if (!n.is_read) unread.value = Math.max(0, unread.value - 1)
+}
 const openNoti = async (n) => {
   if (!n.is_read) {
     try { await api.post('/notifications/read', { id: n.id }) } catch (e) { /* 忽略 */ }
@@ -367,6 +374,21 @@ const links = [
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .bell-time { font-size: 11px; color: var(--text2); flex-shrink: 0; }
+/* 单条删除按钮（右侧 ✕，hover 变红） */
+.bell-del {
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s, background .15s, color .15s;
+}
+.bell-item:hover .bell-del { opacity: 1; }
+.bell-del:hover { background: color-mix(in srgb, var(--danger, #e5484d) 12%, transparent); color: var(--danger, #e5484d); }
 .bell-panel-enter-active, .bell-panel-leave-active { transition: opacity .18s ease, transform .18s ease; }
 .bell-panel-enter-from, .bell-panel-leave-to { opacity: 0; transform: translateY(-6px); }
 
