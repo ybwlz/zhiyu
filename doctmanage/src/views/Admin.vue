@@ -122,10 +122,10 @@
         <div class="modal-row"><label>科目</label><input v-model="uploadType" class="modal-input" placeholder="如：高等数学" /></div>
         <div class="modal-row">
           <label>公开</label>
-          <div class="vis-seg">
-            <button type="button" class="vis-seg-btn" :class="{ on: uploadVis === 'private' }" @click="uploadVis = 'private'">🔒 私密</button>
-            <button type="button" class="vis-seg-btn" :class="{ on: uploadVis === 'public' }" @click="uploadVis = 'public'">🌍 公开</button>
-          </div>
+          <select v-model="uploadVis" class="modal-input vis-select">
+            <option value="private">私密（仅自己）</option>
+            <option value="public">公开（上笔记广场）</option>
+          </select>
         </div>
         <div class="modal-row">
           <label>开放下载</label><input type="checkbox" v-model="uploadDL" />
@@ -160,10 +160,7 @@
           <div class="modal-row"><label>科目</label><input v-model="aiType" class="modal-input" /></div>
           <div class="modal-row">
             <label>公开</label>
-            <div class="vis-seg">
-              <button type="button" class="vis-seg-btn" :class="{ on: aiVis === 'private' }" @click="aiVis = 'private'">🔒 私密</button>
-              <button type="button" class="vis-seg-btn" :class="{ on: aiVis === 'public' }" @click="aiVis = 'public'">🌍 公开</button>
-            </div>
+            <select v-model="aiVis" class="modal-input vis-select"><option value="private">私密</option><option value="public">公开</option></select>
             <label class="ml">开放下载</label><input type="checkbox" v-model="aiDL" />
             <label class="ml">收费</label><input v-model.number="aiPrice" type="number" min="0" class="modal-input w60" />
             <label class="ml">仅预览</label><input type="checkbox" v-model="aiPreview" />
@@ -520,31 +517,13 @@ export default {
 .modal-row label.ml { width: auto; }
 .modal-input { flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text1); font-size: 13.5px; }
 .modal-input.w60 { width: 70px; flex: none; }
-/* 公开/私密分段选择（替换原生 select，风格与按钮统一） */
-.vis-seg {
-  display: inline-flex;
-  align-items: center;
-  background: var(--btn-bg);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px;
-  gap: 2px;
-}
-.vis-seg-btn {
-  border: none;
-  background: transparent;
-  color: var(--text2);
-  font-size: 13px;
-  padding: 6px 16px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all .2s;
-}
-.vis-seg-btn:hover { color: var(--text1); }
-.vis-seg-btn.on {
-  background: color-mix(in srgb, var(--brand-1) 14%, transparent);
-  color: var(--brand-1);
-  font-weight: 600;
+/* 公开/私密下拉：跟随深色主题（含展开的选项列表），星空背景下不再是白色 */
+.vis-select { flex: 1; min-width: 0; }
+html[data-theme="starlight"] .vis-select {
+  background: #232b3d;
+  border-color: rgba(255, 255, 255, .14);
+  color: #e8ecf8;
+  color-scheme: dark; /* 原生下拉选项列表也按暗色渲染 */
 }
 .hint { font-size: 11.5px; color: var(--text2); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
