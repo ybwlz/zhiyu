@@ -425,3 +425,33 @@ def delete_doc(doc_id: int, user=None):
     except Exception as e:
         print('[ERROR]', e)
         return jsonify({'error': 'server_error'}), 500
+
+@bp.route('/api/upload/image', methods=['POST'])
+@require_login
+def upload_note_image(user=None):
+    """笔记图片上传（编辑器/上传流程用）：存 uploads/images/，返回可引用 URL。
+    魔数校验真实图片格式 + 2MB 上限，防伪造扩展名落盘。"""
+    file = request.files.get('file') or request.files.get('image')
+    if not file or not file.filename:
+        return jsonify({'error': 'bad_request'}), 400
+    data = file.read()
+    if not data:
+        return jsonify({'error': 'bad_request'}), 400
+    magic = data[:12]
+    is_img = (magic.startswith(b'\x89PNG\r\n\x1a\n')
+              or magic.startswith(b'\xff\xd8\xff')
+              or magic.startswith(b'GIF87a') or magic.startswith(b'GIF89a')
+              or (magic[:4] == b'RIFF' and magic[8:12] == b'WEBP'))
+    if not is_img:
+        return jsonify({'error': '仅支持图片格式'}), 400
+    if len(data) > 2 * 1024 * 1024:
+        return jsonify({'error': '图片不能超过 2MB'}), 400
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ('.png', '.jpg', '.jpeg', '.gif', '.webp'):
+        ext = '.png'
+    img_dir = os.path.join(UPLOAD_FOLDER, 'images')
+    os.makedirs(img_dir, exist_ok=True)
+    fname = f"n{user['id']}_{secrets.token_hex(6)}{ext}"
+    with open(os.path.join(img_dir, fname), 'wb') as f:
+        f.write(data)
+    return jsonify({'success': True, 'url': f'/uploads/images/{fname}'})

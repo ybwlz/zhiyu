@@ -1490,6 +1490,27 @@ const locateAiDiff = () => {
 onMounted(() => {
   // 新建页：载入暂存草稿（zhiyu_draft_new）——AI 预填的直接应用并删除；用户普通暂存（未保存的新建内容）也恢复
   if (!isEdit.value) {
+    // 上传流程带来的草稿（md 正文 + 图片已组装成 markdown）：直接应用并清除，之后跳过本地普通草稿恢复
+    let appliedUpload = false
+    try {
+      const upRaw = sessionStorage.getItem('zhiyu_upload_new')
+      if (upRaw) {
+        const up = JSON.parse(upRaw)
+        if (up && (up.content || up.title)) {
+          if (up.title) title.value = up.title
+          if (up.type) type.value = up.type
+          if (up.visibility !== undefined) visibility.value = up.visibility
+          if (up.content) {
+            content.value = up.content
+            nextTick(() => renderRight())
+          }
+          appliedUpload = true
+          ElMessage.success('已载入上传内容（文字+图片），确认后点「保存」')
+        }
+        sessionStorage.removeItem('zhiyu_upload_new')
+      }
+    } catch (e) {}
+    if (!appliedUpload) {
     try {
       const raw = localStorage.getItem('zhiyu_draft_new')
       if (raw) {
@@ -1516,6 +1537,7 @@ onMounted(() => {
         }
       }
     } catch (e) {}
+    }
   }
   load()
   bindAnnGlobal({ onDel: delAnn })

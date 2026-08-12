@@ -272,12 +272,47 @@ export default {
     },
     editNote(id) { this.$router.push('/edit/' + id + '?from=study') },
     newNote() { this.$router.push('/edit') },
-    onPickFiles(e) { this.uploadFiles = Array.from(e.target.files || []); e.target.value = '' },
+    onPickFiles(e) {
+      // 累积选择：多次点选追加而不是覆盖（避免先选 md 再选图片时 md 丢失）
+      const picked = Array.from(e.target.files || [])
+      const names = new Set(this.uploadFiles.map(f => f.name))
+      for (const f of picked) if (!names.has(f.name)) { this.uploadFiles.push(f); names.add(f.name) }
+      e.target.value = ''
+    },
+    // 图片文件？
+    isImageFile(f) { return /^\.(png|jpe?g|gif|webp)$/i.test((f.name || '').replace(/.*\./, '.')) },
+    // md/txt 文件？
+    isMdFile(f) { return /\.(md|markdown|txt)$/i.test(f.name || '') },
+    // 读取文件文本
+    readText(f) { return new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result || '')); r.readAsText(f) }) },
     async doUpload() {
       if (!this.uploadFiles.length) return
       this.uploading = true
       let ok = 0
+      let mdContent = null      // 第一篇 md 正文
+      let mdTitle = ''
+      const imgPromises = []   // 图片上传任务（先传拿 URL）
+      const attachFiles = []   // 附件类文件（走老逻辑直接建篇）
       for (const file of this.uploadFiles) {
+        if (this.isImageFile(file)) {
+          const fd = new FormData()
+          fd.append('file', file)
+          imgPromises.push(api.post('/upload/image', fd).then(r => r.data.url).catch(() => null))
+        } else if (this.isMdFile(file)) {
+          if (mdContent === null) {
+            mdContent = await this.readText(file)
+            mdTitle = file.name.replace(/\.[^.]+$/, '')
+          } else {
+            attachFiles.push(file) // 多余的 md 视作附件
+          }
+        } else {
+          attachFiles.push(file)
+        }
+      }
+      // 图片上传拿 URL
+      const imgUrls = (await Promise.all(imgPromises)).filter(Boolean)
+      // 附件：保持老逻辑直接入库（每个一篇）
+      for (const file of attachFiles) {
         const fd = new FormData()
         fd.append('file', file)
         fd.append('type', this.uploadType)
@@ -285,10 +320,25 @@ export default {
         fd.append('visibility', this.uploadVis)
         try { await api.post('/docs', fd); ok++ } catch (e) { /* 忽略 */ }
       }
+      // md/图片：组装成一篇草稿，进编辑器确认后再入库
+      if (mdContent !== null || imgUrls.length) {
+        let body = mdContent !== null ? mdContent.trim() : ''
+        for (const u of imgUrls) body += (body ? '\n\n' : '') + `![${u.split('/').pop()}](${u})`
+        try {
+          sessionStorage.setItem('zhiyu_upload_new', JSON.stringify({
+            title: mdTitle || (imgUrls[0] || '').split('/').pop() || '未命名',
+            type: this.uploadType,
+            visibility: this.uploadVis,
+            content: body,
+          }))
+          this.$router.push('/edit?from=upload')
+          return
+        } catch (e) { /* sessionStorage 失败则降级：忽略 */ }
+      }
       this.uploading = false
       this.uploadOpen = false
       this.uploadFiles = []
-      if (ok) { this.loadMyNotes() }
+      if (ok) { this.loadMyNotes(); this.loadRoom() }
     },
     async aiGenerate() {
       const topic = this.aiTopic.trim()
