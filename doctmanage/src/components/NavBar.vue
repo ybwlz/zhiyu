@@ -122,7 +122,14 @@ const onAnyOutside = (e) => {
   if (bellWrap.value && !bellWrap.value.contains(e.target) && !e.target.closest('.bell-btn')) bellOpen.value = false
   if (!e.target.closest('.nav-burger') && !e.target.closest('.nav-mobile-menu')) menuOpen.value = false
 }
-const onAnyWheel = () => { bellOpen.value = false; menuOpen.value = false }
+const onAnyWheel = (e) => {
+  // 面板/导航内部滚动（通知列表、移动菜单）不收起，仅页面其他区域滚动时收起
+  const t = e.target
+  if (bellWrap.value && bellWrap.value.contains(t)) return
+  if (navBarRoot.value && navBarRoot.value.contains(t)) return
+  bellOpen.value = false
+  menuOpen.value = false
+}
 const unread = ref(0)
 const notifications = ref([])
 
