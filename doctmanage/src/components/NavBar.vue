@@ -26,7 +26,7 @@
         >{{ link.label }}</router-link>
       </div>
 
-      <div class="nav-right">
+      <div class="nav-right" :class="{ 'logged-out': !auth.isLogin }">
         <!-- 移动端汉堡菜单 -->
         <button class="nav-burger" data-tip="菜单" data-tip-align="right" @click="menuOpen = !menuOpen">☰</button>
         <!-- 主题下拉 -->
@@ -75,8 +75,7 @@
     <Transition name="bell-panel">
       <div v-if="menuOpen" class="nav-mobile-menu">
         <router-link v-for="link in links" :key="link.label" class="mm-link" :to="link.to" :class="{ active: isNavActive(link) }" @click="menuOpen = false">{{ link.label }}</router-link>
-        <router-link v-if="!auth.isLogin" class="mm-link" to="/login" @click="menuOpen = false">登录</router-link>
-        <router-link v-else class="mm-link" to="/admin" @click="menuOpen = false">书房</router-link>
+        <router-link v-if="auth.isLogin" class="mm-link" to="/admin" @click="menuOpen = false">书房</router-link>
         <router-link v-if="auth.isLogin" class="mm-link" to="/friends" @click="menuOpen = false">关注</router-link>
         <router-link v-if="auth.isLogin" class="mm-link" to="/messages" @click="menuOpen = false">私信</router-link>
         <router-link v-if="auth.isLogin" class="mm-link" to="/mall" @click="menuOpen = false">商城</router-link>
@@ -399,6 +398,10 @@ const links = [
   .nav-right .msg-link { order: 3; }
   .nav-right .me-link { order: 4; margin-left: auto; }
   .nav-right .nav-burger { order: 5; }
+  /* 未登录：登录按钮从汉堡菜单拿出，主题保持中间、汉堡贴最右 */
+  .nav-right.logged-out .admin-link { display: inline-flex !important; align-items: center; order: 0; }
+  .nav-right.logged-out .kb-theme-wrap { order: 1; margin-left: auto; margin-right: auto; }
+  .nav-right.logged-out .nav-burger { order: 2; margin-left: auto; }
   /* 通知按钮更小 */
   .nav-right .bell-btn { width: 26px; height: 26px; }
   .nav-right .bell-btn .bell-svg { width: 14px; height: 14px; }
