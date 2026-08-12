@@ -7,6 +7,7 @@ import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import { full as emoji } from 'markdown-it-emoji'
 import mathjax3 from 'markdown-it-mathjax3'
+import alerts from 'markdown-it-github-alerts'
 import mdImgSize from '@/utils/mdImgSize.js'
 import anchor from 'markdown-it-anchor'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -242,8 +243,10 @@ const createBlock = (klass, defaultTitle) => [Container, klass, {
     const token = tokens[idx]
     const info = token.info.trim().slice(klass.length).trim()
     if (token.nesting === 1) {
+      if (klass === 'details') return `<details class="custom-block details"><summary>${info || defaultTitle}</summary>\n`
       return `<div class="${klass} custom-block"><p class="custom-block-title">${info || defaultTitle}</p>\n`
     }
+    if (klass === 'details') return `</details>\n`
     return `</div>\n`
   }
 }]
@@ -253,6 +256,8 @@ md.use(...createBlock('tip', '提示'))
 md.use(...createBlock('info', '信息'))
 md.use(...createBlock('warning', '警告'))
 md.use(...createBlock('danger', '注意'))
+md.use(...createBlock('details', '详细信息'))
+md.use(alerts) // GitHub 风格警报：> [!NOTE] / [!TIP] / [!IMPORTANT] / [!WARNING] / [!CAUTION]
 const rendered = computed(() => doc.value ? md.render(doc.value.content) : '')
 
 // 路由参数是对外 key（public_id），兼容旧数字 id 链接；数字 id 等拿到文档后从 doc 取

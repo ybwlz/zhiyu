@@ -7,6 +7,7 @@ import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import { full as emoji } from 'markdown-it-emoji'
 import mathjax3 from 'markdown-it-mathjax3'
+import alerts from 'markdown-it-github-alerts'
 import mdImgSize from '@/utils/mdImgSize.js'
 import { ElMessage } from 'element-plus'
 import TurndownService from 'turndown'
@@ -56,14 +57,16 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
          `<pre class="language-${langName}"><code class="language-${langName}">${code}</code></pre>` +
          `</div>`
 }
-// 自定义块容器：例题 / 公式 / 提示 / 信息 / 警告 / 注意（:::example / :::formula / :::tip …）
+// 自定义块容器：例题 / 公式 / 提示 / 信息 / 警告 / 注意 / 详细信息（:::example / :::formula / :::tip … / :::details）
 const createBlock = (klass, defaultTitle) => [Container, klass, {
   render(tokens, idx) {
     const token = tokens[idx]
     const info = token.info.trim().slice(klass.length).trim()
     if (token.nesting === 1) {
+      if (klass === 'details') return `<details class="custom-block details"><summary>${info || defaultTitle}</summary>\n`
       return `<div class="${klass} custom-block"><p class="custom-block-title">${info || defaultTitle}</p>\n`
     }
+    if (klass === 'details') return `</details>\n`
     return `</div>\n`
   }
 }]
@@ -73,6 +76,8 @@ md.use(...createBlock('tip', '提示'))
 md.use(...createBlock('info', '信息'))
 md.use(...createBlock('warning', '警告'))
 md.use(...createBlock('danger', '注意'))
+md.use(...createBlock('details', '详细信息'))
+md.use(alerts) // GitHub 风格警报：> [!NOTE] / [!TIP] / [!IMPORTANT] / [!WARNING] / [!CAUTION]
 const rightEl = ref(null)
 const loadedPubId = ref('') // 文档 public_id（返回笔记页时用，避免 URL 暴露数字 id）
 const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -120,6 +125,38 @@ const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', 
 td.addRule('codeHeader', {
   filter: (node) => node.classList && node.classList.contains('code-header'),
   replacement: () => '',
+})
+// 自定义容器（::: tip/info/warning/danger/details 等）：标题是装饰，容器本体保留语法
+td.addRule('customBlockTitle', {
+  filter: (node) => node.classList && (node.classList.contains('custom-block-title') || node.nodeName === 'SUMMARY'),
+  replacement: () => '',
+})
+td.addRule('customBlock', {
+  filter: (node) => node.classList && node.classList.contains('custom-block'),
+  replacement: (content, node) => {
+    const isDetails = node.classList.contains('details')
+    const cls = Array.from(node.classList).filter(c => c !== 'custom-block' && c !== 'details')
+    const klass = isDetails ? 'details' : (cls[0] || '')
+    const titleEl = node.querySelector('.custom-block-title, summary')
+    const title = titleEl ? titleEl.textContent.trim() : ''
+    return `\n\n::: ${klass}${title ? ' ' + title : ''}\n${content.trim()}\n:::\n\n`
+  },
+})
+// GitHub 警报（> [!NOTE] 等）：标题是装饰，警报本体保留语法
+td.addRule('githubAlertTitle', {
+  filter: (node) => node.classList && node.classList.contains('markdown-alert-title'),
+  replacement: () => '',
+})
+td.addRule('githubAlert', {
+  filter: (node) => node.classList && node.classList.contains('markdown-alert'),
+  replacement: (content, node) => {
+    const m = String(node.className).match(/markdown-alert-(\w+)/)
+    const type = ((m && m[1]) || 'note').toUpperCase()
+    const titleEl = node.querySelector('.markdown-alert-title')
+    const title = (titleEl ? titleEl.textContent.trim() : '') || type
+    const inner = content.trim().split('\n').map(l => '> ' + l).join('\n')
+    return `\n\n> [!${title}]\n${inner}\n\n`
+  },
 })
 // 图片尺寸：编辑器调整大小后保存为 markdown 的 =WxH 语法（addRule 会插到最前优先匹配）
 td.addRule('imgSize', {

@@ -91,6 +91,7 @@
           <div class="panel-title">🔥 热门榜</div>
           <div v-for="(n, i) in hotNotes" :key="n.id" class="rank-item" @click="openNote(n.public_id || n.id)">
             <span class="rank-no" :class="{ top: i < 3 }">{{ i + 1 }}</span>
+            <span v-if="n.pinned_until && new Date(n.pinned_until) > new Date()" class="pin-badge">📌</span>
             <span class="rank-title">{{ n.title }}</span>
             <span class="rank-meta">👍 {{ n.likes_count || 0 }}</span>
           </div>
@@ -141,16 +142,16 @@ export default {
       if (this.sortBy === 'hot') list.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))
       else if (this.sortBy === 'fav') {
         // 「⭐ 收藏」= 筛选出我收藏过的笔记（按收藏时间倒序近似：收藏数降序）
-        return list.filter(n => this.faved[n.id]).sort((a, b) => (b.favorites_count || 0) - (a.favorites_count || 0))
+        return this.pinnedFirst(list.filter(n => this.faved[n.id]).sort((a, b) => (b.favorites_count || 0) - (a.favorites_count || 0)))
       }
       else list.sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || '')))
-      return list
+      return this.pinnedFirst(list)
     },
     hotNotes() {
-      return [...this.notes].sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0)).slice(0, 5)
+      return this.pinnedFirst([...this.notes].sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))).slice(0, 5)
     },
     recentNotes() {
-      return [...this.notes].sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || ''))).slice(0, 5)
+      return this.pinnedFirst([...this.notes].sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || '')))).slice(0, 5)
     },
     comm() {
       const sum = (k) => this.notes.reduce((a, d) => a + (Number(d[k]) || 0), 0)
@@ -158,6 +159,12 @@ export default {
     },
   },
   methods: {
+    // 置顶优先：pinned_until 未过期的笔记排最前（次级排序保持原序）
+    pinnedFirst(list) {
+      const now = Date.now()
+      const isPinned = (n) => n.pinned_until && new Date(n.pinned_until).getTime() > now
+      return [...list].sort((a, b) => (isPinned(b) ? 1 : 0) - (isPinned(a) ? 1 : 0))
+    },
     async load() {
       this.loading = true
       try {
