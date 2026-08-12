@@ -1,728 +1,386 @@
-# Markdown 扩展
+# 知屿 Markdown 语法说明
 
-VitePress 带有内置的 Markdown 扩展。
+知屿的笔记支持一套丰富的 Markdown 语法，在 **Docs 阅览室 / 笔记阅读 / 编辑区** 三处渲染一致（个别能力有范围差异，已在文中标注）。以下按能力逐项说明，每条都给出「写法」与「效果」。
 
-## GitHub 风格的表格
+---
 
-**输入**
+## 1. 基础语法
 
+| 能力 | 写法 | 效果 |
+| --- | --- | --- |
+| 标题 | `# 一级`、`## 二级` … `###### 六级` | 各级标题 |
+| 加粗 | `**加粗**` | **加粗** |
+| 斜体 | `*斜体*` | *斜体* |
+| 删除线 | `~~删除~~` | ~~删除~~ |
+| 行内代码 | `` `code` `` | `code` |
+| 链接 | `[文字](https://example.com)` | [文字](https://example.com) |
+| 无序列表 | `- 项` / `* 项` | • 项 |
+| 有序列表 | `1. 项` `2. 项` | 1. 项 2. 项 |
+| 引用 | `> 内容` | 引用块 |
+| 分割线 | `---` | 水平线 |
+| 任务列表 | `- [ ] 待办` `- [x] 完成` | ☐ 待办 ☑ 完成 |
 
+---
 
-```
-| Tables        |      Are      |  Cool |
-| ------------- | :-----------: | ----: |
-| col 3 is      | right-aligned | $1600 |
-| col 2 is      |   centered    |   $12 |
-| zebra stripes |   are neat    |    $1 |
-```
+## 2. 表格（GitHub 风格）
 
-**输出**
-| Tables        |      Are      |  Cool |
-| ------------- | :-----------: | ----: |
-| col 3 is      | right-aligned | $1600 |
-| col 2 is      |   centered    |   $12 |
-| zebra stripes |   are neat    |    $1 |
+**写法**
 
-## Emoji 🎉
-**输入**
-```
-:tada: :100:
-```
+````text
+| 列1 | 列2 | 列3 |
+| --- | :---: | ---: |
+| 左对齐 | 居中 | 右对齐 |
+| a | b | c |
+````
 
-**输出**
+**效果**
 
-:tada: :100:
+| 列1 | 列2 | 列3 |
+| --- | :---: | ---: |
+| 左对齐 | 居中 | 右对齐 |
+| a | b | c |
 
-这里可以找到[所有支持的 emoji 列表](https://github.com/markdown-it/markdown-it-emoji/blob/master/lib/data/full.mjs)。
+> 对齐方式：`:---` 左对齐、`:---:` 居中、`---:` 右对齐。
 
-## 目录表 (TOC)
+---
 
-**输入**
+## 3. Emoji
 
-```
-[[toc]]
-```
+**写法**：`:tada: :100: :heart:`
 
-**输出**
+**效果**：🎉 💯 ❤️
 
-[[toc]]
+> 完整表情列表见 [markdown-it-emoji](https://github.com/markdown-it/markdown-it-emoji/blob/master/lib/data/full.mjs)。
 
-可以使用 `markdown.toc` 选项配置 TOC 的呈现效果。
+---
 
-## 自定义容器
+## 4. 代码块
 
-自定义容器可以通过它们的类型、标题和内容来定义。
+### 4.1 语法高亮
 
-### 默认标题
+**写法**
 
-**输入**
-
-```md
-::: info
-This is an info box.
-:::
-
-::: tip
-This is a tip.
-:::
-
-::: warning
-This is a warning.
-:::
-
-::: danger
-This is a dangerous warning.
-:::
-
-::: details
-This is a details block.
-:::
-```
-
-**输出**
-
-::: info
-This is an info box.
-:::
-
-::: tip
-This is a tip.
-:::
-
-::: warning
-This is a warning.
-:::
-
-::: danger
-This is a dangerous warning.
-:::
-
-::: details
-This is a details block.
-:::
-
-### 自定义标题
-
-可以通过在容器的 "type" 之后附加文本来设置自定义标题。
-
-**输入**
-
-````md
-::: danger STOP
-危险区域，请勿继续
-:::
-
-::: details 点我查看代码
+````text
 ```js
-console.log('Hello, VitePress!')
-```
-:::
-````
-
-**输出**
-
-::: danger STOP
-危险区域，请勿继续
-:::
-
-::: details 点我查看代码
-```js
-console.log('Hello, VitePress!')
-```
-:::
-
-## GitHub 风格的警报
-
-VitePress 同样支持以标注的方式渲染 [GitHub 风格的警报](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)。它们和[自定义容器](#自定义容器)的渲染方式相同。
-
-```md
-> [!NOTE]
-> 强调用户在快速浏览文档时也不应忽略的重要信息。
-
-> [!TIP]
-> 有助于用户更顺利达成目标的建议性信息。
-
-> [!IMPORTANT]
-> 对用户达成目标至关重要的信息。
-
-> [!WARNING]
-> 因为可能存在风险，所以需要用户立即关注的关键内容。
-
-> [!CAUTION]
-> 行为可能带来的负面影响。
-```
-
-> [!NOTE]
-> 强调用户在快速浏览文档时也不应忽略的重要信息。
-
-> [!TIP]
-> 有助于用户更顺利达成目标的建议性信息。
-
-> [!IMPORTANT]
-> 对用户达成目标至关重要的信息。
-
-> [!WARNING]
-> 因为可能存在风险，所以需要用户立即关注的关键内容。
-
-> [!CAUTION]
-> 行为可能带来的负面影响。
-
-## 代码块中的语法高亮
-
-VitePress 使用 [Shiki](https://github.com/shikijs/shiki) 在 Markdown 代码块中使用彩色文本实现语法高亮。Shiki 支持多种编程语言。需要做的就是将有效的语言别名附加到代码块的开头：
-
-**输入**
-
-````
-```js
-export default {
-  name: 'MyComponent',
-  // ...
-}
+const greet = (name) => `Hello, ${name}!`
 ```
 ````
 
-````
-```html
-<ul>
-  <li v-for="todo in todos" :key="todo.id">
-    {{ todo.text }}
-  </li>
-</ul>
-```
-````
-
-**输出**
+**效果**
 
 ```js
-export default {
-  name: 'MyComponent',
-  // ...
-}
+const greet = (name) => `Hello, ${name}!`
 ```
 
-```html
-<ul>
-  <li v-for="todo in todos" :key="todo.id">
-    {{ todo.text }}
-  </li>
-</ul>
-```
+> 语言写在围栏后（`js` / `html` / `python` / `ts` / `css` …），支持 highlight.js 全部语言；代码块右上角有复制按钮，头部显示语言名。
 
-在 Shiki 的代码仓库中，可以找到[合法的编程语言列表](https://shiki.style/languages)。
+### 4.2 行高亮
 
-## 在代码块中实现行高亮
+在围栏语言后加 `{行号}` 即可高亮指定行。
 
-**输入**
+**写法**
 
-````
-```js{4}
-export default {
-  data () {
-    return {
-      msg: 'Highlighted!'
-    }
-  }
-}
+````text
+```js{2,5-6}
+const a = 1
+const b = 2      // ← 第 2 行高亮
+const c = 3
+const d = 4
+const e = 5      // ← 第 5、6 行高亮
 ```
 ````
 
-**输出**
+**效果**
 
-```js{4}
-export default {
-  data () {
-    return {
-      msg: 'Highlighted!'
-    }
-  }
-}
+```js{2,5-6}
+const a = 1
+const b = 2      // ← 第 2 行高亮
+const c = 3
+const d = 4
+const e = 5      // ← 第 5、6 行高亮
 ```
 
-除了单行之外，还可以指定多个单行、多行，或两者均指定：
+> 支持：单行 `{4}`、多行 `{5-8}`、组合 `{1,4,6-8}`、混合 `{4,7-13,16,23-27,40}`。
 
-- 多行：例如 `{5-8}`、`{3-10}`、`{10-17}`
-- 多个单行：例如 `{4,7,9}`
-- 多行与单行：例如 `{4,7-13,16,23-27,40}`
+### 4.3 行号
 
-**输入**
+在围栏语言后加 `:line-numbers` 显示行号，`=N` 可自定义起始行号。
 
-````
-```js{1,4,6-8}
-export default { // Highlighted
-  data () {
-    return {
-      msg: `Highlighted!
-      This line isn't highlighted,
-      but this and the next 2 are.`,
-      motd: 'VitePress is awesome',
-      lorem: 'ipsum'
-    }
-  }
-}
+**写法**
+
+````text
+```python:line-numbers
+def hello():
+    print('hi')
 ```
 ````
 
-**输出**
+**效果**
 
-```js{1,4,6-8}
-export default { // Highlighted
-  data () {
-    return {
-      msg: `Highlighted!
-      This line isn't highlighted,
-      but this and the next 2 are.`,
-      motd: 'VitePress is awesome',
-      lorem: 'ipsum'
-    }
-  }
-}
+```python:line-numbers
+def hello():
+    print('hi')
 ```
 
-也可以使用 `// [!code highlight]` 注释实现行高亮。
+**写法**
 
-**输入**
-
-````
-```js
-export default {
-  data () {
-    return {
-      msg: 'Highlighted!' // [!code highlight](删除括号及其内容)
-    }
-  }
-}
+````text
+```python:line-numbers=10
+print('从第 10 行开始编号')
 ```
 ````
 
-**输出**
+**效果**
 
-```js
-export default {
-  data () {
-    return {
-      msg: 'Highlighted!' // [!code highlight]
-    }
-  }
-}
+```python:line-numbers=10
+print('从第 10 行开始编号')
 ```
 
-## 代码块中聚焦
+---
 
-在某一行上添加 `// [!code focus]` 注释将聚焦它并模糊代码的其他部分。
+## 5. 代码组（tabs 切换）
 
-此外，可以使用 `// [!code focus:<lines>]` 定义要聚焦的行数。
+把多个代码块放进 `::: code-group` 容器，每个代码块用 `[标题]` 命名，渲染为可切换的标签页。
 
-**输入**
+**写法**
 
-````
-```js
-export default {
-  data () {
-    return {
-      msg: 'Focused!' // [!code focus](删除括号及其内容)
-    }
-  }
-}
-```
-````
-
-**输出**
-
-```js
-export default {
-  data () {
-    return {
-      msg: 'Focused!' // [!code focus]
-    }
-  }
-}
-```
-
-## 代码块中的颜色差异
-
-在某一行添加 `// [!code --]` 或 `// [!code ++]` 注释将会为该行创建 diff，同时保留代码块的颜色。
-
-**输入**
-
-````
-```js
-export default {
-  data () {
-    return {
-      msg: 'Removed' // [!code --](删除括号及其内容)
-      msg: 'Added' // [!code ++](删除括号及其内容)
-    }
-  }
-}
-```
-````
-
-**输出**
-
-```js
-export default {
-  data () {
-    return {
-      msg: 'Removed' // [!code --]
-      msg: 'Added' // [!code ++]
-    }
-  }
-}
-```
-
-## 高亮“错误”和“警告”
-
-在某一行添加 `// [!code warning]` 或 `// [!code error]` 注释将会为该行相应的着色。
-
-**输入**
-
-````
-```js
-export default {
-  data () {
-    return {
-      msg: 'Error', // [!code error](删除括号及其内容)
-      msg: 'Warning' // [!code warning](删除括号及其内容)
-    }
-  }
-}
-```
-````
-
-**输出**
-
-```js
-export default {
-  data () {
-    return {
-      msg: 'Error', // [!code error]
-      msg: 'Warning' // [!code warning]
-    }
-  }
-}
-```
-
-## 行号
-
-可以在代码块中添加 `:line-numbers` / `:no-line-numbers` 标记来覆盖在配置中的设置。
-
-还可以通过在 `:line-numbers` 之后添加 `=` 来自定义起始行号，例如 `:line-numbers=2` 表示代码块中的行号从 2 开始。
-
-**输入**
-
-````md
-```ts {1}
-// 默认禁用行号
-const line2 = 'This is line 2'
-const line3 = 'This is line 3'
-```
-
-```ts:line-numbers {1}
-// 启用行号
-const line2 = 'This is line 2'
-const line3 = 'This is line 3'
-```
-
-```ts:line-numbers=2 {1}
-// 行号已启用，并从 2 开始
-const line3 = 'This is line 3'
-const line4 = 'This is line 4'
-```
-````
-
-**输出**
-
-```ts {1}
-// 默认禁用行号
-const line2 = 'This is line 2'
-const line3 = 'This is line 3'
-```
-
-```ts:line-numbers {1}
-// 启用行号
-const line2 = 'This is line 2'
-const line3 = 'This is line 3'
-```
-
-```ts:line-numbers=2 {1}
-// 行号已启用，并从 2 开始
-const line3 = 'This is line 3'
-const line4 = 'This is line 4'
-```
-## 导入代码片段
-
-可以通过下面的语法来从现有文件中导入代码片段：
-
-```md
-<<< @/filepath
-```
-
-此语法同时支持[行高亮](#在代码块中实现行高亮)：
-
-```md
-<<< @/filepath{highlightLines}
-```
-
-**输入**
-
-```md
-<<< @/snippets/snippet.js{2}
-```
-
-**Code file**
-
-```js
-export default function () {
-  // ..
-}
-```
-
-**输出**
-
-<<< @/snippets/snippet.js{2}
-
-::: tip
-`@` 的值对应于源代码根目录。
-```md
-<<< @/snippets/snippet.js
-```
-:::
-
-也可以使用 [VS Code region](https://code.visualstudio.com/docs/editor/codebasics#_folding) 来只包含代码文件的相应部分。可以在文件目录后面的 `#` 符号后提供一个自定义的区域名：
-
-**输入**
-
-```md
-<<< @/snippets/snippet-with-region.js#snippet{1}
-```
-
-**Code file**
-
-```js
-// #region snippet
-function foo() {
-  // ..
-}
-// #endregion snippet
-
-export default foo
-```
-
-**输出**
-
-<<< @/snippets/snippet-with-region.js#snippet{1}
-
-也可以像这样在大括号内(`{}`)指定语言：
-
-```md
-<<< @/snippets/snippet.cs{c#}
-
-<!-- 带行高亮: -->
-
-<<< @/snippets/snippet.cs{1,2,4-6 c#}
-
-<!-- 带行号: -->
-
-<<< @/snippets/snippet.cs{1,2,4-6 c#:line-numbers}
-```
-
-如果无法从文件扩展名推测出源语言，这将会很有帮助
-
-## 代码组
-
-可以像这样对多个代码块进行分组：
-
-**输入**
-
-````md
+````text
 ::: code-group
 
 ```js [config.js]
-/**
- * @type {import('vitepress').UserConfig}
- */
-const config = {
-  // ...
-}
-
-export default config
+const config = { name: 'demo' }
 ```
 
 ```ts [config.ts]
-import type { UserConfig } from 'vitepress'
-
-const config: UserConfig = {
-  // ...
-}
-
-export default config
+const config: Config = { name: 'demo' }
 ```
 
 :::
 ````
 
-**输出**
+**效果**
 
 ::: code-group
 
 ```js [config.js]
-/**
- * @type {import('vitepress').UserConfig}
- */
-const config = {
-  // ...
-}
-
-export default config
+const config = { name: 'demo' }
 ```
 
 ```ts [config.ts]
-import type { UserConfig } from 'vitepress'
-
-const config: UserConfig = {
-  // ...
-}
-
-export default config
+const config: Config = { name: 'demo' }
 ```
 
 :::
 
-也可以在代码组中[导入代码片段](#导入代码片段)：
+---
 
-**输入**
+## 6. 自定义容器
 
-```md
-::: code-group
+### 6.1 基础类型
 
-<!-- 文件名默认用作标题 -->
+**写法**
 
-<<< @/snippets/snippet.js
-
-<!-- 也可以提供定制的代码组 -->
-
-<<< @/snippets/snippet-with-region.js#snippet{1,2 ts:line-numbers} [snippet with region]
-
+````text
+::: info
+这是一条信息。
 :::
-```
-
-**输出**
-
-::: code-group
-
-<!-- 文件名默认用作标题 -->
-
-<<< @/snippets/snippet.js
-
-<!-- 也可以提供定制的代码组 -->
-
-<<< @/snippets/snippet-with-region.js#snippet{1,2 ts:line-numbers} [snippet with region]
-
-:::
-
-## 包含 markdown 文件
-
-可以像这样在一个 markdown 文件中包含另一个 markdown 文件，甚至是内嵌的。
 
 ::: tip
- `@`，它的值对应于源代码根目录。
+这是一条建议。
 :::
-例如，可以这样用相对路径包含 Markdown 文件：
-
-**输入**
-
-```md
-# Docs
-
-## Basics
-
-<!--@include: @/parts/basics.md-->
-```
-
-**Part file** (`parts/basics.md`)
-
-```md
-Some getting started stuff.
-
-### Configuration
-
-Can be created using `.foorc.json`.
-```
-
-**等价代码**
-
-```md
-# Docs
-
-## Basics
-
-<!--@include: @/parts/basics.md-->
-```
-
-它还支持选择行范围：
-
-**输入**
-
-```md
-# Docs
-
-## Basics
-
-<!--@include: ./parts/basics.md{3,}-->
-```
-
-**Part file** (`parts/basics.md`)
-
-```md
-Some getting started stuff.
-
-### Configuration
-
-Can be created using `.foorc.json`.
-```
-
-**等价代码**
-
-```md
-# Docs
-
-## Basics
-
-<!--@include: @/parts/basics.md{3,}-->
-```
-
-所选行范围的格式可以是： `{3,}`、 `{,10}`、`{1,10}`
 
 ::: warning
-如果指定的文件不存在，这将不会产生错误。因此，在使用这个功能的时候请保证内容按预期呈现。
+这是一个警告。
 :::
-## 数学方程
 
-**输入**
+::: danger
+这是危险内容。
+:::
 
-```md
-When $a \ne 0$, there are two solutions to $(ax^2 + bx + c = 0)$ and they are
-$$ x = {-b \pm \sqrt{b^2-4ac} \over 2a} $$
+::: details
+这是可折叠的详细信息。
+:::
+````
 
-**Maxwell's equations:**
+**效果**
 
-| equation                                                                                                                                                                  | description                                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| $\nabla \cdot \vec{\mathbf{B}}  = 0$                                                                                                                                      | divergence of $\vec{\mathbf{B}}$ is zero                                               |
-| $\nabla \times \vec{\mathbf{E}}\, +\, \frac1c\, \frac{\partial\vec{\mathbf{B}}}{\partial t}  = \vec{\mathbf{0}}$                                                          | curl of $\vec{\mathbf{E}}$ is proportional to the rate of change of $\vec{\mathbf{B}}$ |
-| $\nabla \times \vec{\mathbf{B}} -\, \frac1c\, \frac{\partial\vec{\mathbf{E}}}{\partial t} = \frac{4\pi}{c}\vec{\mathbf{j}}    \nabla \cdot \vec{\mathbf{E}} = 4 \pi \rho$ | _wha?_                                                                                 |
+::: info
+这是一条信息。
+:::
+
+::: tip
+这是一条建议。
+:::
+
+::: warning
+这是一个警告。
+:::
+
+::: danger
+这是危险内容。
+:::
+
+::: details
+这是可折叠的详细信息。
+:::
+
+### 6.2 自定义标题
+
+在类型后直接跟标题文字。
+
+**写法**
+
+````text
+::: danger STOP
+危险区域，请勿继续！
+:::
+
+::: details 点我查看代码
+```js
+console.log('Hello, 知屿!')
 ```
+:::
+````
 
-**输出**
+**效果**
 
-When $a \ne 0$, there are two solutions to $(ax^2 + bx + c = 0)$ and they are
-$$ x = {-b \pm \sqrt{b^2-4ac} \over 2a} $$
+::: danger STOP
+危险区域，请勿继续！
+:::
 
-**Maxwell's equations:**
+::: details 点我查看代码
+```js
+console.log('Hello, 知屿!')
+```
+:::
 
-| equation                                                                                                                                                                  | description                                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| $\nabla \cdot \vec{\mathbf{B}}  = 0$                                                                                                                                      | divergence of $\vec{\mathbf{B}}$ is zero                                               |
-| $\nabla \times \vec{\mathbf{E}}\, +\, \frac1c\, \frac{\partial\vec{\mathbf{B}}}{\partial t}  = \vec{\mathbf{0}}$                                                          | curl of $\vec{\mathbf{E}}$ is proportional to the rate of change of $\vec{\mathbf{B}}$ |
-| $\nabla \times \vec{\mathbf{B}} -\, \frac1c\, \frac{\partial\vec{\mathbf{E}}}{\partial t} = \frac{4\pi}{c}\vec{\mathbf{j}}    \nabla \cdot \vec{\mathbf{E}} = 4 \pi \rho$ | _wha?_                                                                                 |
+### 6.3 学习专用容器
+
+笔记阅读页与编辑区额外支持：
+
+````text
+::: example
+例题内容
+:::
+
+::: formula
+公式推导内容
+:::
+````
+
+---
+
+## 7. GitHub 风格警报
+
+**写法**
+
+````text
+> [!NOTE]
+> 快速浏览时也不应忽略的重要信息。
+
+> [!TIP]
+> 有助于更顺利达成目标的建议。
+
+> [!IMPORTANT]
+> 对达成目标至关重要的信息。
+
+> [!WARNING]
+> 需要用户立即关注的关键内容。
+
+> [!CAUTION]
+> 行为可能带来的负面影响。
+````
+
+**效果**
+
+> [!NOTE]
+> 快速浏览时也不应忽略的重要信息。
+
+> [!TIP]
+> 有助于更顺利达成目标的建议。
+
+> [!IMPORTANT]
+> 对达成目标至关重要的信息。
+
+> [!WARNING]
+> 需要用户立即关注的关键内容。
+
+> [!CAUTION]
+> 行为可能带来的负面影响。
+
+---
+
+## 8. 数学公式（LaTeX）
+
+行内公式用 `$...$`，块级公式用 `$$...$$`。
+
+**写法**
+
+````text
+当 $a \ne 0$ 时，方程 $ax^2 + bx + c = 0$ 有两个解：
+
+$$
+x = {-b \pm \sqrt{b^2-4ac} \over 2a}
+$$
+````
+
+**效果**
+
+当 $a \ne 0$ 时，方程 $ax^2 + bx + c = 0$ 有两个解：
+
+$$
+x = {-b \pm \sqrt{b^2-4ac} \over 2a}
+$$
+
+> 支持 KaTeX/LaTeX 语法，也可在表格、列表中使用。
+
+---
+
+## 9. 图片与附件
+
+**写法**
+
+````text
+![图片说明](/uploads/images/xxx.png)
+````
+
+**效果**：图片直接显示在正文中，支持缩放。
+
+> - 上传笔记时，图片会自动上传并追加到正文末尾（文字在上、图片在下）。
+> - 附件（PDF / Word / Excel / 压缩包等）会显示「📎 附件」下载按钮。
+
+---
+
+## 10. 目录（仅 Docs 阅览室）
+
+在 Docs 阅览室中，`[[toc]]` 会渲染为文章目录（基于二、三级标题）。
+
+````text
+[[toc]]
+````
+
+> 笔记阅读页与编辑区暂不渲染 `[[toc]]`。
+
+---
+
+## 11. 批注（编辑区）
+
+编辑区支持批注块（文字批注 / 手绘画布），保存为 `:::annotation` 容器。
+
+````text
+:::annotation
+批注内容
+:::
+````
+
+---
+
+## 12. 知屿暂不支持的语法（VitePress 专属）
+
+以下语法在知屿中**不会生效**，会按普通文本或普通代码显示：
+
+- `<<< @/filepath` — 导入外部代码片段
+- `<!--@include: @/xxx.md-->` — 包含其他 Markdown 文件
+- `// [!code highlight]` / `// [!code focus]` / `// [!code --]` / `// [!code ++]` / `// [!code warning]` / `// [!code error]` — Shiki 专属代码行注释
+
+> 代码行高亮请使用第 4.2 节的 `{行号}` 大括号语法。
