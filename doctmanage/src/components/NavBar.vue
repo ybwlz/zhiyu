@@ -398,10 +398,10 @@ const links = [
   .nav-right .msg-link { order: 3; }
   .nav-right .me-link { order: 4; margin-left: auto; }
   .nav-right .nav-burger { order: 5; }
-  /* 未登录：登录按钮从汉堡菜单拿出，主题保持中间、汉堡贴最右 */
-  .nav-right.logged-out .admin-link { display: inline-flex !important; align-items: center; order: 0; }
-  .nav-right.logged-out .kb-theme-wrap { order: 1; margin-left: auto; margin-right: auto; }
-  .nav-right.logged-out .nav-burger { order: 2; margin-left: auto; }
+  /* 未登录：主题居中，登录在主题右侧、汉堡菜单左侧，汉堡贴最右 */
+  .nav-right.logged-out .kb-theme-wrap { order: 0; margin-left: auto; margin-right: auto; }
+  .nav-right.logged-out .admin-link { display: inline-flex !important; align-items: center; order: 1; }
+  .nav-right.logged-out .nav-burger { order: 2; }
   /* 通知按钮更小 */
   .nav-right .bell-btn { width: 26px; height: 26px; }
   .nav-right .bell-btn .bell-svg { width: 14px; height: 14px; }
