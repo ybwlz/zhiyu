@@ -43,3 +43,5 @@ coverage
 # Cypress
 /frontend/cypress/videos/
 /frontend/cypress/screenshots/
+dist-electron
+release

@@ -15,6 +15,7 @@ import Mall from "@/views/Mall.vue";
 import EditNote from "@/views/EditNote.vue";
 import Settings from "@/views/Settings.vue";
 import LegalPage from "@/views/LegalPage.vue";
+import Download from "@/views/Download.vue";
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -28,6 +29,7 @@ const router = createRouter({
         { path: '/changelog', component: Changelog },
         { path: '/activity', component: Activity },
         { path: '/guide', component: Guide },
+        { path: '/download', component: Download },
         { path: '/notes', component: NotesSquare },
         { path: '/notes/:key', component: NoteReader },
         { path: '/user/:key', component: Profile },

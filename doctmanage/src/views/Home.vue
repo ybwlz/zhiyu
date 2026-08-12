@@ -46,6 +46,8 @@
             </div>
             <!-- 移动端专属：开始探索 -->
             <button class="hero-explore-btn" type="button" @click="goExplore">开始探索知屿 →</button>
+            <!-- 桌面版下载入口 -->
+            <router-link to="/download" class="hero-dl-link">💻 下载桌面版</router-link>
           </div>
         </section>
 
@@ -970,6 +972,19 @@ const updateSubjectsProgress = () => {
     transition: transform .25s, box-shadow .25s;
   }
   .hero-explore-btn:active { transform: scale(0.96); }
+  /* 桌面版下载入口 */
+  .hero-dl-link {
+    display: inline-block;
+    margin: 18px auto 0;
+    padding: 10px 28px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, .2);
+    color: var(--c-text-1, #e8ecf8);
+    font-size: 14px;
+    text-decoration: none;
+    transition: all .2s;
+  }
+  .hero-dl-link:hover { border-color: var(--brand-1); color: var(--brand-1); transform: translateY(-1px); }
   /* 移动端：最近更新跑马灯自然接在 hero 内容下方（首屏露出，往下延伸）；与精选笔记拉开间距 */
   .recent-mobile {
     display: block;
