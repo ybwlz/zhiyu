@@ -14,9 +14,11 @@
             <h1 class="hero-title">{{ site.name }}<span class="hero-title-accent">· 个人知识库</span></h1>
             <p class="hero-tagline">{{ site.tagline }}</p>
             <p class="hero-desc">{{ site.desc }}</p>
+            <!-- 移动端专属加长文案（桌面隐藏） -->
+            <p class="hero-desc-ext">📚 随手记录课堂笔记、截图与灵感，🤖 AI 帮你整理、问答与改写——让知识在这里持续生长。</p>
 
-            <!-- 全局搜索 -->
-            <div class="hero-search">
+            <!-- 全局搜索（移动端隐藏） -->
+            <div class="hero-search mobile-hidden">
               <span class="search-icon">🔍</span>
               <input
                 v-model="searchQuery"
@@ -35,12 +37,19 @@
               <span class="ts-item">🪙 知屿币 <b>{{ today.points }}</b></span>
               <router-link to="/mall" class="ts-link">去商城 →</router-link>
             </div>
-            <!-- 统计 -->
-            <div class="hero-stats">
+            <!-- 统计（移动端隐藏，改为探索按钮） -->
+            <div class="hero-stats mobile-hidden">
               <CountUp :to="stats.docs" label="篇笔记" />
               <CountUp :to="stats.subjects" label="个科目" />
               <CountUp :to="stats.types" label="个分类" />
               <CountUp :to="stats.days" label="天持续积累" />
+            </div>
+            <!-- 移动端专属：开始探索 -->
+            <button class="hero-explore-btn" type="button" @click="goExplore">开始探索知屿 →</button>
+
+            <!-- 移动端专属：最近更新跑马灯上移到 hero 下方 -->
+            <div class="recent-mobile">
+              <RecentMarquee v-if="!loading && recentDocs.length > 0" :docs="recentDocs" />
             </div>
           </div>
         </section>
@@ -140,8 +149,8 @@
           </div>
         </section>
 
-        <!-- ═══════ 最近更新 ═══════ -->
-        <section class="kb-recent">
+        <!-- ═══════ 最近更新（移动端已上移到 hero，此处仅桌面显示） ═══════ -->
+        <section class="kb-recent desktop-only">
           <div class="container">
             <p class="section-kicker">RECENT</p>
             <h2 class="section-title">最近<span class="grad">更新</span></h2>
@@ -149,40 +158,7 @@
 
             <div v-if="loading" class="recent-empty">加载中…</div>
             <div v-else-if="recentDocs.length === 0" class="recent-empty">还没有笔记，去「管理后台」上传第一篇吧 📤</div>
-            <!-- 卡片够多时：双行反向跑马灯（第一行向右、第二行向左），卡片风格同精选笔记 -->
-            <div v-else-if="recentDocs.length >= 8" class="recent-marquee">
-              <div class="marquee-row">
-                <div class="marquee-track track-right" :style="{ animationDuration: marqueeDur(row1) }">
-                  <div class="marquee-item" v-for="(doc, i) in doubled(row1)" :key="doc.id + '-r1-' + i" :style="marqueeCardStyle(i)" @click="goDoc(doc)">
-                    <span class="marquee-type">{{ doc.type }}</span>
-                    <span class="marquee-emoji">{{ marqueeEmoji(doc.type) }}</span>
-                    <h3 class="marquee-title">{{ doc.title }}</h3>
-                    <p class="marquee-desc">{{ marqueeExcerpt(doc) }}</p>
-                    <span class="marquee-date">{{ fmtDate(doc.updated_at || doc.created_at) }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="marquee-row">
-                <div class="marquee-track track-left" :style="{ animationDuration: marqueeDur(row2) }">
-                  <div class="marquee-item" v-for="(doc, i) in doubled(row2)" :key="doc.id + '-r2-' + i" :style="marqueeCardStyle(i)" @click="goDoc(doc)">
-                    <span class="marquee-type">{{ doc.type }}</span>
-                    <span class="marquee-emoji">{{ marqueeEmoji(doc.type) }}</span>
-                    <h3 class="marquee-title">{{ doc.title }}</h3>
-                    <p class="marquee-desc">{{ marqueeExcerpt(doc) }}</p>
-                    <span class="marquee-date">{{ fmtDate(doc.updated_at || doc.created_at) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- 卡片少时：保持原垂直列表 -->
-            <div v-else class="recent-list">
-              <div class="recent-item" v-for="doc in recentDocs" :key="doc.id" @click="goDoc(doc)">
-                <span class="recent-type">{{ doc.type }}</span>
-                <span class="recent-title">{{ doc.title }}</span>
-                <span class="recent-time">{{ fmtDate(doc.updated_at || doc.created_at) }}</span>
-                <span class="recent-arrow">→</span>
-              </div>
-            </div>
+            <RecentMarquee v-else :docs="recentDocs" />
           </div>
         </section>
 
@@ -210,6 +186,7 @@ import { storeToRefs } from 'pinia'
 
 
 import SpotlightCarousel from '@/components/SpotlightCarousel.vue'
+import RecentMarquee from '@/components/RecentMarquee.vue'
 import CountUp from '@/components/CountUp.vue'
 
 const router = useRouter()
@@ -238,7 +215,6 @@ const subjectCount = (name) => {
 }
 // ── 登录用户今日概览（仅本人可见自己的数据） ──
 import api from '@/utils/api.js'
-import { cleanText } from '@/utils/mdText.js'
 import { useAuthStore } from '@/stores/auth.js'
 const auth = useAuthStore()
 const today = ref(null)
@@ -299,31 +275,6 @@ const recentDocs = computed(() => {
     .sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''))
     .slice(0, 12)
 })
-// 跑马灯：交错拆成两行（第一行 0,2,4… 第二行 1,3,5…），滚动更均匀
-const row1 = computed(() => recentDocs.value.filter((_, i) => i % 2 === 0))
-const row2 = computed(() => recentDocs.value.filter((_, i) => i % 2 === 1))
-// 无缝循环：每行渲染两份（动画位移 50% 恰好一份宽度）
-const doubled = (arr) => [...arr, ...arr]
-// 滚动速度随卡片数自适应（放慢，卡片越多越慢）
-const marqueeDur = (arr) => Math.max(24, arr.length * 5) + 's'
-// ── 跑马灯卡片样式：与精选笔记同款（渐变底 + emoji 水印 + 摘要） ──
-const TYPE_EMOJI = {
-  高等数学: '∫', 中学公式: '∑', 线性代数: '🧮', 概率论: '🎲', 数据结构: '🌳',
-  计算机组成原理: '⚙️', 操作系统: '🛠️', 计算机网络: '🌐', 英语: '🔤', 政治: '📜',
-}
-const marqueeEmoji = (type) => TYPE_EMOJI[type] || '📄'
-const PALETTES = [
-  ['#0ea5e9', '#6366f1'], ['#8b5cf6', '#ec4899'], ['#10b981', '#38bdf8'],
-  ['#f59e0b', '#ef4444'], ['#ec4899', '#8b5cf6'],
-]
-const marqueeCardStyle = (i) => {
-  const [c1, c2] = PALETTES[i % PALETTES.length]
-  return { '--c1': c1, '--c2': c2 }
-}
-const marqueeExcerpt = (doc) => {
-  const t = cleanText(doc.content)
-  return t ? t.slice(0, 50) + '…' : '点击进入阅读完整内容'
-}
 
 const fmtDate = (s) => (s || '').slice(0, 10)
 
@@ -335,6 +286,8 @@ const doSearch = async () => {
 }
 const goSubject = (name) => router.push({ path: '/notes', query: { type: name } })
 const goDoc = (doc) => router.push(`/docs/${doc.public_id}`)
+// 移动端「开始探索知屿」→ 笔记广场
+const goExplore = () => router.push('/notes')
 
 const onFeatureClick = (feat) => {
   if (feat.title === 'AI 助手') { aiOpen.value = true; return }
@@ -889,140 +842,6 @@ const updateSubjectsProgress = () => {
 .feature-card:hover .feature-arrow { opacity: 1; transform: translateX(0); color: var(--brand-1); }
 
 /* ═══════════ 最近更新 ═══════════ */
-/* ── 最近更新 · 双行反向跑马灯 ── */
-.recent-marquee {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow: hidden;
-}
-.marquee-row {
-  overflow: hidden;
-  /* 左右淡出遮罩，滚动进出更柔和 */
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
-}
-.marquee-track {
-  display: flex;
-  gap: 14px;
-  width: max-content;
-  will-change: transform;
-}
-.track-left  { animation-name: marquee-left;  animation-timing-function: linear; animation-iteration-count: infinite; }
-.track-right { animation-name: marquee-right; animation-timing-function: linear; animation-iteration-count: infinite; }
-/* 第二行向左：0 → -50%（一份内容宽度），无缝循环 */
-@keyframes marquee-left  { from { transform: translateX(0); }    to { transform: translateX(-50%); } }
-/* 第一行向右：从 -50% → 0，视觉上向右移动 */
-@keyframes marquee-right { from { transform: translateX(-50%); } to { transform: translateX(0); } }
-/* 悬停暂停，方便点击卡片 */
-.recent-marquee:hover .marquee-track { animation-play-state: paused; }
-.marquee-item {
-  flex-shrink: 0;
-  position: relative;
-  width: 300px;
-  height: 185px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  padding: 22px 22px 18px;
-  border-radius: 20px;
-  overflow: hidden;
-  cursor: pointer;
-  /* 与精选笔记卡片同款渐变底 */
-  background:
-    radial-gradient(120% 90% at 85% -10%, color-mix(in srgb, var(--c1) 30%, transparent), transparent 55%),
-    radial-gradient(110% 100% at 10% 110%, color-mix(in srgb, var(--c2) 26%, transparent), transparent 55%),
-    var(--card-bg);
-  border: 1px solid var(--border);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.14);
-  transition: border-color .25s, transform .25s, box-shadow .25s;
-}
-.marquee-item:hover {
-  border-color: color-mix(in srgb, var(--brand-1) 45%, var(--border));
-  transform: translateY(-3px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
-}
-.marquee-type {
-  align-self: flex-start;
-  font-size: 12px;
-  color: var(--c1);
-  background: color-mix(in srgb, var(--c1) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--c1) 35%, transparent);
-  padding: 3px 11px;
-  border-radius: 999px;
-}
-.marquee-emoji {
-  position: absolute;
-  right: 18px;
-  top: 12px;
-  font-size: 64px;
-  font-weight: 800;
-  opacity: 0.14;
-  line-height: 1;
-  user-select: none;
-  pointer-events: none;
-}
-.marquee-title {
-  font-size: 17px;
-  font-weight: 700;
-  margin: 16px 0 8px;
-  color: var(--text1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.marquee-desc {
-  flex: 1;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text2);
-  margin: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.marquee-date {
-  font-size: 12px;
-  color: var(--text2);
-  margin-top: 10px;
-}
-.recent-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.recent-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 15px 20px;
-  border-radius: 16px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: all .25s;
-}
-.recent-item:hover {
-  border-color: color-mix(in srgb, var(--brand-1) 45%, var(--border));
-  transform: translateX(5px);
-  box-shadow: var(--shadow-1);
-}
-.recent-type {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--brand-1);
-  background: color-mix(in srgb, var(--brand-1) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand-1) 28%, transparent);
-  padding: 4px 12px;
-  border-radius: 999px;
-  min-width: 74px;
-  text-align: center;
-}
-.recent-title { flex: 1; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recent-time { font-size: 13px; color: var(--text2); flex-shrink: 0; }
-.recent-arrow { color: var(--text2); transition: all .2s; }
-.recent-item:hover .recent-arrow { color: var(--brand-1); transform: translateX(3px); }
 .recent-empty {
   padding: 40px;
   text-align: center;
@@ -1030,6 +849,11 @@ const updateSubjectsProgress = () => {
   border: 1px dashed var(--border);
   border-radius: 18px;
 }
+
+/* ── 移动端专属元素（桌面默认隐藏） ── */
+.hero-desc-ext { display: none; }
+.hero-explore-btn { display: none; }
+.recent-mobile { display: none; }
 
 /* ═══════════ 页脚 ═══════════ */
 .kb-footer {
@@ -1090,7 +914,6 @@ const updateSubjectsProgress = () => {
 }
   .hero-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .subject-card { width: 258px; min-height: 330px; }
-  .recent-time { display: none; }
   /* ── 手机端首页：App 风格（紧凑顶部 + 2×2 功能宫格），不再是全屏大字封面 ── */
   .kb-hero { min-height: auto; padding: 36px 16px 18px; }
   .hero-inner { width: 100%; }
@@ -1108,6 +931,41 @@ const updateSubjectsProgress = () => {
   .hero-title-accent { display: inline; font-size: inherit; }
   .hero-tagline { font-size: 14px; margin-bottom: 6px; }
   .hero-desc { display: none; }
+  /* 移动端加长文案替代原 desc */
+  .hero-desc-ext {
+    display: block;
+    font-size: 13.5px;
+    color: var(--text2);
+    margin: 0 0 20px;
+    line-height: 1.7;
+    max-width: 420px;
+  }
+  /* 移动端隐藏搜索框与统计卡 */
+  .mobile-hidden { display: none !important; }
+  /* 移动端「开始探索知屿」按钮（替代统计卡） */
+  .hero-explore-btn {
+    display: inline-block;
+    margin: 6px auto 24px;
+    padding: 12px 34px;
+    border: none;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    background: linear-gradient(120deg, var(--brand-1), var(--brand-2));
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--brand-1) 35%, transparent);
+    transition: transform .25s, box-shadow .25s;
+  }
+  .hero-explore-btn:active { transform: scale(0.96); }
+  /* 移动端：最近更新跑马灯上移到 hero 下方 */
+  .recent-mobile {
+    display: block;
+    width: 100%;
+    margin-top: 26px;
+  }
+  /* 移动端隐藏桌面版底部最近更新区块（已上移） */
+  .kb-recent.desktop-only { display: none; }
   .hero-search {
     max-width: 100%;
     padding: 6px 6px 6px 16px;
