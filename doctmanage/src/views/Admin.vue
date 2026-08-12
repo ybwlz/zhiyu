@@ -126,8 +126,9 @@
         </div>
         <div class="modal-row">
           <label>开放下载</label><input type="checkbox" v-model="uploadDL" />
-          <label class="ml">收费（知屿币）</label><input v-model.number="uploadPrice" type="number" min="0" class="modal-input w60" :class="{ 'input-err': uploadPriceErr }" :disabled="uploadVis === 'private'" />
+          <label class="ml">收费（知屿币）</label><input v-model.number="uploadPrice" type="number" min="0" max="99999" class="modal-input w60" :class="{ 'input-err': uploadPriceErr || uploadPriceMaxErr }" :disabled="uploadVis === 'private'" />
           <span v-if="uploadPriceErr" class="price-err">价格不能为负数</span>
+          <span v-else-if="uploadPriceMaxErr" class="price-err">价格不能超过 99999</span>
           <span v-else-if="uploadVis === 'private'" class="hint">私密笔记不可购买，无需定价</span>
         </div>
         <div class="modal-row">
@@ -161,8 +162,9 @@
             <label>公开</label>
             <VisibilitySelect v-model="aiVis" :options="aiVisOptions" />
             <label class="ml">开放下载</label><input type="checkbox" v-model="aiDL" />
-            <label class="ml">收费</label><input v-model.number="aiPrice" type="number" min="0" class="modal-input w60" :class="{ 'input-err': aiPriceErr }" :disabled="aiVis === 'private'" />
+            <label class="ml">收费</label><input v-model.number="aiPrice" type="number" min="0" max="99999" class="modal-input w60" :class="{ 'input-err': aiPriceErr || aiPriceMaxErr }" :disabled="aiVis === 'private'" />
             <span v-if="aiPriceErr" class="price-err">价格不能为负数</span>
+            <span v-else-if="aiPriceMaxErr" class="price-err">价格不能超过 99999</span>
             <label class="ml">仅预览</label><input type="checkbox" v-model="aiPreview" />
           </div>
           <div class="ai-preview"><pre class="ai-gen">{{ aiGen }}</pre></div>
@@ -208,6 +210,9 @@ export default {
     // 价格负数提示（私密时价格已禁用，无需提示）
     uploadPriceErr() { return this.uploadVis !== 'private' && this.uploadPrice < 0 },
     aiPriceErr() { return this.aiVis !== 'private' && this.aiPrice < 0 },
+    // 价格超上限提示（封顶 99999）
+    uploadPriceMaxErr() { return this.uploadVis !== 'private' && this.uploadPrice > 99999 },
+    aiPriceMaxErr() { return this.aiVis !== 'private' && this.aiPrice > 99999 },
     grouped() {
       const map = new Map()
       for (const n of this.myNotes) {

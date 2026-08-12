@@ -133,8 +133,8 @@ def create_doc(user=None):
         if request.is_json:
             downloadable = 1 if request.json.get('downloadable', 1) else 0
             price = int(request.json.get('price') or 0)
-            if price < 0:
-                return jsonify({'error': '价格不能为负数'}), 400
+            if price < 0 or price > 99999:
+                return jsonify({'error': '价格需在 0~99999 之间'}), 400
             preview_only = 1 if request.json.get('preview_only') else 0
         fmt = 'md'
         attachment = None
@@ -342,8 +342,8 @@ def update_doc(doc_id: int, user=None):
                 price = data.get('price')
                 pv = data.get('preview_only')
                 new_price = int(price or 0) if price is not None else 0
-                if new_price < 0:
-                    return jsonify({'error': '价格不能为负数'}), 400
+                if new_price < 0 or new_price > 99999:
+                    return jsonify({'error': '价格需在 0~99999 之间'}), 400
                 if visibility in ('public', 'private'):
                     cur.execute(
                         "UPDATE docs SET type=%s, title=%s, slug=%s, content=%s, visibility=%s, downloadable=%s, price=%s, preview_only=%s, updated_at=%s WHERE id=%s",
