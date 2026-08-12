@@ -45,3 +45,4 @@ coverage
 /frontend/cypress/screenshots/
 dist-electron
 release
+doctmanage/public/mathjax/
