@@ -334,6 +334,44 @@ a {
   font-size: 16px; /* Increased font size as requested */
 }
 
+/* ── 深空星际主题：代码高亮改用 GitHub Dark 配色 ──
+   组件里引入的是 highlight.js 浅色主题（github.css），深色背景下黑色/深蓝 token 看不清；
+   此处按主题覆盖为深色色板（docs/notes/编辑区统一生效） */
+html[data-theme="starlight"] .markdown-body .hljs { color: #c9d1d9; }
+html[data-theme="starlight"] .markdown-body .hljs-comment,
+html[data-theme="starlight"] .markdown-body .hljs-quote,
+html[data-theme="starlight"] .markdown-body .hljs-meta { color: #8b949e; }
+html[data-theme="starlight"] .markdown-body .hljs-keyword,
+html[data-theme="starlight"] .markdown-body .hljs-selector-tag,
+html[data-theme="starlight"] .markdown-body .hljs-subst { color: #ff7b72; }
+html[data-theme="starlight"] .markdown-body .hljs-string,
+html[data-theme="starlight"] .markdown-body .hljs-doctag { color: #a5d6ff; }
+html[data-theme="starlight"] .markdown-body .hljs-number,
+html[data-theme="starlight"] .markdown-body .hljs-literal,
+html[data-theme="starlight"] .markdown-body .hljs-variable,
+html[data-theme="starlight"] .markdown-body .hljs-template-variable,
+html[data-theme="starlight"] .markdown-body .hljs-tag .hljs-attr { color: #79c0ff; }
+html[data-theme="starlight"] .markdown-body .hljs-title,
+html[data-theme="starlight"] .markdown-body .hljs-section,
+html[data-theme="starlight"] .markdown-body .hljs-selector-id { color: #d2a8ff; }
+html[data-theme="starlight"] .markdown-body .hljs-type,
+html[data-theme="starlight"] .markdown-body .hljs-built_in,
+html[data-theme="starlight"] .markdown-body .hljs-builtin-name,
+html[data-theme="starlight"] .markdown-body .hljs-class .hljs-title { color: #ffa657; }
+html[data-theme="starlight"] .markdown-body .hljs-name,
+html[data-theme="starlight"] .markdown-body .hljs-selector-class,
+html[data-theme="starlight"] .markdown-body .hljs-selector-pseudo { color: #7ee787; }
+html[data-theme="starlight"] .markdown-body .hljs-attr,
+html[data-theme="starlight"] .markdown-body .hljs-attribute,
+html[data-theme="starlight"] .markdown-body .hljs-symbol,
+html[data-theme="starlight"] .markdown-body .hljs-bullet,
+html[data-theme="starlight"] .markdown-body .hljs-regexp,
+html[data-theme="starlight"] .markdown-body .hljs-link { color: #79c0ff; }
+html[data-theme="starlight"] .markdown-body .hljs-addition { color: #7ee787; }
+html[data-theme="starlight"] .markdown-body .hljs-deletion { color: #ffa198; }
+html[data-theme="starlight"] .markdown-body .hljs-emphasis { font-style: italic; }
+html[data-theme="starlight"] .markdown-body .hljs-strong { font-weight: 700; }
+
 /* Typography */
 .markdown-body {
   line-height: 1.8;

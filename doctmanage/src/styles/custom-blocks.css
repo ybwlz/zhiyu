@@ -154,3 +154,17 @@ html.dark .markdown-body .custom-block.example .custom-block-title { color: #79b
 html.dark .markdown-body .custom-block.formula { background-color: rgba(147, 112, 219, .16); border-color: rgba(147, 112, 219, .32); color: var(--c-text-1); }
 html.dark .markdown-body .custom-block.formula .custom-block-title { color: #b49ce8; }
 
+/* GitHub 警报：深色主题适配（浅色版黑字在深色背景下看不见） */
+html.dark .markdown-body .markdown-alert { color: var(--c-text-1); }
+html.dark .markdown-body .markdown-alert-title { color: var(--c-text-1); }
+html.dark .markdown-body .markdown-alert-note { background-color: rgba(56, 139, 253, 0.18); }
+html.dark .markdown-body .markdown-alert-note .markdown-alert-title { color: #58a6ff; }
+html.dark .markdown-body .markdown-alert-tip { background-color: rgba(63, 185, 80, 0.16); }
+html.dark .markdown-body .markdown-alert-tip .markdown-alert-title { color: #3fb950; }
+html.dark .markdown-body .markdown-alert-important { background-color: rgba(130, 80, 223, 0.18); }
+html.dark .markdown-body .markdown-alert-important .markdown-alert-title { color: #a371f7; }
+html.dark .markdown-body .markdown-alert-warning { background-color: rgba(187, 128, 9, 0.16); }
+html.dark .markdown-body .markdown-alert-warning .markdown-alert-title { color: #d29922; }
+html.dark .markdown-body .markdown-alert-caution { background-color: rgba(248, 81, 73, 0.16); }
+html.dark .markdown-body .markdown-alert-caution .markdown-alert-title { color: #f85149; }
+

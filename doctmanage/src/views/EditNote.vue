@@ -44,19 +44,112 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true, highlight:
   return hljs.highlightAuto(code).value
 }}).use(emoji).use(mathjax3).use(mdImgSize)
 setupAnnotation(md)
-// 代码块包裹：与 Docs/NoteReader 阅读页一致（容器 + 语言标签 + 复制按钮），保存时 .code-header 不落正文
-md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+// ── 代码块：容器包裹 + 行高亮 {n} + 行号 :line-numbers（与 Docs 阅读一致）；[title] 存 data-title 供保存还原 ──
+md.renderer.rules.fence = function (tokens, idx, options, env, self) {
   const token = tokens[idx]
-  const langName = token.info ? String(token.info).trim().split(/\s+/)[0] : ''
+  const unescape = (str) => md.utils.unescapeAll(str).trim()
+  const info = token.info ? unescape(token.info) : ''
+  let rawInfo = info
+  let langName = ''
+  let lineNumbersMode = false
+  let lineNumbersStart = 1
+  const highlights = []
+  let title = ''
+  // 1. 标题 [foo]
+  const titleMatch = rawInfo.match(/\[(.*?)\]/)
+  if (titleMatch) {
+    title = titleMatch[1]
+    rawInfo = rawInfo.replace(/\[.*?\]/, '')
+  }
+  // 2. 高亮 {4,6-10}
+  const rangeMatch = rawInfo.match(/\{([0-9,\s-]+)\}/)
+  if (rangeMatch) {
+    const rangeStr = rangeMatch[1]
+    rawInfo = rawInfo.replace(/\{.*?\}/, '')
+    rangeStr.split(',').forEach(part => {
+      part = part.trim()
+      if (part.includes('-')) {
+        const [s, e] = part.split('-')
+        for (let i = parseInt(s, 10); i <= parseInt(e, 10); i++) highlights.push(i)
+      } else if (part) highlights.push(parseInt(part, 10))
+    })
+  }
+  // 3. 行号 :line-numbers(=start)?
+  const lnMatch = rawInfo.match(/:line-numbers(?:=(\d+))?/)
+  if (lnMatch) {
+    lineNumbersMode = true
+    if (lnMatch[1]) lineNumbersStart = parseInt(lnMatch[1], 10)
+    rawInfo = rawInfo.replace(/:line-numbers(?:=\d+)?/, '')
+  }
+  // 4. 语言
+  langName = rawInfo.trim().split(/\s+/)[0] || ''
+  // 5. 高亮代码
   let code = options.highlight ? options.highlight(token.content, langName) : ''
   if (!code) code = md.utils.escapeHtml(token.content)
+  // 6. 行数
+  const lines = token.content.split(/\r?\n/)
+  if (lines[lines.length - 1] === '') lines.pop()
+  // 7. wrapper 类
+  const wrapperClasses = ['code-block-wrapper']
+  if (lineNumbersMode) wrapperClasses.push('line-numbers-mode')
+  // 8. code-group 内第一个加 active
+  if (idx > 0 && tokens[idx - 1].type === 'container_code-group_open') {
+    wrapperClasses.push('active')
+  } else {
+    for (let k = idx - 1; k >= 0; k--) {
+      if (tokens[k].type === 'container_code-group_close') break
+      if (tokens[k].type === 'container_code-group_open') { wrapperClasses.push('active'); break }
+    }
+  }
+  // 9. 高亮 overlay
+  let highlightOverlay = ''
+  if (highlights.length > 0) {
+    highlightOverlay = '<div class="highlight-lines">'
+    for (let i = 0; i < lines.length; i++) {
+      const lineNum = i + 1
+      highlightOverlay += `<div class="highlight-line ${highlights.includes(lineNum) ? 'highlighted' : ''}">&nbsp;</div>`
+    }
+    highlightOverlay += '</div>'
+  }
+  // 10. 行号
+  let lineNumbersHtml = ''
+  if (lineNumbersMode) {
+    lineNumbersHtml = '<div class="line-numbers-wrapper">'
+    for (let i = 0; i < lines.length; i++) lineNumbersHtml += `<span class="line-number">${lineNumbersStart + i}</span><br>`
+    lineNumbersHtml += '</div>'
+  }
   const label = langName ? `<span class="code-lang">${langName}</span>` : ''
   const copyBtn = `<button class="copy-code-btn" contenteditable="false" data-code="${encodeURIComponent(token.content)}"></button>`
-  return `<div class="code-block-wrapper">` +
-         `<div class="code-header">${label}${copyBtn}</div>` +
-         `<pre class="language-${langName}"><code class="language-${langName}">${code}</code></pre>` +
-         `</div>`
+  const titleAttr = title ? ` data-title="${md.utils.escapeHtml(title)}"` : ''
+  const hlAttr = highlights.length ? ` data-highlights="${highlights.join(',')}"` : ''
+  return `<div class="${wrapperClasses.join(' ')}"${titleAttr}${hlAttr}>` +
+    `<div class="code-header">${label}${copyBtn}</div>` +
+    lineNumbersHtml + highlightOverlay +
+    `<pre class="language-${langName}"><code class="language-${langName}">${code}</code></pre>` +
+    `</div>`
 }
+// ── 代码组 ::: code-group（tabs 切换） ──
+md.use(Container, 'code-group', {
+  render: function (tokens, idx) {
+    if (tokens[idx].nesting === 1) {
+      let tabs = ''
+      let i = idx + 1
+      let first = true
+      while (i < tokens.length && tokens[i].type !== 'container_code-group_close') {
+        if (tokens[i].type === 'fence') {
+          const info = tokens[i].info ? md.utils.unescapeAll(tokens[i].info).trim() : ''
+          const m = info.match(/\[(.*?)\]/)
+          const title = m ? m[1] : (info.split(/\s+/)[0] || 'Code')
+          tabs += `<div class="code-group-tab ${first ? 'active' : ''}">${title}</div>`
+          first = false
+        }
+        i++
+      }
+      return `<div class="code-group"><div class="code-group-tabs">${tabs}</div><div class="code-group-blocks">\n`
+    }
+    return `</div></div>\n`
+  }
+})
 // 自定义块容器：例题 / 公式 / 提示 / 信息 / 警告 / 注意 / 详细信息（:::example / :::formula / :::tip … / :::details）
 const createBlock = (klass, defaultTitle) => [Container, klass, {
   render(tokens, idx) {
@@ -152,11 +245,32 @@ td.addRule('githubAlert', {
   replacement: (content, node) => {
     const m = String(node.className).match(/markdown-alert-(\w+)/)
     const type = ((m && m[1]) || 'note').toUpperCase()
-    const titleEl = node.querySelector('.markdown-alert-title')
-    const title = (titleEl ? titleEl.textContent.trim() : '') || type
     const inner = content.trim().split('\n').map(l => '> ' + l).join('\n')
-    return `\n\n> [!${title}]\n${inner}\n\n`
+    return `\n\n> [!${type}]\n${inner}\n\n`
   },
+})
+// 代码块 wrapper：保存时还原 ```lang[ title]（title 来自渲染时存的 data-title）
+td.addRule('codeWrapper', {
+  filter: (node) => node.classList && node.classList.contains('code-block-wrapper'),
+  replacement: (content, node) => {
+    const pre = node.querySelector('pre code')
+    const lang = pre ? (String(pre.className).match(/language-(\S+)/) || [])[1] || '' : ''
+    const code = pre ? pre.textContent : ''
+    const title = node.getAttribute('data-title') || ''
+    const hl = node.getAttribute('data-highlights') || ''
+    const titlePart = title ? ' [' + title + ']' : ''
+    const hlPart = hl ? `{${hl}}` : ''
+    return `\n\n\`\`\`${lang}${titlePart}${hlPart}\n${code}\n\`\`\`\n\n`
+  },
+})
+// 代码组：tabs 行是渲染装饰，容器还原 ::: code-group
+td.addRule('codeGroupTabs', {
+  filter: (node) => node.classList && node.classList.contains('code-group-tabs'),
+  replacement: () => '',
+})
+td.addRule('codeGroup', {
+  filter: (node) => node.classList && node.classList.contains('code-group'),
+  replacement: (content, node) => `\n\n::: code-group\n${content.trim()}\n:::\n\n`,
 })
 // 图片尺寸：编辑器调整大小后保存为 markdown 的 =WxH 语法（addRule 会插到最前优先匹配）
 td.addRule('imgSize', {
@@ -421,6 +535,19 @@ const onEditorClick = (e) => {
       e.target.classList.add('copied')
       setTimeout(() => e.target.classList.remove('copied'), 2000)
     }).catch(() => {})
+    return
+  }
+  // 代码组 tab 切换（::: code-group）
+  if (e.target.classList.contains('code-group-tab')) {
+    e.preventDefault()
+    e.stopPropagation()
+    const tabs = e.target.parentElement
+    const blocks = tabs.nextElementSibling
+    if (blocks && blocks.classList.contains('code-group-blocks')) {
+      const idx = [...tabs.children].indexOf(e.target)
+      tabs.querySelectorAll('.code-group-tab').forEach((t) => t.classList.toggle('active', t === e.target))
+      blocks.querySelectorAll('.code-block-wrapper').forEach((b, i) => b.classList.toggle('active', i === idx))
+    }
     return
   }
   // 批注由全局委托处理（capture 阶段已拦截），这里不再重复
