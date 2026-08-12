@@ -29,18 +29,23 @@ from routes.misc_routes import bp as misc_bp
 from routes.annotation_routes import bp as annotation_bp
 
 app = Flask(__name__)
-# CORS 白名单（仅允许前端站点跨域）
+# CORS 白名单（仅允许前端站点跨域）——只注册一次，避免第二次 CORS(app) 用默认全放行覆盖白名单
 CORS(app, resources={r"/api/*": {"origins": [
     "http://localhost:5173", "http://127.0.0.1:5173",
     "http://localhost:4173", "http://192.168.1.230:5173",
 ]}})
-CORS(app)
+# 请求体上限（防磁盘/内存耗尽；正常笔记/上传远小于此）
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
 for _bp in (auth_bp, docs_bp, notes_bp, users_bp, social_bp, messages_bp, ai_bp, misc_bp, annotation_bp):
     app.register_blueprint(_bp)
 
 @app.after_request
 def add_header(response):
+    # 基础安全响应头（防内容嗅探 / 点击劫持）
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Content-Security-Policy', "frame-ancestors 'self'")
     # 仅缓存状态码为 200 的 GET 请求
     if request.method == 'GET' and response.status_code == 200:
         # 动态数据接口（评论/互动/笔记/用户/好友/知屿币/AI）不缓存，避免新数据被旧缓存遮挡

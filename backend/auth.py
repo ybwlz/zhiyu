@@ -11,8 +11,6 @@ from flask import request, jsonify
 from config import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 from db import get_conn
 
-# 内存会话：token -> username（服务重启失效，个人库够用）
-SESSIONS = {}
 SESSION_TTL = timedelta(days=7)
 
 # ── 邮箱验证码 ─────────────────────────────
@@ -54,6 +52,8 @@ def issue_token(username):
                 return token
             cur.execute("INSERT INTO tokens (token, user_id, expires_at) VALUES (%s, %s, %s)",
                         (token, r['id'], datetime.now() + SESSION_TTL))
+            # 顺带清理过期 token，防止表无限增长
+            cur.execute("DELETE FROM tokens WHERE expires_at < NOW()")
         conn.commit()
     finally:
         conn.close()

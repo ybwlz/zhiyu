@@ -45,7 +45,7 @@
         <button class="set-btn primary" @click="saveEmail">绑定邮箱</button>
       </div>
       <div class="set-divider"></div>
-      <div class="set-row"><label>当前密码</label><input v-model="pwd.old" type="password" class="set-input" /></div>
+      <div class="set-row"><label>当前密码</label><input v-model="pwd.old" type="password" class="set-input" placeholder="未设置过密码可留空" /></div>
       <div class="set-row"><label>新密码</label><input v-model="pwd.nw" type="password" class="set-input" placeholder="至少 6 位" /></div>
       <div class="set-row"><label>确认新密码</label><input v-model="pwd.confirm" type="password" class="set-input" /></div>
       <div class="set-actions"><button class="set-btn primary" @click="savePwd">修改密码</button></div>
@@ -240,9 +240,9 @@ export default {
       }
     },
     async savePwd() {
-      if (!this.pwd.old) { ElMessage.warning('请输入当前密码'); return }
       if (this.pwd.nw.length < 6) { ElMessage.warning('新密码至少 6 位'); return }
       if (this.pwd.nw !== this.pwd.confirm) { ElMessage.warning('两次输入的新密码不一致'); return }
+      // 未设置过密码（邮箱验证码注册）可留空旧密码直接设置；已设置密码则后端校验旧密码
       try {
         await api.post('/auth/change-password', { old_password: this.pwd.old, new_password: this.pwd.nw })
         ElMessage.success('密码已修改')

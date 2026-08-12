@@ -162,7 +162,7 @@ const endAiDrag = () => {
   window.removeEventListener('mouseup', endAiDrag)
 }
 
-const md = new MarkdownIt({ breaks: true, linkify: true })
+const md = new MarkdownIt({ breaks: true, linkify: true, html: false })
 const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 // 公式占位 + KaTeX 渲染（不依赖外部 MathJax 脚本）
 const renderMd = (t) => {

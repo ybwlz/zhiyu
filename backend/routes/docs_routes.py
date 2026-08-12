@@ -133,14 +133,24 @@ def create_doc(user=None):
         if request.is_json:
             downloadable = 1 if request.json.get('downloadable', 1) else 0
             price = int(request.json.get('price') or 0)
+            if price < 0:
+                return jsonify({'error': '价格不能为负数'}), 400
             preview_only = 1 if request.json.get('preview_only') else 0
         fmt = 'md'
         attachment = None
         content_val = ''
         if file:
             ext = (file.filename or '').rsplit('.', 1)[-1].lower() if '.' in (file.filename or '') else ''
-            if (file.content_length or 0) > 5 * 1024 * 1024:
+            # 真实大小校验（FileStorage.content_length 通常不可用）
+            try:
+                file.stream.seek(0, os.SEEK_END)
+                fsize = file.stream.tell()
+                file.stream.seek(0)
+            except Exception:
+                fsize = 0
+            if fsize > 5 * 1024 * 1024:
                 return jsonify({'error': '文件不能超过 5MB'}), 400
+            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
             tmp_name = f"tmp_{secrets.token_hex(8)}"
             tmp_path = os.path.join(UPLOAD_FOLDER, tmp_name)
             file.save(tmp_path)
@@ -152,6 +162,15 @@ def create_doc(user=None):
                 except Exception:
                     pass
             else:
+                # 附件扩展名白名单（禁止 .html/.svg 等可执行/嗅探类型落盘）
+                ALLOWED_ATT = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar', '7z',
+                               'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp3', 'mp4', 'csv', 'txt'}
+                if ext not in ALLOWED_ATT:
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+                    return jsonify({'error': '不支持的文件类型'}), 400
                 att_dir = os.path.join(UPLOAD_FOLDER, 'attachments')
                 try:
                     os.makedirs(att_dir, exist_ok=True)
@@ -322,12 +341,15 @@ def update_doc(doc_id: int, user=None):
                 dl = data.get('downloadable')
                 price = data.get('price')
                 pv = data.get('preview_only')
+                new_price = int(price or 0) if price is not None else 0
+                if new_price < 0:
+                    return jsonify({'error': '价格不能为负数'}), 400
                 if visibility in ('public', 'private'):
                     cur.execute(
                         "UPDATE docs SET type=%s, title=%s, slug=%s, content=%s, visibility=%s, downloadable=%s, price=%s, preview_only=%s, updated_at=%s WHERE id=%s",
                         (type_val, title_val, slug_val, content_val, visibility,
                          1 if dl is None else (1 if dl else 0),
-                         int(price or 0) if price is not None else 0,
+                         new_price,
                          1 if pv else 0, datetime.now(), doc_id)
                     )
                 else:
@@ -335,7 +357,7 @@ def update_doc(doc_id: int, user=None):
                         "UPDATE docs SET type=%s, title=%s, slug=%s, content=%s, downloadable=%s, price=%s, preview_only=%s, updated_at=%s WHERE id=%s",
                         (type_val, title_val, slug_val, content_val,
                          1 if dl is None else (1 if dl else 0),
-                         int(price or 0) if price is not None else 0,
+                         new_price,
                          1 if pv else 0, datetime.now(), doc_id)
                     )
             conn.commit()

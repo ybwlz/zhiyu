@@ -96,6 +96,14 @@ def annotation_upload_img(user=None):
         return jsonify({'error': '图片格式错误'}), 400
     if len(raw) > 2 * 1024 * 1024:
         return jsonify({'error': '图片不能超过 2MB'}), 400
+    # 魔数校验（防伪造扩展名的非图片内容落盘）
+    magic = raw[:12]
+    is_img = (magic.startswith(b'\x89PNG\r\n\x1a\n')
+              or magic.startswith(b'\xff\xd8\xff')
+              or magic.startswith(b'GIF87a') or magic.startswith(b'GIF89a')
+              or (magic[:4] == b'RIFF' and magic[8:12] == b'WEBP'))
+    if not is_img:
+        return jsonify({'error': '图片格式不支持'}), 400
     att_dir = os.path.join(UPLOAD_FOLDER, 'attachments')
     try:
         os.makedirs(att_dir, exist_ok=True)

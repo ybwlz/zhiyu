@@ -1079,6 +1079,7 @@ const nextDoc = computed(() => {
           <div class="doc-container">
             <article class="doc-card">
               <div class="doc-tools" v-if="currentDoc">
+                <a v-if="currentDoc.attachment" class="att-link" :href="'/uploads/' + currentDoc.attachment" target="_blank" rel="noopener">📎 附件</a>
                 <button v-if="isMyDoc(currentDoc) || auth.user?.role === 'admin'" class="tool-btn" @click="editCurrent">✏️ 编辑此页</button>
                 <button class="immersive-btn" :class="{ on: immersive }" @click="toggleImmersive" data-tip="沉浸">⛶</button>
               </div>
@@ -1094,6 +1095,14 @@ const nextDoc = computed(() => {
               </div>
               <div v-if="docLoading" class="doc-loading">加载中…</div>
               <div v-else class="markdown-body" v-html="rendered" @click="onContentClick"></div>
+              <!-- 附件：上传的文件（PDF/Office 等）可下载 -->
+              <div v-if="currentDoc && currentDoc.attachment" class="doc-attachment">
+                <a :href="'/uploads/' + currentDoc.attachment" download class="att-link">📎 下载附件</a>
+              </div>
+              <!-- 附件下载（创建时上传的 PDF/Excel 等） -->
+              <div v-if="currentDoc && currentDoc.attachment" class="doc-attachment">
+                <a :href="'/uploads/' + currentDoc.attachment" download class="att-link">📎 下载附件</a>
+              </div>
               <ImageViewer :visible="viewerOpen" :url="viewerUrl" @close="viewerOpen = false" />
               <DoodleBall v-if="currentDoc" target=".doc-card" :doc-id="currentDoc.id" :is-mine="isMyDoc(currentDoc)" />
               <!-- 上一篇/下一篇：等正文加载完成（docLoading=false 且 currentDoc 就绪）才显示，加载中只显示「加载中…」与 notes 页一致 -->
@@ -2061,6 +2070,48 @@ const nextDoc = computed(() => {
 .sidebar-restore { display: none; }
 .sidebar-restore svg { display: none; }
 .doc-tools { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 14px; }
+/* 附件下载条 */
+.doc-attachment {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+.att-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--brand-1);
+  background: color-mix(in srgb, var(--brand-1) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-1) 30%, transparent);
+  text-decoration: none;
+  transition: all .2s;
+}
+.att-link:hover {
+  background: color-mix(in srgb, var(--brand-1) 16%, transparent);
+  transform: translateY(-1px);
+}
+/* 附件下载条 */
+.doc-attachment {
+  margin: 18px 0 4px;
+  padding: 12px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-1) 6%, transparent);
+}
+.att-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--brand-1);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.att-link:hover { text-decoration: underline; }
 .tool-btn { padding: 7px 16px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--brand-1) 45%, transparent); background: color-mix(in srgb, var(--brand-1) 8%, transparent); color: var(--brand-1); font-size: 12.5px; cursor: pointer; transition: all .2s; }
 .tool-btn:hover { background: linear-gradient(120deg, var(--brand-1), var(--brand-2)); color: #fff; border-color: transparent; }
 

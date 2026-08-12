@@ -49,9 +49,10 @@ def note_like(doc_id, user=None):
         with conn.cursor() as cur:
             cur.execute("INSERT INTO note_likes (user_id, doc_id) VALUES (%s, %s)", (user['id'], doc_id))
         bump_doc_count(conn, doc_id, 'likes_count', 1)
-        # 笔记作者获得 1 知屿币（排除自己给自己点赞）
+        # 笔记作者获得 1 知屿币（排除自己给自己点赞；每日上限防刷币）
         if row.get('user_id') and row['user_id'] != user['id']:
-            grant_points(conn, row['user_id'], 1, 'note_liked')
+            if daily_points(conn, row['user_id'], 'note_liked', 30) < 30:
+                grant_points(conn, row['user_id'], 1, 'note_liked')
             notify(conn, row['user_id'], user['id'], 'like', doc_id)
         conn.commit()
         return jsonify({'success': True, 'likes_count': row.get('likes_count', 0) + 1})
@@ -176,7 +177,8 @@ def note_favorite(doc_id, user=None):
             cur.execute("INSERT INTO note_favorites (user_id, doc_id) VALUES (%s, %s)", (user['id'], doc_id))
         bump_doc_count(conn, doc_id, 'favorites_count', 1)
         if row.get('user_id') and row['user_id'] != user['id']:
-            grant_points(conn, row['user_id'], 1, 'note_favorited')
+            if daily_points(conn, row['user_id'], 'note_favorited', 30) < 30:
+                grant_points(conn, row['user_id'], 1, 'note_favorited')
             notify(conn, row['user_id'], user['id'], 'favorite', doc_id)
         conn.commit()
         return jsonify({'success': True, 'favorites_count': row.get('favorites_count', 0) + 1})
@@ -212,7 +214,8 @@ def note_share(doc_id, user=None):
         with conn.cursor() as cur:
             cur.execute("INSERT INTO note_shares (user_id, doc_id) VALUES (%s, %s)", (user['id'], doc_id))
         if row.get('user_id') and row['user_id'] != user['id']:
-            grant_points(conn, row['user_id'], 2, 'note_shared')
+            if daily_points(conn, row['user_id'], 'note_shared', 20) < 20:
+                grant_points(conn, row['user_id'], 2, 'note_shared')
         conn.commit()
         return jsonify({'success': True})
     except pymysql.err.IntegrityError:
@@ -303,7 +306,8 @@ def delete_note_comment(doc_id, comment_id, user=None):
         conn.close()
 
 @bp.route('/api/notes/<int:doc_id>/download', methods=['POST'])
-def note_download(doc_id):
+@require_login
+def note_download(doc_id, user=None):
     """下载：作者未开放下载 / 收费仅预览需先购买"""
     row, err = fetch_doc_visible(doc_id=doc_id)
     if err:

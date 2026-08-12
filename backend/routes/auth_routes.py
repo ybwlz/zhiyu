@@ -3,7 +3,8 @@
 from flask import Blueprint, request, jsonify
 import re
 import secrets
-from datetime import datetime
+import hmac
+from datetime import datetime, timedelta
 import pymysql
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -15,6 +16,28 @@ from utils import gen_public_id
 
 bp = Blueprint('auth', __name__)
 
+# ── 登录防爆破（内存，重启失效） ──
+LOGIN_FAILS = {}   # 归一化账号 -> {'count': n, 'lock_until': datetime}
+CODE_SEND_IP = {}  # 客户端 ip -> {'last': datetime}
+
+
+def _login_locked(key):
+    rec = LOGIN_FAILS.get(key)
+    return bool(rec and rec.get('lock_until') and datetime.now() < rec['lock_until'])
+
+
+def _login_fail(key):
+    rec = LOGIN_FAILS.get(key) or {'count': 0, 'lock_until': None}
+    rec['count'] = rec.get('count', 0) + 1
+    if rec['count'] >= 5:
+        rec['lock_until'] = datetime.now() + timedelta(minutes=10)
+        rec['count'] = 0
+    LOGIN_FAILS[key] = rec
+
+
+def _login_ok(key):
+    LOGIN_FAILS.pop(key, None)
+
 @bp.route('/api/auth/send-code', methods=['POST'])
 def auth_send_code():
     data = request.get_json(silent=True) or {}
@@ -22,6 +45,12 @@ def auth_send_code():
     if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', email):
         return jsonify({'error': '邮箱格式不正确'}), 400
     now = datetime.now()
+    # IP 维度限流：同一 IP 5 秒内只能发一次（防刷邮件）
+    ip = request.remote_addr or ''
+    ip_prev = CODE_SEND_IP.get(ip)
+    if ip_prev and now - ip_prev['last'] < timedelta(seconds=5):
+        return jsonify({'error': '发送太频繁，请稍后再试'}), 429
+    CODE_SEND_IP[ip] = {'last': now}
     prev = EMAIL_CODES.get(email)
     if prev and prev['last_sent'] and now - prev['last_sent'] < CODE_RESEND:
         return jsonify({'error': '发送太频繁，请 60 秒后再试'}), 429
@@ -48,7 +77,7 @@ def auth_register():
     rec = EMAIL_CODES.get(email)
     if not rec or rec['expires'] < datetime.now():
         return jsonify({'error': '验证码已过期，请重新获取'}), 400
-    if rec['code'] != code:
+    if not hmac.compare_digest(rec['code'], code):
         rec['tries'] = rec.get('tries', 0) + 1
         if rec['tries'] >= CODE_MAX_TRIES:
             EMAIL_CODES.pop(email, None)
@@ -97,7 +126,7 @@ def auth_code_login():
     rec = EMAIL_CODES.get(email)
     if not rec or rec['expires'] < datetime.now():
         return jsonify({'error': '验证码已过期，请重新获取'}), 400
-    if rec['code'] != code:
+    if not hmac.compare_digest(rec['code'], code):
         rec['tries'] = rec.get('tries', 0) + 1
         if rec['tries'] >= CODE_MAX_TRIES:
             EMAIL_CODES.pop(email, None)
@@ -151,21 +180,27 @@ def auth_code_login():
 @bp.route('/api/auth/login', methods=['POST'])
 def auth_login():
     data = request.get_json(silent=True) or {}
-    account = (data.get('email') or data.get('username') or '').strip().lower()
+    raw = (data.get('email') or data.get('username') or '').strip()
     password = data.get('password') or ''
+    # 邮箱不区分大小写；用户名区分大小写（修复大写用户名无法登录）
+    email_part = raw.lower()
+    if _login_locked(email_part):
+        return jsonify({'error': '尝试次数过多，请 10 分钟后再试'}), 429
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, username, password_hash, role, nickname, email, avatar, cover, public_id FROM users WHERE email=%s OR username=%s",
-                (account, account)
+                (email_part, raw)
             )
             user = cur.fetchone()
     finally:
         conn.close()
 
     if not user or not user['password_hash'] or not check_password_hash(user['password_hash'], password):
+        _login_fail(email_part)
         return jsonify({'error': '账号或密码错误'}), 401
+    _login_ok(email_part)
     token = issue_token(user['username'])
     return jsonify({'token': token, 'user': {
         'id': user['id'], 'username': user['username'], 'role': user['role'], 'nickname': user['nickname'], 'email': user['email'], 'avatar': user['avatar'], 'cover': user['cover'], 'public_id': user['public_id']
@@ -209,7 +244,7 @@ def auth_update_email(user=None):
     rec = EMAIL_CODES.get(email)
     if not rec or rec['expires'] < datetime.now():
         return jsonify({'error': '验证码已过期，请重新获取'}), 400
-    if rec['code'] != code:
+    if not hmac.compare_digest(rec['code'], code):
         rec['tries'] = rec.get('tries', 0) + 1
         if rec['tries'] >= CODE_MAX_TRIES:
             EMAIL_CODES.pop(email, None)
@@ -260,6 +295,15 @@ def auth_me():
     user = get_current_user()
     if not user:
         return jsonify({'error': 'unauthorized'}), 401
+    # 附带是否已设置密码（验证码注册的无密码用户据此提示设置密码）
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT password_hash FROM users WHERE id=%s", (user['id'],))
+            row = cur.fetchone()
+            user['has_password'] = bool(row and row['password_hash'])
+    finally:
+        conn.close()
     return jsonify(user)
 
 @bp.route('/api/auth/logout', methods=['POST'])

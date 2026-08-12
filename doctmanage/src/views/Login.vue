@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth.js'
@@ -16,6 +16,10 @@ const countdown = ref(0)
 
 const emailForm = ref({ email: '', code: '' })
 const pwdForm = ref({ account: '', password: '' })
+
+// 验证码倒计时定时器（组件卸载时清理）
+let codeTimer = null
+onBeforeUnmount(() => { if (codeTimer) clearInterval(codeTimer) })
 
 // 条款：默认不勾选，首次登录（自动建号）必须勾选
 const agree = ref(false)
@@ -48,9 +52,10 @@ const sendCode = async () => {
       ElMessage.success('验证码已发送到 ' + email + '，10 分钟内有效')
     }
     countdown.value = 60
-    const t = setInterval(() => {
+    if (codeTimer) clearInterval(codeTimer)
+    codeTimer = setInterval(() => {
       countdown.value--
-      if (countdown.value <= 0) clearInterval(t)
+      if (countdown.value <= 0) { clearInterval(codeTimer); codeTimer = null }
     }, 1000)
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || '发送失败')

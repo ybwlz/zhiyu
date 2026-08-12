@@ -6,7 +6,7 @@ import urllib.request
 
 from pymysql.cursors import DictCursor
 
-from config import DEEPSEEK_API_KEY, DEEPSEEK_RESPONSES_MODEL, DEEPSEEK_RESPONSES_URL
+from config import DEEPSEEK_API_KEY, DEEPSEEK_RESPONSES_MODEL, DEEPSEEK_RESPONSES_URL, FREE_AI_QUOTA
 from db import get_conn
 from auth import require_login
 from utils import notify
@@ -65,6 +65,16 @@ def _ai_reply(user_id, content):
     """AI 官方账号回复：带上与 AI 的最近对话作多轮上下文，返回回复文本（失败返回 None）"""
     if not DEEPSEEK_API_KEY:
         return None
+    # AI 私信与 AI 助手共用免费额度（防刷爆 DeepSeek API）
+    conn0 = get_conn()
+    try:
+        with conn0.cursor(pymysql.cursors.DictCursor) as cur:
+            cur.execute("SELECT ai_used, ai_quota_bonus FROM users WHERE id=%s", (user_id,))
+            u = cur.fetchone()
+    finally:
+        conn0.close()
+    if u and (u.get('ai_used') or 0) >= FREE_AI_QUOTA + (u.get('ai_quota_bonus') or 0):
+        return 'AI 额度已用完，可去知屿币商城兑换额度后继续使用'
     conn = get_conn()
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cur:

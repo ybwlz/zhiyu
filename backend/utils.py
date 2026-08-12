@@ -39,7 +39,12 @@ def daily_points(conn, user_id, reason, limit):
             WHERE user_id=%s AND reason=%s AND DATE(created_at)=CURDATE()""", (user_id, reason))
         return cur.fetchone()['got']
 
+_ALLOWED_COUNT_COLS = {'likes_count', 'favorites_count', 'comments_count', 'downloads_count'}
+
 def bump_doc_count(conn, doc_id, col, delta):
+    # 列名白名单：防止拼接注入
+    if col not in _ALLOWED_COUNT_COLS:
+        return
     with conn.cursor() as cur:
         cur.execute(f"UPDATE docs SET {col} = GREATEST({col} + %s, 0) WHERE id=%s", (delta, doc_id))
 
