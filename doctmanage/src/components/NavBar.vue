@@ -435,6 +435,14 @@ const links = [
   .nav-right .bell-btn { width: 26px; height: 26px; }
   .nav-right .bell-btn .bell-svg { width: 14px; height: 14px; }
   .nav-right .bell-dot { min-width: 13px; height: 13px; font-size: 9px; padding: 0 3px; }
+  /* 通知面板移动端：相对视口贴右缘，宽度自适应，不超出屏幕 */
+  .nav-right .bell-panel {
+    position: fixed;
+    top: 56px;
+    right: 12px;
+    left: auto;
+    width: min(320px, calc(100vw - 24px));
+  }
   /* 头像与汉堡菜单靠右贴边 */
   .kb-navbar { padding-right: 8px; }
 }
