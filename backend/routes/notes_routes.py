@@ -49,7 +49,7 @@ def note_like(doc_id, user=None):
         with conn.cursor() as cur:
             cur.execute("INSERT INTO note_likes (user_id, doc_id) VALUES (%s, %s)", (user['id'], doc_id))
         bump_doc_count(conn, doc_id, 'likes_count', 1)
-        # 笔记作者获得 1 积分（排除自己给自己点赞）
+        # 笔记作者获得 1 知屿币（排除自己给自己点赞）
         if row.get('user_id') and row['user_id'] != user['id']:
             grant_points(conn, row['user_id'], 1, 'note_liked')
             notify(conn, row['user_id'], user['id'], 'like', doc_id)
@@ -334,7 +334,7 @@ def note_download(doc_id):
 @bp.route('/api/notes/<int:doc_id>/read', methods=['POST'])
 @require_login
 def note_read(doc_id, user=None):
-    """阅读时长上报：累计阅读时长；每满 60 秒得 1 积分（每日上限 60 分）"""
+    """阅读时长上报：累计阅读时长；每满 60 秒得 1 知屿币（每日上限 60 币）"""
     row, err = fetch_doc_visible(doc_id=doc_id)
     if err:
         return err
@@ -350,7 +350,7 @@ def note_read(doc_id, user=None):
         with conn.cursor() as cur:
             cur.execute("INSERT INTO read_logs (user_id, doc_id, seconds) VALUES (%s, %s, %s)", (user['id'], doc_id, seconds))
             cur.execute("UPDATE users SET read_seconds = read_seconds + %s WHERE id=%s", (seconds, user['id']))
-            # 当日已获阅读积分
+            # 当日已获阅读知屿币
             cur.execute("""SELECT COALESCE(SUM(delta),0) AS got FROM point_logs
                 WHERE user_id=%s AND reason='read' AND DATE(created_at)=CURDATE()""", (user['id'],))
             got = cur.fetchone()['got']

@@ -27,13 +27,13 @@ def ensure_unique_slug(conn, base_slug: str) -> str:
             slug = f"{base_slug}-{idx}"
 
 def grant_points(conn, user_id, delta, reason):
-    """给用户加/减积分并记日志"""
+    """给用户加/减知屿币并记日志"""
     with conn.cursor() as cur:
         cur.execute("UPDATE users SET points = points + %s WHERE id=%s", (delta, user_id))
         cur.execute("INSERT INTO point_logs (user_id, delta, reason) VALUES (%s, %s, %s)", (user_id, delta, reason))
 
 def daily_points(conn, user_id, reason, limit):
-    """返回该用户当日某原因已获得积分；达到 limit 后不再加分"""
+    """返回该用户当日某原因已获得知屿币；达到 limit 后不再加币"""
     with conn.cursor() as cur:
         cur.execute("""SELECT COALESCE(SUM(delta),0) AS got FROM point_logs
             WHERE user_id=%s AND reason=%s AND DATE(created_at)=CURDATE()""", (user_id, reason))

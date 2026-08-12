@@ -53,7 +53,7 @@ const exchange = async (g) => {
 }
 
 const confirmPin = async (note) => {
-  if (points.value < pickGoods.value.cost) { ElMessage.warning('积分不足（需 ' + pickGoods.value.cost + ' 分）'); return }
+  if (points.value < pickGoods.value.cost) { ElMessage.warning('知屿币不足（需 ' + pickGoods.value.cost + ' 知屿币）'); return }
   try {
     const res = await api.post('/mall/exchange', { goods_id: pickGoods.value.id, doc_id: note.id })
     points.value = res.data.points_left
@@ -75,11 +75,11 @@ onMounted(load)
 
 <template>
   <div class="mall-page">
-    <h1 class="page-title">积分商城</h1>
+    <h1 class="page-title">知屿币商城</h1>
     <div class="balance-card">
       <div class="balance-num">{{ points }}</div>
-      <div class="balance-label">我的积分</div>
-      <p class="balance-tip">阅读笔记、发表评论、笔记被点赞/收藏/转发都能获得积分</p>
+      <div class="balance-label">我的知屿币</div>
+      <p class="balance-tip">阅读笔记、发表评论、笔记被点赞/收藏/转发都能获得知屿币</p>
     </div>
 
     <h3 class="section-title">兑换好物</h3>
@@ -88,7 +88,7 @@ onMounted(load)
         <div class="goods-icon">{{ g.icon }}</div>
         <h4>{{ g.name }}</h4>
         <p>{{ g.desc }}</p>
-        <button class="exchange-btn" @click="exchange(g)">兑换 · {{ g.cost }} 积分</button>
+        <button class="exchange-btn" @click="exchange(g)">兑换 · {{ g.cost }} 知屿币</button>
       </div>
     </div>
 
@@ -96,7 +96,7 @@ onMounted(load)
     <div v-if="pickGoods" class="modal-mask" @click.self="pickGoods = null">
       <div class="modal">
         <h3>📌 选择要置顶的笔记（24h）</h3>
-        <p class="modal-tip">仅公开笔记可置顶 · 消耗 {{ pickGoods.cost }} 积分</p>
+        <p class="modal-tip">仅公开笔记可置顶 · 消耗 {{ pickGoods.cost }} 知屿币</p>
         <div v-if="loadingNotes" class="center">加载中…</div>
         <div v-else-if="myNotes.length === 0" class="center empty">你还没有公开笔记，先去发布一篇吧</div>
         <div v-else class="note-pick-list">
@@ -111,9 +111,9 @@ onMounted(load)
       </div>
     </div>
 
-    <h3 class="section-title">积分明细</h3>
+    <h3 class="section-title">知屿币明细</h3>
     <div v-if="loading" class="center">加载中…</div>
-    <div v-else-if="logs.length === 0" class="center empty">暂无积分记录</div>
+    <div v-else-if="logs.length === 0" class="center empty">暂无知屿币记录</div>
     <div v-else class="log-list">
       <div v-for="(l, i) in logs" :key="i" class="log-row">
         <span class="log-reason">{{ reasonText(l.reason) }}</span>

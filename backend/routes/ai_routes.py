@@ -75,7 +75,7 @@ AI_TOOLS = [
     }},
     {'type': 'function', 'function': {
         'name': 'navigate',
-        'description': '跳转到站内页面。可用路径：/（首页）、/notes（笔记广场）、/docs（阅览室）、/notes/{public_id}（打开某篇笔记，public_id 由 search_note 返回，不要自己编）、/edit/{id}（编辑某篇笔记，仍用数字 id）、/edit（新建笔记）、/admin（书房）、/friends（好友）、/mall（积分商城）、/messages（消息）、/changelog（更新日志）、/guide（使用引导）、/user/{public_id}（个人主页，不编 id）。用户要求「帮我跳转到某页 / 打开某笔记 / 去 XX」时调用；若用户只给了笔记标题而你不知道 public_id，先调用 search_note 按标题搜索得到 public_id 后再跳转。',
+        'description': '跳转到站内页面。可用路径：/（首页）、/notes（笔记广场）、/docs（阅览室）、/notes/{public_id}（打开某篇笔记，public_id 由 search_note 返回，不要自己编）、/edit/{id}（编辑某篇笔记，仍用数字 id）、/edit（新建笔记）、/admin（书房）、/friends（好友）、/mall（知屿币商城）、/messages（消息）、/changelog（更新日志）、/guide（使用引导）、/user/{public_id}（个人主页，不编 id）。用户要求「帮我跳转到某页 / 打开某笔记 / 去 XX」时调用；若用户只给了笔记标题而你不知道 public_id，先调用 search_note 按标题搜索得到 public_id 后再跳转。',
         'parameters': {'type': 'object', 'properties': {'to': {'type': 'string', 'description': '站内路径，如 /notes/55'}}, 'required': ['to']},
     }},
     {'type': 'function', 'function': {
@@ -266,7 +266,7 @@ def ai_chat(user=None):
     used = u['ai_used'] if u else 0
     quota = FREE_AI_QUOTA + (u['ai_quota_bonus'] if u else 0)
     if used >= quota:
-        return jsonify({'error': 'AI 额度已用完，可去积分商城兑换', 'used': used, 'quota': quota}), 402
+        return jsonify({'error': 'AI 额度已用完，可去知屿币商城兑换', 'used': used, 'quota': quota}), 402
     # 检索相关笔记（支持指定笔记全文：note_id / 编辑页未保存草稿：draft_content）
     ctx = ai_search_context(user, question)
     note_ctx = ''
@@ -636,7 +636,7 @@ def ai_edit_suggest(user=None):
     used = u['ai_used'] if u else 0
     quota = FREE_AI_QUOTA + (u['ai_quota_bonus'] if u else 0)
     if used >= quota:
-        return jsonify({'error': 'AI 额度已用完，可去积分商城兑换', 'used': used, 'quota': quota}), 402
+        return jsonify({'error': 'AI 额度已用完，可去知屿币商城兑换', 'used': used, 'quota': quota}), 402
     system = (
         '你是「知屿」知识库的 AI 编辑助手，帮用户在笔记编辑器里修改 Markdown 笔记。'
         '用户会提供【笔记上下文】（整篇 Markdown 源码）、【选中内容】（可能为空）和【修改指令】。'

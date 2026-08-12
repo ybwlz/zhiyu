@@ -307,7 +307,7 @@ watch(() => route.params.key, () => {
             <div v-if="isMe" class="stat clickable" @click="openFollowList('followers')"><b>{{ profile.followers_count }}</b><span>粉丝</span></div>
             <div class="stat"><b>{{ profile.public_notes }}</b><span>笔记</span></div>
             <div class="stat"><b>{{ profile.received_likes }}</b><span>获赞</span></div>
-            <div class="stat"><b>{{ profile.points }}</b><span>积分</span></div>
+            <div class="stat"><b>{{ profile.points }}</b><span>知屿币</span></div>
             <div class="stat"><b>{{ fmtSeconds(profile.read_seconds) }}</b><span>阅读</span></div>
           </div>
       <!-- 编辑资料/设置（自己主页，卡片内 stats 下方） -->

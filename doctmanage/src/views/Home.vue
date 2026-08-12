@@ -32,7 +32,7 @@
             <div v-if="auth.isLogin && today" class="today-strip">
               <span class="ts-item">⏱ 今日阅读 <b>{{ today.today_read_min }}</b> 分钟</span>
               <span class="ts-item">🤖 AI 已用 <b>{{ today.ai_used }}</b>/{{ today.ai_quota }} 次</span>
-              <span class="ts-item">🪙 积分 <b>{{ today.points }}</b></span>
+              <span class="ts-item">🪙 知屿币 <b>{{ today.points }}</b></span>
               <router-link to="/mall" class="ts-link">去商城 →</router-link>
             </div>
             <!-- 统计 -->

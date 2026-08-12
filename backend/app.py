@@ -5,7 +5,7 @@
   config.py             全局配置常量
   db.py                 数据库连接与初始化建表
   auth.py               认证/会话/邮箱验证码
-  utils.py              纯工具函数（id/slug/积分/可见性/通知）
+  utils.py              纯工具函数（id/slug/知屿币/可见性/通知）
   shared.py             路由间共享业务函数（fetch_doc_visible）
   routes/               各域蓝图（auth/docs/notes/users/social/messages/ai/misc/annotations）
 """
@@ -43,7 +43,7 @@ for _bp in (auth_bp, docs_bp, notes_bp, users_bp, social_bp, messages_bp, ai_bp,
 def add_header(response):
     # 仅缓存状态码为 200 的 GET 请求
     if request.method == 'GET' and response.status_code == 200:
-        # 动态数据接口（评论/互动/笔记/用户/好友/积分/AI）不缓存，避免新数据被旧缓存遮挡
+        # 动态数据接口（评论/互动/笔记/用户/好友/知屿币/AI）不缓存，避免新数据被旧缓存遮挡
         if request.path.startswith(('/api/notes/', '/api/docs', '/api/users', '/api/friends',
                                     '/api/user/', '/api/changelog', '/api/ai/')):
             response.headers['Cache-Control'] = 'no-store'

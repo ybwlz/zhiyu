@@ -18,7 +18,7 @@
         </div>
         <div class="f-info" @click="goUser(u.other_public_id || u.other_id || u.id)">
           <div class="f-name">{{ u.nickname || u.username }}</div>
-          <div class="f-id">@{{ u.username }} · 积分 {{ u.points }}</div>
+          <div class="f-id">@{{ u.username }} · 知屿币 {{ u.points }}</div>
         </div>
         <div class="f-acts">
           <button class="msg-btn sm" data-tip="私信" @click="openChat(u.other_public_id || u.other_id || u.id)">✉️</button>
@@ -37,7 +37,7 @@
         </div>
         <div class="f-info" @click="goUser(u.other_public_id || u.other_id || u.id)">
           <div class="f-name">{{ u.nickname || u.username }}</div>
-          <div class="f-id">@{{ u.username }} · 积分 {{ u.points }}</div>
+          <div class="f-id">@{{ u.username }} · 知屿币 {{ u.points }}</div>
         </div>
         <div class="f-acts">
           <button class="msg-btn sm" data-tip="私信" @click="openChat(u.other_public_id || u.other_id || u.id)">✉️</button>
@@ -61,7 +61,7 @@
           </div>
           <div class="f-info" @click="goUser(u.other_public_id || u.other_id || u.id)">
             <div class="f-name">{{ u.nickname || u.username }}</div>
-            <div class="f-id">@{{ u.username }} · 积分 {{ u.points }}</div>
+            <div class="f-id">@{{ u.username }} · 知屿币 {{ u.points }}</div>
           </div>
           <div class="f-acts">
             <button class="msg-btn sm" data-tip="私信" @click="openChat(u.other_public_id || u.other_id || u.id)">✉️</button>

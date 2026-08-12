@@ -118,7 +118,7 @@ def init_db():
             cur.execute("CREATE UNIQUE INDEX uq_users_email ON users(email)")
         except Exception:
             pass
-        # ── 用户资料扩展：头像/简介/喜好/积分/阅读时长 ──
+        # ── 用户资料扩展：头像/简介/喜好/知屿币/阅读时长 ──
         for col, ddl in [
             ("avatar", "VARCHAR(255)"),
             ("bio", "VARCHAR(255)"),

@@ -591,7 +591,7 @@ const aiSummary = async () => {
     })
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}))
-      summary.value = err.error === 'AI 额度已用完，可去积分商城兑换' ? '⚠️ AI 额度已用完，可去积分商城兑换' : '😅 总结失败：' + (err.error || '网络异常')
+      summary.value = err.error === 'AI 额度已用完，可去知屿币商城兑换' ? '⚠️ AI 额度已用完，可去知屿币商城兑换' : '😅 总结失败：' + (err.error || '网络异常')
     } else {
       const reader = resp.body.getReader()
       const decoder = new TextDecoder('utf-8')

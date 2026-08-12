@@ -287,7 +287,7 @@ const send = async () => {
     })
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}))
-      if (resp.status === 402) assistantMsg.content = '⚠️ 免费额度已用完，可去积分商城兑换 AI 次数'
+      if (resp.status === 402) assistantMsg.content = '⚠️ 免费额度已用完，可去知屿币商城兑换 AI 次数'
       else if (resp.status === 401) assistantMsg.content = '请先登录后使用 AI 助手。'
       else assistantMsg.content = '😅 AI 服务暂时不可用：' + (err.error || '网络异常')
       assistantMsg.stream = false

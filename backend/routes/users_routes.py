@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""用户主页 / 资料 / 头像封面 / 今日概览 / 积分 / 热力图"""
+"""用户主页 / 资料 / 头像封面 / 今日概览 / 知屿币 / 热力图"""
 from flask import Blueprint, request, jsonify
 import os
 import secrets
@@ -261,7 +261,7 @@ def reset_cover(user=None):
 @bp.route('/api/user/today', methods=['GET'])
 @require_login
 def user_today(user=None):
-    """今日概览：今日阅读分钟、AI 已用/额度、积分"""
+    """今日概览：今日阅读分钟、AI 已用/额度、知屿币"""
     conn = get_conn()
     try:
         with conn.cursor() as cur:
