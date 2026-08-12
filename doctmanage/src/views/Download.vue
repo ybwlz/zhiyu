@@ -104,10 +104,10 @@ const isDesktop = typeof document !== 'undefined' && document.documentElement.cl
 const showSacl = ref(true) // 默认展开，用户打开即可看到关闭步骤
 // 智能应用控制关闭步骤（图片来自 public/sacl-guide/）
 const saclSteps = [
-  { text: '打开 Windows 安全中心', img: './sacl-guide/sacl-1.png' },
-  { text: '进入「应用和浏览器控制」页面', img: './sacl-guide/sacl-2.png' },
-  { text: '打开「智能应用控制」设置', img: './sacl-guide/sacl-3.png' },
-  { text: '点击「关闭」按钮', img: './sacl-guide/sacl-4.png' },
+  { text: '打开 Windows 安全中心', img: './sacl-guide/sacl-1.webp' },
+  { text: '进入「应用和浏览器控制」页面', img: './sacl-guide/sacl-2.webp' },
+  { text: '打开「智能应用控制」设置', img: './sacl-guide/sacl-3.webp' },
+  { text: '点击「关闭」按钮', img: './sacl-guide/sacl-4.webp' },
 ]
 </script>
 
