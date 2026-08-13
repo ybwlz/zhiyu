@@ -41,6 +41,10 @@ def admin_stats(user):
             roles = {r['role']: r['c'] for r in cur.fetchall()}
             cur.execute("SELECT COUNT(*) c FROM ai_chat_logs WHERE created_at >= %s", (datetime.now() - timedelta(days=6),))
             ai_7 = cur.fetchone()['c']
+            cur.execute("""SELECT DATE(created_at) d, COUNT(*) c FROM ai_chat_logs
+                WHERE created_at >= %s GROUP BY DATE(created_at) ORDER BY d""",
+                        (datetime.now() - timedelta(days=6),))
+            ai_7_daily = [{'date': str(r['d']), 'count': r['c']} for r in cur.fetchall()]
             # 近 7 天：每日新增用户 / 笔记 / AI 使用
             cur.execute("""SELECT DATE(created_at) d, COUNT(*) c FROM users
                 WHERE created_at >= %s GROUP BY DATE(created_at) ORDER BY d""",
@@ -52,7 +56,7 @@ def admin_stats(user):
             docs_7 = [{'date': str(r['d']), 'count': r['c']} for r in cur.fetchall()]
         return jsonify({
             'users': user_total, 'docs': doc_total, 'docs_public': doc_public, 'docs_private': doc_private,
-            'ai_usage': ai_total, 'audit_pending': audit_pending, 'ai_7': ai_7,
+            'ai_usage': ai_total, 'audit_pending': audit_pending, 'ai_7': ai_7, 'ai_7_daily': ai_7_daily,
             'users_roles': roles,
             'users_7': users_7, 'docs_7': docs_7,
         })

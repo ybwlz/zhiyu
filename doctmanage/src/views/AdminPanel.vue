@@ -39,13 +39,13 @@
           </div>
         </div>
         <div class="chart-pair">
-          <div class="trend-card">
-            <h3>🥧 笔记结构</h3>
-            <div ref="pie1Ref" class="echart-box"></div>
+          <div class="trend-card wide">
+            <h3>📈 近 7 天趋势</h3>
+            <div ref="lineChartRef" class="echart-box tall"></div>
           </div>
           <div class="trend-card">
-            <h3>👥 用户角色</h3>
-            <div ref="pie2Ref" class="echart-box"></div>
+            <h3>🥧 笔记结构</h3>
+            <div ref="pieRef" class="echart-box tall"></div>
           </div>
         </div>
         <div class="dash-bottom">
@@ -508,14 +508,14 @@ import MarkdownIt from 'markdown-it'
 import { full as emoji } from 'markdown-it-emoji'
 import mdImgSize from '@/utils/mdImgSize.js'
 import * as echarts from 'echarts/core'
-import { PieChart, BarChart } from 'echarts/charts'
+import { PieChart, BarChart, LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import api from '@/utils/api.js'
 import { useAuthStore } from '@/stores/auth.js'
 import VisibilitySelect from '@/components/VisibilitySelect.vue'
 
-echarts.use([PieChart, BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer])
+echarts.use([PieChart, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer])
 
 const router = useRouter()
 const route = useRoute()
@@ -590,37 +590,35 @@ const trendDays = computed(() => {
 })
 const dayCount = (arr, d) => (arr || []).find(x => String(x.date).startsWith(d))?.count || 0
 // ECharts 图表
-const barChartRef = ref(null)
-const pie1Ref = ref(null)
-const pie2Ref = ref(null)
-let barChart = null
-let pieChart1 = null
-let pieChart2 = null
+const lineChartRef = ref(null)
+const pieRef = ref(null)
+let lineChart = null
+let pieChart = null
 function initCharts() {
-  if (!barChartRef.value || barChart) return
-  barChart = echarts.init(barChartRef.value)
-  pieChart1 = echarts.init(pie1Ref.value)
-  pieChart2 = echarts.init(pie2Ref.value)
+  if (!lineChartRef.value || lineChart) return
+  lineChart = echarts.init(lineChartRef.value)
+  pieChart = echarts.init(pieRef.value)
   window.addEventListener('resize', resizeCharts)
 }
-function resizeCharts() { barChart?.resize(); pieChart1?.resize(); pieChart2?.resize() }
+function resizeCharts() { lineChart?.resize(); pieChart?.resize() }
 function renderCharts() {
-  if (!barChart) return
+  if (!lineChart) return
   const days = trendDays.value.map(d => d.slice(5))
-  // 柱状：近 7 天用户/笔记
-  barChart.setOption({
+  // 折线图：近 7 天 用户/笔记/AI 趋势
+  lineChart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['新增用户', '新增笔记'], textStyle: { color: 'var(--text2)' }, top: 0 },
-    grid: { left: 30, right: 10, top: 28, bottom: 4 },
-    xAxis: { type: 'category', data: days, axisLabel: { color: 'var(--text2)' }, axisLine: { lineStyle: { color: 'var(--border)' } } },
+    legend: { data: ['新增用户', '新增笔记', 'AI 使用'], textStyle: { color: 'var(--text2)' }, top: 0 },
+    grid: { left: 34, right: 12, top: 28, bottom: 4 },
+    xAxis: { type: 'category', boundaryGap: false, data: days, axisLabel: { color: 'var(--text2)' }, axisLine: { lineStyle: { color: 'var(--border)' } } },
     yAxis: { type: 'value', minInterval: 1, axisLabel: { color: 'var(--text2)' }, splitLine: { lineStyle: { color: 'var(--border)' } } },
     series: [
-      { name: '新增用户', type: 'bar', data: trendDays.value.map(d => dayCount(stats.value.users_7, d)), itemStyle: { color: '#3b82f6', borderRadius: [3, 3, 0, 0] }, barWidth: 12 },
-      { name: '新增笔记', type: 'bar', data: trendDays.value.map(d => dayCount(stats.value.docs_7, d)), itemStyle: { color: '#22c55e', borderRadius: [3, 3, 0, 0] }, barWidth: 12 },
+      { name: '新增用户', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.users_7, d)), itemStyle: { color: '#3b82f6' }, areaStyle: { opacity: .08, color: '#3b82f6' } },
+      { name: '新增笔记', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.docs_7, d)), itemStyle: { color: '#22c55e' }, areaStyle: { opacity: .08, color: '#22c55e' } },
+      { name: 'AI 使用', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.ai_7_daily, d)), itemStyle: { color: '#a855f7' }, areaStyle: { opacity: .08, color: '#a855f7' } },
     ],
   })
-  // 环形饼图1：笔记结构（公开/私密）
-  pieChart1.setOption({
+  // 环形饼图：笔记结构（公开/私密/待审）
+  pieChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}: {c}（{d}%）' },
     legend: { bottom: 0, textStyle: { color: 'var(--text2)' } },
     series: [{
@@ -633,25 +631,7 @@ function renderCharts() {
       data: [
         { value: stats.value.docs_public || 0, name: '公开笔记', itemStyle: { color: '#3b82f6' } },
         { value: stats.value.docs_private || 0, name: '私密笔记', itemStyle: { color: '#22c55e' } },
-      ],
-    }],
-  })
-  // 环形饼图2：用户角色
-  const roles = stats.value.users_roles || {}
-  pieChart2.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c}（{d}%）' },
-    legend: { bottom: 0, textStyle: { color: 'var(--text2)' } },
-    series: [{
-      type: 'pie',
-      radius: ['42%', '68%'],
-      center: ['50%', '44%'],
-      itemStyle: { borderRadius: 6, borderColor: 'var(--bg)', borderWidth: 2 },
-      label: { show: false },
-      emphasis: { scale: true, scaleSize: 8, label: { show: true, fontSize: 14, fontWeight: 700, formatter: '{b}\n{c}' } },
-      data: [
-        { value: roles.user || 0, name: '普通用户', itemStyle: { color: '#3b82f6' } },
-        { value: roles.moderator || 0, name: '辅助管理员', itemStyle: { color: '#a855f7' } },
-        { value: roles.admin || 0, name: '站长', itemStyle: { color: '#f59e0b' } },
+        { value: stats.value.audit_pending || 0, name: '待审笔记', itemStyle: { color: '#f59e0b' } },
       ],
     }],
   })
@@ -1053,9 +1033,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', resizeCharts)
-  barChart?.dispose()
-  pieChart1?.dispose()
-  pieChart2?.dispose()
+  lineChart?.dispose()
+  pieChart?.dispose()
 })
 </script>
 
@@ -1108,7 +1087,8 @@ onUnmounted(() => {
 .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
 /* 圆环图 */
 .echart-box { width: 100%; height: 240px; }
-.chart-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.echart-box.tall { height: 280px; }
+.chart-pair { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-top: 14px; }
 .rings-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 14px; }
 .ring-card { border: 1px solid var(--border); border-radius: 14px; background: var(--btn-bg); padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .ring-wrap { position: relative; width: 84px; height: 84px; }
