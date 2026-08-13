@@ -464,8 +464,7 @@ def admin_notice(user):
                 uids = [int(x) for x in (target or []) if str(x).isdigit()]
             extra = json_dumps({'title': title, 'content': content})
             for uid in uids:
-                if uid == user['id']:
-                    continue
+                # 管理后台通知：不跳过自己（站长也可给自己发通知/测试）
                 cur.execute("INSERT INTO notifications (user_id, actor_id, type, extra) VALUES (%s,%s,'admin_notice',%s)",
                             (uid, user['id'], extra))
         conn.commit()
