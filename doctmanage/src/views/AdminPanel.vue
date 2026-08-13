@@ -22,6 +22,10 @@
           <div class="stat-card"><div class="sc-icon">🤖</div><b>{{ stats.ai_usage ?? '-' }}</b><span>AI 使用次数</span></div>
           <div class="stat-card warn" @click="mod = 'audits'"><div class="sc-icon">🔍</div><b>{{ stats.audit_pending ?? '-' }}</b><span>待审笔记</span></div>
         </div>
+        <div class="trend-card" style="margin-bottom: 14px;">
+          <h3>💬 互动趋势（近 7 天）</h3>
+          <div ref="interactChartRef" class="echart-box"></div>
+        </div>
         <div class="chart-pair">
           <div class="trend-card wide">
             <h3>📈 近 7 天趋势</h3>
@@ -540,6 +544,7 @@ watch(mod, (v) => {
     nextTick(() => {
       if (lineChart) { lineChart.dispose(); lineChart = null }
       if (pieChart) { pieChart.dispose(); pieChart = null }
+      if (interactChart) { interactChart.dispose(); interactChart = null }
       initCharts()
       renderCharts()
     })
@@ -595,15 +600,18 @@ const dayCount = (arr, d) => (arr || []).find(x => String(x.date).startsWith(d))
 // ECharts 图表
 const lineChartRef = ref(null)
 const pieRef = ref(null)
+const interactChartRef = ref(null)
 let lineChart = null
 let pieChart = null
+let interactChart = null
 function initCharts() {
   if (!lineChartRef.value || lineChart) return
   lineChart = echarts.init(lineChartRef.value)
   pieChart = echarts.init(pieRef.value)
+  interactChart = echarts.init(interactChartRef.value)
   window.addEventListener('resize', resizeCharts)
 }
-function resizeCharts() { lineChart?.resize(); pieChart?.resize() }
+function resizeCharts() { lineChart?.resize(); pieChart?.resize(); interactChart?.resize() }
 function renderCharts() {
   if (!lineChart) return
   try {
@@ -621,6 +629,19 @@ function renderCharts() {
       { name: '新增用户', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.users_7, d)), itemStyle: { color: '#3b82f6' }, areaStyle: { opacity: .08, color: '#3b82f6' } },
       { name: '新增笔记', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.docs_7, d)), itemStyle: { color: '#22c55e' }, areaStyle: { opacity: .08, color: '#22c55e' } },
       { name: 'AI 使用次数', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.ai_7_daily, d)), itemStyle: { color: '#a855f7' }, areaStyle: { opacity: .08, color: '#a855f7' } },
+    ],
+  })
+  // 互动趋势：近 7 天 评论/点赞/收藏
+  interactChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['新增评论', '新增点赞', '新增收藏'], textStyle: { color: 'var(--text2)' }, top: 0 },
+    grid: { left: 34, right: 12, top: 28, bottom: 4 },
+    xAxis: { type: 'category', boundaryGap: false, data: days, axisLabel: { color: 'var(--text2)' }, axisLine: { lineStyle: { color: 'var(--border)' } } },
+    yAxis: { type: 'value', minInterval: 1, axisLabel: { color: 'var(--text2)' }, splitLine: { lineStyle: { color: 'var(--border)' } } },
+    series: [
+      { name: '新增评论', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.comments_7, d)), itemStyle: { color: '#f59e0b' } },
+      { name: '新增点赞', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.likes_7, d)), itemStyle: { color: '#ec4899' } },
+      { name: '新增收藏', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.favorites_7, d)), itemStyle: { color: '#06b6d4' } },
     ],
   })
   // 环形饼图：数据分布（公开/私密/待审/AI 使用次数）
@@ -1043,6 +1064,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', resizeCharts)
   lineChart?.dispose()
   pieChart?.dispose()
+  interactChart?.dispose()
 })
 </script>
 
