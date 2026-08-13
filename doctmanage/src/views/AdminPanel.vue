@@ -247,9 +247,12 @@
           <div class="form-row">
             <VisibilitySelect v-model="noticeTarget" :options="noticeTargetOptions" class="ap-vis" />
             <div v-if="noticeTarget === 'one'" class="user-pick">
-              <input v-model="noticeUserQ" class="ap-input" placeholder="搜索用户（用户名/昵称）" @input="searchUsers('notice')" @focus="userSelOpen.notice = true" @blur="setTimeout(() => userSelOpen.notice = false, 200)" />
+              <input v-model="noticeUserQ" class="ap-input" placeholder="搜索用户添加（可多选）" @input="searchUsers('notice')" @focus="userSelOpen.notice = true" @blur="setTimeout(() => userSelOpen.notice = false, 200)" />
               <div v-if="userSelOpen.notice && noticeUserResults.length" class="user-sel">
                 <div v-for="u in noticeUserResults" :key="u.id" class="user-sel-item" @mousedown.prevent="pickUser('notice', u)">{{ u.nickname || u.username }} · {{ u.username }}</div>
+              </div>
+              <div v-if="noticeSelList.length" class="user-picked-list">
+                <span v-for="s in noticeSelList" :key="s.id" class="user-picked">已选：{{ s.name }}<button class="up-clear" @click="noticeSelList = noticeSelList.filter(x => x.id !== s.id)">✕</button></span>
               </div>
             </div>
           </div>
@@ -571,7 +574,7 @@ const coinUserResults = ref([])
 const coinSel = ref(null)
 const noticeUserQ = ref('')
 const noticeUserResults = ref([])
-const noticeSel = ref(null)
+const noticeSelList = ref([])
 const userSelOpen = ref({ coin: false, notice: false })
 async function searchUsers(which) {
   const q = which === 'coin' ? coinUserQ.value : noticeUserQ.value
@@ -595,8 +598,11 @@ function pickUser(which, u) {
     coinSel.value = { id: u.id, name: u.nickname || u.username }
     coinUserQ.value = u.nickname || u.username
   } else {
-    noticeSel.value = { id: u.id, name: u.nickname || u.username }
-    noticeUserQ.value = u.nickname || u.username
+    // 通知：支持多选（去重）
+    if (!noticeSelList.value.some(x => x.id === u.id)) {
+      noticeSelList.value.push({ id: u.id, name: u.nickname || u.username })
+    }
+    noticeUserQ.value = ''
   }
   userSelOpen.value[which] = false
 }
@@ -667,13 +673,13 @@ const noticeTitle = ref('')
 const noticeContent = ref('')
 async function sendNotice() {
   if (!noticeContent.value.trim()) { toast('通知内容不能为空', 'err'); return }
-  if (noticeTarget.value === 'one' && !noticeSel.value) { toast('请先选择要通知的用户', 'err'); return }
+  if (noticeTarget.value === 'one' && !noticeSelList.value.length) { toast('请至少选择一个用户', 'err'); return }
   try {
-    const target = noticeTarget.value === 'all' ? 'all' : [noticeSel.value.id]
+    const target = noticeTarget.value === 'all' ? 'all' : noticeSelList.value.map(x => x.id)
     const r = (await api.post('/admin/notices', { target, title: noticeTitle.value, content: noticeContent.value })).data
     toast(`已发送给 ${r.sent} 位用户`)
     noticeContent.value = ''
-    noticeSel.value = null
+    noticeSelList.value = []
     noticeUserQ.value = ''
   } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
@@ -860,6 +866,7 @@ onMounted(async () => {
 .user-sel-item { padding: 9px 12px; font-size: 13px; color: var(--text1); cursor: pointer; }
 .user-sel-item:hover { background: color-mix(in srgb, var(--brand-1) 14%, transparent); }
 .user-picked { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; color: var(--brand-1); background: color-mix(in srgb, var(--brand-1) 14%, transparent); padding: 4px 10px; border-radius: 999px; }
+.user-picked-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .up-clear { border: none; background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
 .empty-tip { color: var(--text2); font-size: 13.5px; padding: 30px; text-align: center; }
 .audit-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
