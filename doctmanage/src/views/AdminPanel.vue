@@ -57,6 +57,23 @@
             </div>
           </div>
         </div>
+        <div class="dash-bottom">
+          <div class="trend-card">
+            <h3>🆕 最新注册</h3>
+            <div v-for="u in userList.slice(0, 6)" :key="u.id" class="dash-row">
+              <span class="dr-name">{{ u.nickname || u.username }}</span>
+              <span class="dr-role" :class="u.role">{{ roleLabel(u.role) }}</span>
+              <span class="ap-meta">{{ u.created_at }}</span>
+            </div>
+          </div>
+          <div class="trend-card">
+            <h3>📄 最新笔记</h3>
+            <div v-for="d in docList.slice(0, 6)" :key="d.id" class="dash-row">
+              <span class="dr-name ellipsis">{{ d.title }}</span>
+              <span class="ap-meta">{{ d.nickname || d.username || '系统' }} · {{ d.updated_at }}</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ── 用户管理 ── -->
@@ -946,6 +963,8 @@ onMounted(async () => {
 .ap-back { width: 100%; padding: 8px; border: 1px solid var(--border); background: transparent; color: var(--text2); border-radius: 9px; cursor: pointer; font-size: 12.5px; }
 .ap-back:hover { color: var(--text1); }
 .ap-main { flex: 1; min-width: 0; margin-top: 0; margin-left: 240px; }
+/* 去掉模块大标题后，内容顶部保留间距（不贴导航栏） */
+.ap-main > section { padding-top: 6px; }
 .ap-title { font-size: 18px; font-weight: 700; color: var(--text1); margin: 4px 0 16px; }
 .ap-sub { font-size: 12.5px; color: var(--text2); font-weight: 400; }
 .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 18px; }
@@ -968,6 +987,14 @@ onMounted(async () => {
 .quick-list { display: flex; flex-direction: column; gap: 6px; }
 .quick-item { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text1); font-size: 13.5px; cursor: pointer; text-align: left; }
 .quick-item:hover { background: color-mix(in srgb, var(--brand-1) 12%, transparent); border-color: color-mix(in srgb, var(--brand-1) 40%, transparent); }
+/* 仪表盘底部：最新注册 / 最新笔记 */
+.dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.dash-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); font-size: 13px; }
+.dash-row:last-child { border-bottom: none; }
+.dr-name { flex: 1; min-width: 0; color: var(--text1); }
+.dr-role { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--text2) 16%, transparent); color: var(--text2); }
+.dr-role.admin { background: color-mix(in srgb, #f59e0b 20%, transparent); color: #f59e0b; }
+.dr-role.moderator { background: color-mix(in srgb, var(--brand-1) 20%, transparent); color: var(--brand-1); }
 /* 模块提示小字（替代标题） */
 .audit-tip { font-size: 12.5px; color: var(--text2); margin: 2px 0 14px; }
 /* AI 摘要卡片 */
