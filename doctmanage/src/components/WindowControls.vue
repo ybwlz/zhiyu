@@ -99,6 +99,10 @@ const doQuit = () => { remember('quit'); closeModal.value = false; window.deskto
   overflow: hidden;
   -webkit-app-region: no-drag;
 }
+/* 弹窗背景必须不透明：主题玻璃变量是半透明的，会被深色遮罩透过来导致文字看不清 */
+html[data-theme="starlight"] .modal { background: #0d1220; }
+html[data-theme="sky"] .modal,
+html[data-theme="minimal"] .modal { background: #ffffff; }
 .modal-head {
   display: flex;
   align-items: center;

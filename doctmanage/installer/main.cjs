@@ -176,11 +176,16 @@ ipcMain.handle('install', async (e, payload) => {
       await setAutoStart(path.join(target, '知屿.exe'))
     }
 
-    // 6. 卸载入口：复制安装器 exe → <root>\卸载器\知屿卸载.exe（双击即进入卸载界面）
+    // 6. 卸载入口：复制安装器完整运行文件（exe + dll + resources，排除绿色版）→ <root>\卸载器\
+    //    （只复制 exe 会导致 Electron 缺 icudtl/dll 报 ICU 错误）
     send('copy', 90, '创建卸载入口…')
     try {
       await fsp.mkdir(uninstallDir, { recursive: true })
-      await fsp.copyFile(process.execPath, path.join(uninstallDir, '知屿卸载.exe'))
+      await fsp.cp(path.dirname(process.execPath), uninstallDir, {
+        recursive: true,
+        force: true,
+        filter: (src) => !src.includes('知屿-win32-x64'),
+      })
     } catch (e) { /* 复制失败不中断 */ }
 
     // 7. 注册卸载信息（控制面板「程序和功能」可卸载）
