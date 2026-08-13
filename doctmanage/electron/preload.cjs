@@ -1,4 +1,4 @@
-// 知屿 Electron preload：暴露标题栏/窗口控制给渲染进程
+// 知屿 Electron preload：暴露标题栏/窗口控制/更新检查给渲染进程
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('desktop', {
@@ -11,5 +11,21 @@ contextBridge.exposeInMainWorld('desktop', {
     minimize: () => ipcRenderer.send('window-minimize'),
     maximize: () => ipcRenderer.send('window-maximize'),
     close: () => ipcRenderer.send('window-close'),
+  },
+  // 版本与更新检查
+  appVersion: () => ipcRenderer.invoke('get-app-version'),
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
+  onUpdateAvailable: (cb) => {
+    ipcRenderer.on('update-available', (_e, data) => cb(data))
+  },
+  // 应用内下载并自动安装更新（支持暂停/继续/取消）
+  downloadUpdate: (url) => ipcRenderer.invoke('download-update', url),
+  pauseUpdate: () => ipcRenderer.send('update-pause'),
+  cancelUpdate: () => ipcRenderer.send('update-cancel'),
+  onUpdateProgress: (cb) => {
+    ipcRenderer.on('update-progress', (_e, data) => cb(data))
+  },
+  onUpdateCancelled: (cb) => {
+    ipcRenderer.on('update-cancelled', () => cb())
   },
 })

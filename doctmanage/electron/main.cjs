@@ -3,10 +3,36 @@
 //   - 静态文件：dist-electron 产物（module 脚本在 http 下正常执行）
 //   - /api、/uploads：代理到本地后端（http://localhost:5000）
 //   - /zhiyu/*：前端路由回落 index.html
-const { app, BrowserWindow, shell, ipcMain } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, net } = require('electron')
 const http = require('http')
 const path = require('path')
 const fs = require('fs')
+const { exec } = require('child_process')
+
+// ── 更新检查：对比服务器 version.json（放 /downloads/version.json） ──
+// 注：域名 www.zhiyur.cn 备案通过前会被腾讯云拦截，故更新检查用 IP 直连
+const UPDATE_URL = process.env.ZHIYU_UPDATE_URL || 'http://182.254.209.123/downloads/version.json'
+function compareVersion(a, b) {
+  const pa = String(a).split('.').map(Number)
+  const pb = String(b).split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    const x = pa[i] || 0
+    const y = pb[i] || 0
+    if (x !== y) return x - y
+  }
+  return 0
+}
+async function checkForUpdate() {
+  try {
+    const res = await net.fetch(UPDATE_URL, { cache: 'no-store' })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data && data.version && compareVersion(data.version, app.getVersion()) > 0) return data
+    return null
+  } catch (e) {
+    return null
+  }
+}
 
 // 后端地址优先级：环境变量 ZHIYU_BACKEND > exe 同目录 config.json > 默认云端服务器
 // config.json 示例：{ "backend": "http://182.254.209.123" }（切回本地调试改为 http://localhost:5000）
@@ -127,6 +153,123 @@ app.whenReady().then(() => {
     ipcMain.on('window-minimize', () => win.minimize())
     ipcMain.on('window-maximize', () => { if (win.isMaximized()) win.unmaximize(); else win.maximize() })
     ipcMain.on('window-close', () => win.close())
+    // 版本与更新检查
+    ipcMain.handle('get-app-version', () => app.getVersion())
+    ipcMain.handle('check-update', async () => await checkForUpdate())
+
+    // ── 应用内下载并自动安装更新（支持暂停/继续/取消，断点续传） ──
+    let updateState = null // { url, tmpDir, extractDir, zipPath, file, aborter, received, paused, cancelled }
+    const sendProgress = (pct, extra = {}) => {
+      if (!win.isDestroyed()) win.webContents.send('update-progress', { pct, ...extra })
+    }
+    const finishUpdate = async () => {
+      const s = updateState
+      updateState = null
+      // 解压 zip
+      await new Promise((resolve, reject) => {
+        exec(`tar -xf "${s.zipPath}" -C "${s.extractDir}"`, { windowsHide: true }, (err) => (err ? reject(err) : resolve()))
+      })
+      // 写更新脚本：等退出 → 杀进程 → 覆盖 exe 目录 → 重启
+      const appDir = path.dirname(process.execPath)
+      const batPath = path.join(appDir, 'update.bat')
+      const bat = [
+        '@echo off',
+        'chcp 65001 >nul',
+        'timeout /t 3 /nobreak >nul',
+        'taskkill /f /im 知屿.exe >nul 2>&1',
+        'timeout /t 2 /nobreak >nul',
+        `robocopy "${s.extractDir}" "${appDir}" /E /IS /IT >nul`,
+        `start "" "${appDir}\\知屿.exe"`,
+        ''
+      ].join('\r\n')
+      fs.writeFileSync(batPath, '\ufeff' + bat)
+      exec(`start "" "${batPath}"`, { windowsHide: true }, () => {})
+      sendProgress(100)
+      app.quit()
+      return { ok: true }
+    }
+    ipcMain.handle('download-update', async (_e, url) => {
+      const target = url || UPDATE_URL
+      try {
+        // 已暂停 → 从断点续传
+        if (updateState && updateState.paused && updateState.url === target) {
+          updateState.paused = false
+          updateState.aborter = new AbortController()
+          const s = updateState
+          s.file = fs.createWriteStream(s.zipPath, { flags: 'a' })
+          const res = await net.fetch(target, {
+            cache: 'no-store', signal: s.aborter.signal,
+            headers: s.received > 0 ? { Range: `bytes=${s.received}-` } : {},
+          })
+          if (!res.ok && res.status !== 206) throw new Error('download failed: ' + res.status)
+          const remaining = Number(res.headers.get('content-length')) || 0
+          const total = s.received + remaining
+          const reader = res.body.getReader()
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            s.file.write(Buffer.from(value))
+            s.received += value.length
+            sendProgress(Math.round((s.received / total) * 100))
+          }
+          s.file.end()
+          return await finishUpdate()
+        }
+        // 下载进行中（未暂停）→ 拒绝重复发起
+        if (updateState && !updateState.paused) return { ok: false, error: 'download in progress' }
+        // 全新下载
+        const tmpDir = path.join(require('os').tmpdir(), 'zhiyu-update-' + Date.now())
+        const extractDir = path.join(tmpDir, 'app')
+        fs.mkdirSync(extractDir, { recursive: true })
+        const zipPath = path.join(tmpDir, 'update.zip')
+        const aborter = new AbortController()
+        updateState = { url: target, tmpDir, extractDir, zipPath, file: fs.createWriteStream(zipPath), aborter, received: 0, paused: false, cancelled: false }
+        const res = await net.fetch(target, { cache: 'no-store', signal: aborter.signal })
+        if (!res.ok) throw new Error('download failed: ' + res.status)
+        const total = Number(res.headers.get('content-length')) || 0
+        const reader = res.body.getReader()
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          updateState.file.write(Buffer.from(value))
+          updateState.received += value.length
+          if (total) sendProgress(Math.round((updateState.received / total) * 100))
+        }
+        updateState.file.end()
+        return await finishUpdate()
+      } catch (err) {
+        // 用户暂停/取消（AbortError）
+        if (updateState && (err.name === 'AbortError' || /abort|interrupt/i.test(String(err)))) {
+          if (updateState.cancelled) {
+            updateState = null
+            return { ok: false, cancelled: true }
+          }
+          updateState.paused = true
+          updateState.file.end()
+          sendProgress(updateState.received, { paused: true })
+          return { ok: false, paused: true, received: updateState.received }
+        }
+        updateState = null
+        return { ok: false, error: String((err && err.message) || err) }
+      }
+    })
+    ipcMain.on('update-pause', () => {
+      if (updateState && !updateState.paused && !updateState.cancelled) updateState.aborter.abort()
+    })
+    ipcMain.on('update-cancel', () => {
+      if (updateState) {
+        updateState.cancelled = true
+        updateState.aborter.abort()
+        try { fs.rmSync(updateState.tmpDir, { recursive: true, force: true }) } catch (e) { /* 忽略 */ }
+        updateState = null
+      }
+      if (!win.isDestroyed()) win.webContents.send('update-cancelled')
+    })
+    // 启动数秒后静默检查更新，有新版本通知前端提示
+    setTimeout(async () => {
+      const upd = await checkForUpdate()
+      if (upd && !win.isDestroyed()) win.webContents.send('update-available', upd)
+    }, 8000)
     win.loadURL('http://127.0.0.1:' + port + '/')
   })
 })

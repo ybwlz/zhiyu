@@ -9,6 +9,7 @@ import MinimalBackground from '@/components/MinimalBackground.vue'
 import AIAssistant from '@/components/AIAssistant.vue'
 import ToolBall from '@/components/ToolBall.vue'
 import WindowControls from '@/components/WindowControls.vue'
+import UpdateNotice from '@/components/UpdateNotice.vue'
 
 const auth = useAuthStore()
 // 启动时用最新 /auth/me 刷新登录用户信息（后端字段有更新时，localStorage 旧缓存也能补上 public_id 等新字段）
@@ -31,6 +32,7 @@ onMounted(() => { auth.fetchMe() })
   <AIAssistant />
   <ToolBall />
   <WindowControls />
+  <UpdateNotice />
 </template>
 
 <style>
