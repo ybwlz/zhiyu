@@ -10,20 +10,46 @@
       <svg width="11" height="11" viewBox="0 0 11 11"><line x1="1" y1="1" x2="10" y2="10" stroke="currentColor" stroke-width="1.1" /><line x1="10" y1="1" x2="1" y2="10" stroke="currentColor" stroke-width="1.1" /></svg>
     </button>
   </div>
+
+  <!-- 关闭确认弹窗（站内风格）：默认缩小到托盘，可勾选不再询问 -->
+  <div v-if="isElectron && closeModal" class="modal-mask" @click.self="closeModal = false">
+    <div class="modal">
+      <div class="modal-head">
+        <b>退出知屿？</b>
+        <button class="modal-close" @click="closeModal = false">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">关闭后知屿将缩小到系统托盘，仍在后台运行，随时可恢复。</p>
+        <label class="dont-ask"><input type="checkbox" v-model="dontAsk" /> 不再询问（记住本次选择）</label>
+      </div>
+      <div class="modal-foot">
+        <button class="ap-btn ghost" @click="doQuit">直接退出</button>
+        <button class="ap-btn" @click="doHide">缩小到托盘</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ElMessageBox } from 'element-plus'
+import { ref } from 'vue'
 const isElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron')
 const minimize = () => window.desktop?.windowControls?.minimize()
 const maximize = () => window.desktop?.windowControls?.maximize()
-// 关闭：弹提示（缩小到托盘 / 直接退出）
+
+const closeModal = ref(false)
+const dontAsk = ref(false)
+const STORE_KEY = 'zhiyu_close_action'
+
 const close = () => {
-  ElMessageBox.confirm('关闭后知屿将缩小到系统托盘，仍在后台运行。', '知屿', {
-    confirmButtonText: '缩小到托盘', cancelButtonText: '直接退出', type: 'warning',
-  }).then(() => { window.desktop?.hideToTray?.() })
-    .catch((action) => { if (action === 'cancel') window.desktop?.quitApp?.() })
+  // 已记住选择：直接执行（默认缩小到托盘）
+  const saved = localStorage.getItem(STORE_KEY)
+  if (saved === 'hide') { window.desktop?.hideToTray?.(); return }
+  if (saved === 'quit') { window.desktop?.quitApp?.(); return }
+  closeModal.value = true
 }
+const remember = (act) => { if (dontAsk.value) localStorage.setItem(STORE_KEY, act) }
+const doHide = () => { remember('hide'); closeModal.value = false; window.desktop?.hideToTray?.() }
+const doQuit = () => { remember('quit'); closeModal.value = false; window.desktop?.quitApp?.() }
 </script>
 
 <style scoped>
@@ -36,27 +62,99 @@ const close = () => {
   display: flex;
   align-items: stretch;
   -webkit-app-region: no-drag;
-  z-index: 2147483001;
+  z-index: 999;
 }
 .wc-btn {
   width: 46px;
-  border: none;
   background: transparent;
-  color: var(--text1);
+  border: none;
+  color: var(--text2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: background .15s;
+}
+.wc-btn:hover { background: rgba(255,255,255,.08); color: var(--text1); }
+.wc-close:hover { background: #e81123; color: #fff; }
+
+/* ── 关闭确认弹窗（站内风格） ── */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
 }
-.wc-btn:hover {
-  background: color-mix(in srgb, var(--text1) 13%, transparent);
+.modal {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 380px;
+  max-width: 92vw;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .35);
+  overflow: hidden;
+  -webkit-app-region: no-drag;
 }
-.wc-btn:active {
-  background: color-mix(in srgb, var(--text1) 22%, transparent);
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 0;
+  font-size: 16px;
+  color: var(--text1);
 }
-.wc-close:hover {
-  background: #e81123;
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+.modal-close:hover { background: rgba(255,255,255,.08); color: var(--text1); }
+.modal-body { padding: 14px 20px 8px; }
+.modal-desc {
+  color: var(--text2);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0 0 16px;
+}
+.dont-ask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+}
+.dont-ask input { accent-color: var(--brand-1); width: 15px; height: 15px; }
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px 18px;
+}
+.ap-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  background: var(--brand-1);
   color: #fff;
+  transition: filter .15s;
 }
+.ap-btn:hover { filter: brightness(1.08); }
+.ap-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+.ap-btn.ghost:hover { border-color: var(--brand-1); color: var(--brand-1); }
 </style>
