@@ -25,26 +25,7 @@
         <div class="dash-grid">
           <div class="trend-card">
             <h3>📈 近 7 天增长</h3>
-            <div class="chart-row">
-              <div class="chart-col">
-                <div class="chart-label">新增用户</div>
-                <div class="bars">
-                  <div v-for="d in trendDays" :key="d" class="bar-wrap">
-                    <div class="bar" :style="{ height: barH(dayCount(stats.users_7, d), usersMax) + 'px' }" :title="d + ': ' + dayCount(stats.users_7, d)"></div>
-                    <span class="bar-day">{{ d.slice(5) }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="chart-col">
-                <div class="chart-label">新增笔记</div>
-                <div class="bars">
-                  <div v-for="d in trendDays" :key="d" class="bar-wrap">
-                    <div class="bar note" :style="{ height: barH(dayCount(stats.docs_7, d), docsMax) + 'px' }" :title="d + ': ' + dayCount(stats.docs_7, d)"></div>
-                    <span class="bar-day">{{ d.slice(5) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <div ref="barChartRef" class="echart-box"></div>
           </div>
           <div class="trend-card">
             <h3>⚡ 快捷入口</h3>
@@ -57,47 +38,9 @@
             </div>
           </div>
         </div>
-        <div class="rings-row">
-          <div class="ring-card">
-            <div class="ring-wrap">
-              <svg viewBox="0 0 100 100">
-                <circle class="ring-bg" cx="50" cy="50" r="40" />
-                <circle class="ring-val" cx="50" cy="50" r="40" stroke="#3b82f6" :stroke-dasharray="`${pct(stats.docs_public, stats.docs) * 2.51} 251`" />
-              </svg>
-              <span class="ring-num">{{ pct(stats.docs_public, stats.docs) }}%</span>
-            </div>
-            <div class="ring-label">🌐 公开笔记</div>
-          </div>
-          <div class="ring-card">
-            <div class="ring-wrap">
-              <svg viewBox="0 0 100 100">
-                <circle class="ring-bg" cx="50" cy="50" r="40" />
-                <circle class="ring-val" cx="50" cy="50" r="40" stroke="#22c55e" :stroke-dasharray="`${pct(stats.docs_private, stats.docs) * 2.51} 251`" />
-              </svg>
-              <span class="ring-num">{{ pct(stats.docs_private, stats.docs) }}%</span>
-            </div>
-            <div class="ring-label">🔒 私密笔记</div>
-          </div>
-          <div class="ring-card">
-            <div class="ring-wrap">
-              <svg viewBox="0 0 100 100">
-                <circle class="ring-bg" cx="50" cy="50" r="40" />
-                <circle class="ring-val" cx="50" cy="50" r="40" stroke="#f59e0b" :stroke-dasharray="`${pct(stats.audit_pending, stats.docs) * 2.51} 251`" />
-              </svg>
-              <span class="ring-num">{{ pct(stats.audit_pending, stats.docs) }}%</span>
-            </div>
-            <div class="ring-label">🔍 待审占比</div>
-          </div>
-          <div class="ring-card">
-            <div class="ring-wrap">
-              <svg viewBox="0 0 100 100">
-                <circle class="ring-bg" cx="50" cy="50" r="40" />
-                <circle class="ring-val" cx="50" cy="50" r="40" stroke="#a855f7" :stroke-dasharray="`${pct(stats.ai_7, stats.ai_usage) * 2.51} 251`" />
-              </svg>
-              <span class="ring-num">{{ pct(stats.ai_7, stats.ai_usage) }}%</span>
-            </div>
-            <div class="ring-label">🤖 AI 近7天占比</div>
-          </div>
+        <div class="trend-card" style="margin-top: 14px;">
+          <h3>🥧 内容结构（点击放大高亮）</h3>
+          <div ref="pieChartRef" class="echart-box tall"></div>
         </div>
         <div class="dash-bottom">
           <div class="trend-card">
@@ -553,14 +496,20 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import { full as emoji } from 'markdown-it-emoji'
 import mdImgSize from '@/utils/mdImgSize.js'
+import * as echarts from 'echarts/core'
+import { PieChart, BarChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import api from '@/utils/api.js'
 import { useAuthStore } from '@/stores/auth.js'
 import VisibilitySelect from '@/components/VisibilitySelect.vue'
+
+echarts.use([PieChart, BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer])
 
 const router = useRouter()
 const route = useRoute()
@@ -634,6 +583,54 @@ const trendDays = computed(() => {
   return days
 })
 const dayCount = (arr, d) => (arr || []).find(x => String(x.date).startsWith(d))?.count || 0
+// ECharts 图表
+const barChartRef = ref(null)
+const pieChartRef = ref(null)
+let barChart = null
+let pieChart = null
+function initCharts() {
+  if (!barChartRef.value || barChart) return
+  barChart = echarts.init(barChartRef.value)
+  pieChart = echarts.init(pieChartRef.value)
+  window.addEventListener('resize', resizeCharts)
+}
+function resizeCharts() { barChart?.resize(); pieChart?.resize() }
+function renderCharts() {
+  if (!barChart) return
+  const days = trendDays.value.map(d => d.slice(5))
+  // 柱状：近 7 天用户/笔记
+  barChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['新增用户', '新增笔记'], textStyle: { color: 'var(--text2)' }, top: 0 },
+    grid: { left: 30, right: 10, top: 28, bottom: 4 },
+    xAxis: { type: 'category', data: days, axisLabel: { color: 'var(--text2)' }, axisLine: { lineStyle: { color: 'var(--border)' } } },
+    yAxis: { type: 'value', minInterval: 1, axisLabel: { color: 'var(--text2)' }, splitLine: { lineStyle: { color: 'var(--border)' } } },
+    series: [
+      { name: '新增用户', type: 'bar', data: trendDays.value.map(d => dayCount(stats.value.users_7, d)), itemStyle: { color: '#3b82f6', borderRadius: [3, 3, 0, 0] }, barWidth: 12 },
+      { name: '新增笔记', type: 'bar', data: trendDays.value.map(d => dayCount(stats.value.docs_7, d)), itemStyle: { color: '#22c55e', borderRadius: [3, 3, 0, 0] }, barWidth: 12 },
+    ],
+  })
+  // 环形饼图：内容结构（点击高亮放大）
+  pieChart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: {c}（{d}%）' },
+    legend: { bottom: 0, textStyle: { color: 'var(--text2)' } },
+    series: [{
+      type: 'pie',
+      radius: ['42%', '68%'],
+      center: ['50%', '44%'],
+      avoidLabelOverlap: true,
+      itemStyle: { borderRadius: 6, borderColor: 'var(--bg)', borderWidth: 2 },
+      label: { show: false },
+      emphasis: { scale: true, scaleSize: 8, label: { show: true, fontSize: 14, fontWeight: 700, formatter: '{b}\n{c}' } },
+      data: [
+        { value: stats.value.docs_public || 0, name: '公开笔记', itemStyle: { color: '#3b82f6' } },
+        { value: stats.value.docs_private || 0, name: '私密笔记', itemStyle: { color: '#22c55e' } },
+        { value: stats.value.audit_pending || 0, name: '待审笔记', itemStyle: { color: '#f59e0b' } },
+        { value: stats.value.ai_usage || 0, name: 'AI 使用', itemStyle: { color: '#a855f7' } },
+      ],
+    }],
+  })
+}
 // 柱状图高度（按最大值归一化）
 const usersMax = computed(() => Math.max(1, ...((stats.value.users_7) || []).map(x => x.count || 0)))
 const docsMax = computed(() => Math.max(1, ...((stats.value.docs_7) || []).map(x => x.count || 0)))
@@ -667,6 +664,13 @@ const auditLabel = s => ({ approved: '✅ 通过', pending: '⏳ 待审', blocke
 async function loadStats() {
   try { stats.value = (await api.get('/admin/stats')).data } catch (e) { /* 权限不足 */ }
 }
+// 数据就绪后初始化/渲染图表
+watch(stats, (s) => {
+  if (s && s.users !== undefined) {
+    initCharts()
+    renderCharts()
+  }
+})
 async function loadUsers(page) {
   uPage.value = page || 1
   try {
@@ -1021,6 +1025,12 @@ onMounted(async () => {
   loadManagers()
   loadAiLogs(1)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', resizeCharts)
+  barChart?.dispose()
+  pieChart?.dispose()
+})
 </script>
 
 <style scoped>
@@ -1071,6 +1081,8 @@ onMounted(async () => {
 /* 仪表盘底部：最新注册 / 最新笔记 */
 .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
 /* 圆环图 */
+.echart-box { width: 100%; height: 240px; }
+.echart-box.tall { height: 300px; }
 .rings-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 14px; }
 .ring-card { border: 1px solid var(--border); border-radius: 14px; background: var(--btn-bg); padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .ring-wrap { position: relative; width: 84px; height: 84px; }
