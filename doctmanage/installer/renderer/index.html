@@ -33,7 +33,11 @@
         <h1>知屿<span class="star-accent">✦</span></h1>
         <p class="tagline">把散落的笔记、截图与灵感，<br>汇成一座属于自己的知识岛。</p>
         <p class="desc">个人知识库 · 笔记 / 截图 / AI 助手 / 收藏，云端同步，随处访问。</p>
-        <button class="btn-primary" id="btnNext">开始安装 →</button>
+        <p class="installed-banner hidden" id="installedBanner">已安装于 <b id="installedDir"></b></p>
+        <div class="welcome-actions">
+          <button class="btn-primary" id="btnNext">开始安装 →</button>
+          <button class="btn-danger hidden" id="btnUninstall">卸载知屿</button>
+        </div>
       </div>
     </section>
 
@@ -132,10 +136,20 @@
       </div>
     </section>
 
-    <!-- ⑥ 完成页 -->
+    <!-- ⑦ 卸载确认页 -->
+    <section class="page hidden" id="pageUninstall">
+      <h2 class="p-title">卸载知屿？</h2>
+      <p class="p-sub">将删除 <b id="uninstallDir"></b> 下的程序、桌面快捷方式与开机自启项。<br>你的云端笔记数据不受影响（保存在服务器）。</p>
+      <div class="nav-row">
+        <button class="btn-ghost" id="btnUnBack">← 取消</button>
+        <button class="btn-danger" id="btnUnGo">确认卸载</button>
+      </div>
+    </section>
+
+    <!-- ⑧ 完成页（安装/卸载共用） -->
     <section class="page hidden" id="pageDone">
       <div class="done-icon">✓</div>
-      <h2>安装完成</h2>
+      <h2 id="doneTitle">安装完成</h2>
       <p class="done-desc" id="doneDir"></p>
       <div class="nav-row center">
         <button class="btn-primary" id="btnLaunch">启动知屿</button>

@@ -10,4 +10,8 @@ contextBridge.exposeInMainWorld('installer', {
   install: (payload) => ipcRenderer.invoke('install', payload),
   launchApp: (dir) => ipcRenderer.invoke('launch-app', dir),
   onProgress: (cb) => ipcRenderer.on('install-progress', (_e, d) => cb(d)),
+  getInstalled: () => ipcRenderer.invoke('get-installed'),
+  isUninstallMode: () => ipcRenderer.invoke('is-uninstall-mode'),
+  uninstall: (payload) => ipcRenderer.invoke('uninstall', payload),
+  finishUninstall: (payload) => ipcRenderer.invoke('finish-uninstall', payload),
 })

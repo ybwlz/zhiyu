@@ -8,6 +8,30 @@ const { execFile } = require('child_process')
 const os = require('os')
 
 const isDev = !app.isPackaged
+// 卸载模式：--uninstall（由卸载器 exe 带参启动）
+const isUninstallMode = process.argv.includes('--uninstall')
+// 卸载键（HKCU + HKLM 都查/写，兼容管理员安装）
+const UNINST_KEY = 'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\知屿'
+function regQueryString(subKey, name) {
+  return new Promise((resolve) => {
+    execFile('reg', ['query', subKey, '/v', name], (err, stdout) => {
+      if (err) return resolve('')
+      const m = stdout.match(/REG_SZ\s+(.+)/)
+      resolve(m ? m[1].trim() : '')
+    })
+  })
+}
+// 已安装信息：读注册表 InstallLocation（用户安装根目录）
+async function getInstalled() {
+  for (const hive of ['HKCU', 'HKLM']) {
+    const key = hive + '\\' + UNINST_KEY
+    const root = await regQueryString(key, 'InstallLocation')
+    if (root && fs.existsSync(path.join(root, '知屿', '知屿.exe'))) {
+      return { installed: true, root, appDir: path.join(root, '知屿'), uninstallDir: path.join(root, '卸载器') }
+    }
+  }
+  return { installed: false }
+}
 // 绿色版所在位置：打包后 extraResource 会放到 resources/知屿-win32-x64
 function greenDir() {
   if (isDev) return path.join(__dirname, '..', '..', '..', 'doctmanage', 'release', '知屿-win32-x64')
@@ -33,6 +57,16 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // --finalize：卸载收尾进程（临时副本）——静默删除整个安装目录（含卸载器自身）+ 临时副本后退出
+  if (process.argv.includes('--finalize')) {
+    const rootArg = process.argv.find(a => a.startsWith('--root='))
+    setTimeout(() => {
+      try { if (rootArg) fs.rmSync(rootArg.slice(7), { recursive: true, force: true }) } catch (e) { /* 忽略 */ }
+      try { fs.rmSync(process.execPath, { force: true }) } catch (e) { /* 忽略 */ }
+      app.exit(0)
+    }, 1200)
+    return
+  }
   const win = createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
@@ -77,7 +111,10 @@ ipcMain.handle('install', async (e, payload) => {
   const send = (stage, pct, msg) => win.webContents.send('install-progress', { stage, pct, msg })
   try {
     const src = greenDir()
-    const target = payload.targetDir
+    // 二级目录结构：<root>\知屿\（主程序）+ <root>\卸载器\（卸载入口）
+    const root = payload.targetDir
+    const target = path.join(root, '知屿')
+    const uninstallDir = path.join(root, '卸载器')
     if (!fs.existsSync(src)) throw new Error('安装资源缺失：' + src)
 
     // 1. 创建目标目录
@@ -139,10 +176,20 @@ ipcMain.handle('install', async (e, payload) => {
       await setAutoStart(path.join(target, '知屿.exe'))
     }
 
+    // 6. 卸载入口：复制安装器 exe → <root>\卸载器\知屿卸载.exe（双击即进入卸载界面）
+    send('copy', 90, '创建卸载入口…')
+    try {
+      await fsp.mkdir(uninstallDir, { recursive: true })
+      await fsp.copyFile(process.execPath, path.join(uninstallDir, '知屿卸载.exe'))
+    } catch (e) { /* 复制失败不中断 */ }
+
+    // 7. 注册卸载信息（控制面板「程序和功能」可卸载）
+    await registerUninstall(root, target, uninstallDir)
+
     send('copy', 95, '完成安装配置…')
     await new Promise(r => setTimeout(r, 300))
     send('done', 100, '安装完成')
-    return { ok: true, target }
+    return { ok: true, target: root }
   } catch (err) {
     send('error', 0, String(err && err.message || err))
     return { ok: false, error: String(err && err.message || err) }
@@ -172,9 +219,73 @@ function setAutoStart(exe) {
   })
 }
 
-// ── 安装完成：启动知屿（可选） ──
-ipcMain.handle('launch-app', (e, targetDir) => {
-  const exe = path.join(targetDir, '知屿.exe')
+// ── 安装完成：启动知屿（可选，exe 在 <root>\知屿\ 子目录） ──
+ipcMain.handle('launch-app', (e, root) => {
+  const exe = path.join(root, '知屿', '知屿.exe')
   if (fs.existsSync(exe)) execFile(exe, [], { detached: true, stdio: 'ignore' }).unref()
   return true
 })
+
+// ── 注册卸载信息（控制面板「程序和功能」） ──
+function registerUninstall(root, appDir, uninstallDir) {
+  const uninstaller = path.join(uninstallDir, '知屿卸载.exe')
+  const run = (args) => new Promise(r => execFile('reg', args, () => r()))
+  return Promise.all([
+    run(['add', 'HKCU\\' + UNINST_KEY, '/f', '/v', 'DisplayName', '/t', 'REG_SZ', '/d', '知屿']),
+    run(['add', 'HKCU\\' + UNINST_KEY, '/f', '/v', 'DisplayVersion', '/t', 'REG_SZ', '/d', '1.2.0']),
+    run(['add', 'HKCU\\' + UNINST_KEY, '/f', '/v', 'Publisher', '/t', 'REG_SZ', '/d', '知屿']),
+    run(['add', 'HKCU\\' + UNINST_KEY, '/f', '/v', 'DisplayIcon', '/t', 'REG_SZ', '/d', path.join(appDir, '知屿.exe') + ',0']),
+    run(['add', 'HKCU\\' + UNINST_KEY, '/f', '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', root]),
+    run(['add', 'HKCU\\' + UNINST_KEY, '/f', '/v', 'UninstallString', '/t', 'REG_SZ', '/d', '"' + uninstaller + '" --uninstall']),
+    run(['add', 'HKCU\\' + UNINST_KEY, '/f', '/v', 'EstimatedSize', '/t', 'REG_DWORD', '/d', '220000']),
+  ])
+}
+
+// ── 卸载：删除主程序目录/快捷方式/注册表/开机自启（卸载器目录最后自删） ──
+ipcMain.handle('uninstall', async (e, { root }) => {
+  const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+  const send = (stage, pct, msg) => win && win.webContents.send('install-progress', { stage, pct, msg })
+  try {
+    send('uninstall', 10, '结束知屿进程…')
+    execFile('taskkill', ['/f', '/im', '知屿.exe'], () => {})
+    execFile('reg', ['delete', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', '知屿', '/f'], () => {})
+    await new Promise(r => setTimeout(r, 600))
+
+    // 删除桌面快捷方式（用户桌面 + 公共桌面）
+    send('uninstall', 30, '删除快捷方式…')
+    for (const dir of [path.join(os.homedir(), 'Desktop'), path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')]) {
+      try { const p = path.join(dir, '知屿.lnk'); if (fs.existsSync(p)) fs.rmSync(p, { force: true }) } catch (e) { /* 忽略 */ }
+    }
+
+    // 删除注册表卸载项
+    send('uninstall', 45, '删除注册表项…')
+    execFile('reg', ['delete', 'HKCU\\' + UNINST_KEY, '/f'], () => {})
+    execFile('reg', ['delete', 'HKLM\\' + UNINST_KEY, '/f'], () => {})
+
+    // 删除主程序目录
+    send('uninstall', 60, '删除安装目录…')
+    if (root) { try { fs.rmSync(path.join(root, '知屿'), { recursive: true, force: true }) } catch (e) { /* 忽略 */ } }
+
+    send('uninstall', 90, '清理完成')
+    await new Promise(r => setTimeout(r, 250))
+    send('done', 100, '已卸载')
+    return { ok: true }
+  } catch (err) {
+    send('error', 0, String(err && err.message || err))
+    return { ok: false, error: String(err && err.message || err) }
+  }
+})
+
+// ── 卸载收尾：复制自己到临时目录，静默删除整个安装目录（含卸载器自身）后退出 ──
+ipcMain.handle('finish-uninstall', async (e, { root }) => {
+  try {
+    const tmp = path.join(os.tmpdir(), 'zhiyu-uninstall-tmp.exe')
+    await fsp.copyFile(process.execPath, tmp)
+    execFile(tmp, ['--finalize', '--root=' + root], { detached: true, stdio: 'ignore' }).unref()
+  } catch (e) { /* 忽略 */ }
+  app.exit(0)
+})
+
+// ── 已安装检测 / 卸载模式 ──
+ipcMain.handle('get-installed', () => getInstalled())
+ipcMain.handle('is-uninstall-mode', () => isUninstallMode)

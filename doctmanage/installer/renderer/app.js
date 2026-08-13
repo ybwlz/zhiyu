@@ -120,7 +120,7 @@ $('btnInstall').onclick = async () => {
   })
   if (result && result.ok) {
     installDoneDir = result.target
-    setTimeout(() => { $('doneDir').textContent = '已安装到：' + installDoneDir; showPage('pageDone') }, 600)
+    setTimeout(() => { $('doneDir').textContent = '已安装到：' + installDoneDir; $('doneTitle').textContent = '安装完成'; $('btnLaunch').classList.remove('hidden'); showPage('pageDone') }, 600)
   }
 }
 
@@ -131,6 +131,49 @@ api.onProgress(({ stage, pct, msg }) => {
   if (msg) $('progressTxt').textContent = msg
 })
 
-// ⑥ 完成
+// ⑥ 完成（安装 / 卸载共用）
 $('btnLaunch').onclick = () => { api.launchApp(installDoneDir); api.close() }
-$('btnFinish').onclick = () => api.close()
+let uninstallFlow = false
+$('btnFinish').onclick = () => {
+  if (uninstallFlow) { api.finishUninstall({ root: installed && installed.root }); return }
+  api.close()
+}
+
+// ── 已安装检测 / 卸载模式 ──
+let installed = null
+let isUninstallMode = false
+;(async () => {
+  try { installed = await api.getInstalled() } catch (e) {}
+  try { isUninstallMode = await api.isUninstallMode() } catch (e) {}
+  if (installed && installed.installed) {
+    $('installedBanner').classList.remove('hidden')
+    $('installedDir').textContent = installed.root
+    $('btnUninstall').classList.remove('hidden')
+  }
+  // --uninstall 模式（卸载器双击）：直接进入卸载确认页
+  if (isUninstallMode && installed && installed.installed) {
+    $('uninstallDir').textContent = installed.root
+    showPage('pageUninstall')
+  }
+})()
+
+// 卸载
+$('btnUninstall').onclick = () => {
+  $('uninstallDir').textContent = installed.root
+  showPage('pageUninstall')
+}
+$('btnUnBack').onclick = () => showPage('pageWelcome')
+$('btnUnGo').onclick = async () => {
+  showPage('pageInstall')
+  const result = await api.uninstall({ root: installed.root })
+  if (result && result.ok) {
+    uninstallFlow = true
+    setTimeout(() => {
+      $('doneTitle').textContent = '卸载完成'
+      $('doneDir').textContent = '知屿 已从你的电脑移除。云端笔记数据仍然保留，随时可重新安装。'
+      $('btnLaunch').classList.add('hidden')
+      $('btnFinish').textContent = '完成'
+      showPage('pageDone')
+    }, 600)
+  }
+}

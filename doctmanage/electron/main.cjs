@@ -155,6 +155,8 @@ app.whenReady().then(() => {
       autoHideMenuBar: true,
       title: '知屿',
       backgroundColor: '#070b16',
+      // 首帧渲染完成后再显示，避免启动白屏/黑屏空窗
+      show: false,
       // 自定义深色标题栏（跟随知屿星空主题，Windows 10+ 生效）
       titleBarStyle: 'hidden',
       // 窗口按钮（- □ ×）由前端绘制（WindowControls），背景完全融入导航栏/主题
@@ -162,6 +164,8 @@ app.whenReady().then(() => {
         contextIsolation: true,
         nodeIntegration: false,
         spellcheck: false,
+        // 前台首帧不节流，加快首屏渲染
+        backgroundThrottling: false,
         preload: require('path').join(__dirname, 'preload.cjs'),
       },
     })
@@ -300,6 +304,10 @@ app.whenReady().then(() => {
       if (upd && !win.isDestroyed()) win.webContents.send('update-available', upd)
     }, 8000)
     win.loadURL('http://127.0.0.1:' + port + '/')
+    // 首帧渲染完成后再显示（避免白屏/黑屏空窗）
+    win.once('ready-to-show', () => win.show())
+    // 兜底：8 秒仍未就绪也强制显示，避免窗口一直不可见
+    setTimeout(() => { if (!win.isDestroyed() && !win.isVisible()) win.show() }, 8000)
     // ── 系统托盘：点 × 隐藏到托盘（菜单栏常驻），托盘菜单可退出 ──
     win.on('close', (e) => {
       if (!isQuiting) { e.preventDefault(); win.hide() }

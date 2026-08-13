@@ -1100,7 +1100,8 @@ const nextDoc = computed(() => {
                   <button class="ai-pv-apply" type="button" @click="applyAiPreview">✓ 应用修改</button>
                 </div>
               </div>
-              <div v-if="docLoading" class="doc-loading">加载中…</div>              <div v-else-if="!currentDoc" class="doc-empty">📖 从左侧列表选择一篇笔记开始阅读</div>
+              <div v-if="docLoading" class="doc-loading">加载中…</div>
+              <div v-else-if="!currentDoc" class="doc-empty">{{ auth.isLogin ? '📖 从左侧列表选择一篇笔记开始阅读' : '🔑 请先登录后使用阅览室' }}</div>
               <div v-else class="markdown-body" v-html="rendered" @click="onContentClick"></div>
               <!-- 附件：上传的文件（PDF/Office 等）可下载 -->
               <div v-if="currentDoc && currentDoc.attachment" class="doc-attachment">
