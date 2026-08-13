@@ -8,8 +8,8 @@ const { execFile } = require('child_process')
 const os = require('os')
 
 const isDev = !app.isPackaged
-// 卸载模式：--uninstall（由卸载器 exe 带参启动）
-const isUninstallMode = process.argv.includes('--uninstall')
+// 卸载模式：--uninstall 参数，或 exe 文件名含「卸载」（双击 知屿卸载.exe 直接进卸载界面）
+const isUninstallMode = process.argv.includes('--uninstall') || path.basename(process.execPath).includes('卸载')
 // 卸载键（HKCU + HKLM 都查/写，兼容管理员安装）
 const UNINST_KEY = 'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\知屿'
 function regQueryString(subKey, name) {
@@ -177,15 +177,17 @@ ipcMain.handle('install', async (e, payload) => {
     }
 
     // 6. 卸载入口：复制安装器完整运行文件（exe + dll + resources，排除绿色版）→ <root>\卸载器\
-    //    （只复制 exe 会导致 Electron 缺 icudtl/dll 报 ICU 错误）
+    //    统一命名为「知屿卸载.exe」（不复制原「知屿安装器.exe」，避免同文件两份）
     send('copy', 90, '创建卸载入口…')
     try {
       await fsp.mkdir(uninstallDir, { recursive: true })
+      const selfName = path.basename(process.execPath)
       await fsp.cp(path.dirname(process.execPath), uninstallDir, {
         recursive: true,
         force: true,
-        filter: (src) => !src.includes('知屿-win32-x64'),
+        filter: (src) => !src.includes('知屿-win32-x64') && path.basename(src) !== selfName,
       })
+      await fsp.copyFile(process.execPath, path.join(uninstallDir, '知屿卸载.exe'))
     } catch (e) { /* 复制失败不中断 */ }
 
     // 7. 注册卸载信息（控制面板「程序和功能」可卸载）
