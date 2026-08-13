@@ -95,6 +95,15 @@ function createTray() {
   } catch (e) { /* 托盘创建失败不阻塞 */ }
 }
 
+// 单实例：二次启动（桌面图标/任务栏）激活已有窗口，固定端口下避免 EADDRINUSE
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    const w = BrowserWindow.getAllWindows()[0]
+    if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus() }
+  })
+
 app.whenReady().then(() => {
   const server = http.createServer((req, res) => {    const u = new URL(req.url, 'http://127.0.0.1')
     const p = decodeURIComponent(u.pathname)
@@ -300,6 +309,7 @@ app.whenReady().then(() => {
     ipcMain.on('quit-app', () => { isQuiting = true; app.quit() })
   })
 })
+} // end single-instance lock
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
