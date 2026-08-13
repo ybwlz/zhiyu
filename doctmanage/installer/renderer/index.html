@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知屿 安装</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-blur"></div>
+  <div class="bg-glow"></div>
+  <div class="stars"></div>
+
+  <!-- 自绘标题栏 -->
+  <div class="titlebar">
+    <div class="tb-brand">知屿</div>
+    <div class="tb-btns">
+      <button class="tb-btn" id="btnMin">─</button>
+      <button class="tb-btn" id="btnMax">▢</button>
+      <button class="tb-btn close" id="btnClose">✕</button>
+    </div>
+  </div>
+
+  <main class="stage">
+    <!-- ① 欢迎页 -->
+    <section class="page" id="pageWelcome">
+      <div class="hero">
+        <div class="logo">
+          <svg viewBox="0 0 64 64" width="46" height="46">
+            <path d="M31 7 C 37 7, 39 11, 34 16 A 10 10 0 0 0 34 36 A 16 16 0 0 0 34 58 A 16 16 0 0 0 34 26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1>知屿<span class="star-accent">✦</span></h1>
+        <p class="tagline">把散落的笔记、截图与灵感，<br>汇成一座属于自己的知识岛。</p>
+        <p class="desc">个人知识库 · 笔记 / 截图 / AI 助手 / 收藏，云端同步，随处访问。</p>
+        <button class="btn-primary" id="btnNext">开始安装 →</button>
+      </div>
+    </section>
+
+    <!-- ② 功能预览页 -->
+    <section class="page hidden" id="pagePreview">
+      <div class="pv-hero">
+        <div class="pv-logo">
+          <svg viewBox="0 0 64 64" width="34" height="34">
+            <path d="M31 7 C 37 7, 39 11, 34 16 A 10 10 0 0 0 34 36 A 16 16 0 0 0 34 58 A 16 16 0 0 0 34 26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="p-title" style="margin:0">一座知识岛，装下你的一切</h2>
+          <p class="p-sub" style="margin:6px 0 0">笔记、截图、灵感、AI，全都安放在一起。</p>
+        </div>
+      </div>
+      <div class="feat-grid">
+        <div class="feat-card"><div class="feat-icon">📝</div><div class="feat-name">Markdown 笔记</div><div class="feat-desc">代码高亮、公式渲染、自定义容器，把笔记写得漂亮。</div></div>
+        <div class="feat-card"><div class="feat-icon">✂️</div><div class="feat-name">截图与附件</div><div class="feat-desc">粘贴即存、图片可拉伸标注，灵感随手收下。</div></div>
+        <div class="feat-card"><div class="feat-icon">🤖</div><div class="feat-name">AI 助手</div><div class="feat-desc">DeepSeek 驱动：问答、总结、辅助写作，随叫随到。</div></div>
+        <div class="feat-card"><div class="feat-icon">⛅</div><div class="feat-name">云端同步</div><div class="feat-desc">网页 / 桌面多端登录，笔记随时随取。</div></div>
+        <div class="feat-card"><div class="feat-icon">📚</div><div class="feat-name">阅览室与广场</div><div class="feat-desc">收藏、阅读、分享，构建自己的知识体系。</div></div>
+        <div class="feat-card"><div class="feat-icon">🎨</div><div class="feat-name">多主题界面</div><div class="feat-desc">深空星际 / 晴空 / 简约，风格随你切换。</div></div>
+      </div>
+      <div class="nav-row">
+        <button class="btn-ghost" id="btnPvBack">← 上一步</button>
+        <button class="btn-primary" id="btnPvNext">下一步：选择主题 →</button>
+      </div>
+    </section>
+
+    <!-- ③ 主题选择页 -->
+    <section class="page hidden" id="pageTheme">
+      <h2 class="p-title">选择你的主题</h2>
+      <p class="p-sub">安装后默认使用，随时可在设置里切换。</p>
+      <div class="themes-tree">
+        <div class="theme-row" data-theme="starlight">
+          <div class="tr-left">
+            <div class="tr-name">深空星际 <span class="tr-tag">默认</span></div>
+            <div class="tr-desc">深邃蓝紫夜空，沉浸式阅读，暗光环境更护眼。</div>
+          </div>
+          <div class="tr-right"><div class="tc-preview starlight"></div></div>
+        </div>
+        <div class="theme-row" data-theme="sky">
+          <div class="tr-left">
+            <div class="tr-name">晴空</div>
+            <div class="tr-desc">清爽浅蓝天空，明亮通透，白天用着舒服。</div>
+          </div>
+          <div class="tr-right"><div class="tc-preview sky"></div></div>
+        </div>
+        <div class="theme-row" data-theme="minimal">
+          <div class="tr-left">
+            <div class="tr-name">简约</div>
+            <div class="tr-desc">干净灰白，少干扰，专注内容本身。</div>
+          </div>
+          <div class="tr-right"><div class="tc-preview minimal"></div></div>
+        </div>
+      </div>
+      <div class="nav-row">
+        <button class="btn-ghost" id="btnThBack">← 上一步</button>
+        <button class="btn-primary" id="btnThNext">下一步 →</button>
+      </div>
+    </section>
+
+    <!-- ④ 安装配置页 -->
+    <section class="page hidden" id="pageConfig">
+      <h2 class="p-title">安装配置</h2>
+      <div class="cfg-block">
+        <div class="cfg-label">安装位置</div>
+        <div class="dir-row">
+          <input type="text" id="dirInput" readonly />
+          <button class="btn-ghost" id="btnBrowse">浏览…</button>
+        </div>
+      </div>
+      <div class="cfg-block opts">
+        <label class="opt"><input type="checkbox" id="optShortcut" checked /><span>创建桌面快捷方式</span></label>
+        <label class="opt"><input type="checkbox" id="optAutoStart" checked /><span>开机自启动</span></label>
+      </div>
+      <div class="cfg-block agree">
+        <label class="opt"><input type="checkbox" id="optAgree" checked /><span>我已阅读并同意</span>
+          <a class="agree-link" id="linkTerms">《服务条款》</a>和<a class="agree-link" id="linkPrivacy">《隐私协议》</a>
+        </label>
+      </div>
+      <div class="nav-row">
+        <button class="btn-ghost" id="btnBack">← 上一步</button>
+        <button class="btn-primary" id="btnInstall">安装</button>
+      </div>
+    </section>
+
+    <!-- ⑤ 安装进度页 -->
+    <section class="page hidden" id="pageInstall">
+      <h2 class="p-title">正在安装</h2>
+      <div class="progress-wrap">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-txt" id="progressTxt">准备中…</div>
+        <div class="progress-pct" id="progressPct">0%</div>
+      </div>
+    </section>
+
+    <!-- ⑥ 完成页 -->
+    <section class="page hidden" id="pageDone">
+      <div class="done-icon">✓</div>
+      <h2>安装完成</h2>
+      <p class="done-desc" id="doneDir"></p>
+      <div class="nav-row center">
+        <button class="btn-primary" id="btnLaunch">启动知屿</button>
+        <button class="btn-ghost" id="btnFinish">完成</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- 条款弹窗 -->
+  <div class="terms-modal hidden" id="termsModal">
+    <div class="terms-box">
+      <div class="terms-head"><b id="termsTitle">服务条款</b><button class="tb-btn close" id="btnTermsClose">✕</button></div>
+      <div class="terms-body" id="termsBody"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

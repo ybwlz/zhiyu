@@ -453,9 +453,12 @@ export default {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--brand-1) 7%, transparent), transparent);
 }
-/* 头像+名字块：占据中间并居中（返回在左、清空在右） */
-.chat-head .ch-user { flex: 1; justify-content: center; }
+/* 头像+名字块：PC 靠左；移动端居中（返回在左、清空在右） */
+.chat-head .ch-user { flex: 1; justify-content: flex-start; }
 .ch-user { display: flex; align-items: center; gap: 11px; cursor: pointer; }
+@media (max-width: 720px) {
+  .chat-head .ch-user { justify-content: center; }
+}
 .ch-avatar {
   width: 42px; height: 42px; border-radius: 50%; overflow: hidden;
   background: linear-gradient(135deg, color-mix(in srgb, var(--brand-1) 70%, transparent), color-mix(in srgb, var(--brand-2) 60%, transparent));

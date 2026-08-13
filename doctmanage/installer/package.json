@@ -1,0 +1,15 @@
+{
+  "name": "zhiyu-installer",
+  "version": "1.0.0",
+  "description": "知屿 自绘安装器（Electron）",
+  "main": "main.cjs",
+  "author": "知屿",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-packager . 知屿安装 --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico --extraResource=../../doctmanage/release/知屿-win32-x64 --extraResource=../../electron/icon.ico"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0"
+  }
+}
