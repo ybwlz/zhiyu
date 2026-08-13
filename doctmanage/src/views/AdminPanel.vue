@@ -77,18 +77,18 @@
         <h2 class="ap-title">📄 笔记管理</h2>
         <div class="toolbar">
           <input v-model="dQuery" class="ap-input" placeholder="搜索标题/作者" @keyup.enter="loadDocs(1)" />
-          <select v-model="dVis" class="ap-input sel" @change="loadDocs(1)">
-            <option value="">全部可见性</option>
-            <option value="public">公开</option>
-            <option value="private">私密</option>
-          </select>
-          <select v-model="dAudit" class="ap-input sel" @change="loadDocs(1)">
-            <option value="">全部审核</option>
-            <option value="pending">待审</option>
-            <option value="approved">已通过</option>
-            <option value="blocked">已拒绝</option>
-          </select>
-          <button class="ap-btn" @click="loadDocs(1)">筛选</button>
+          <div class="filter-seg">
+            <button :class="{ on: dVis === '' }" @click="dVis = ''; loadDocs(1)">全部</button>
+            <button :class="{ on: dVis === 'public' }" @click="dVis = 'public'; loadDocs(1)">公开</button>
+            <button :class="{ on: dVis === 'private' }" @click="dVis = 'private'; loadDocs(1)">私密</button>
+          </div>
+          <div class="filter-seg">
+            <button :class="{ on: dAudit === '' }" @click="dAudit = ''; loadDocs(1)">全部审核</button>
+            <button :class="{ on: dAudit === 'pending' }" @click="dAudit = 'pending'; loadDocs(1)">待审</button>
+            <button :class="{ on: dAudit === 'approved' }" @click="dAudit = 'approved'; loadDocs(1)">通过</button>
+            <button :class="{ on: dAudit === 'blocked' }" @click="dAudit = 'blocked'; loadDocs(1)">拒绝</button>
+          </div>
+          <button class="ap-btn" @click="loadDocs(1)">搜索</button>
         </div>
         <table class="ap-table">
           <thead><tr><th>ID</th><th>标题</th><th>作者</th><th>可见性</th><th>审核</th><th>更新时间</th><th>操作</th></tr></thead>
@@ -333,6 +333,39 @@
           </div>
         </div>
       </div>
+
+      <!-- 自研确认弹窗 -->
+      <div v-if="confirmState" class="modal-mask" @click.self="confirmCancel">
+        <div class="modal small">
+          <div class="modal-head"><b>{{ confirmState.title }}</b><button class="modal-close" @click="confirmCancel">✕</button></div>
+          <div class="modal-body">{{ confirmState.msg }}</div>
+          <div class="modal-foot">
+            <button class="ap-btn ghost" @click="confirmCancel">取消</button>
+            <button class="ap-btn" :class="{ danger: confirmState.danger }" @click="confirmOk">确定</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 自研输入弹窗 -->
+      <div v-if="promptState" class="modal-mask" @click.self="promptCancel">
+        <div class="modal small">
+          <div class="modal-head"><b>{{ promptState.title }}</b><button class="modal-close" @click="promptCancel">✕</button></div>
+          <div class="modal-body">
+            <input v-model="promptState.value" class="ap-input w100" :placeholder="promptState.placeholder" @keyup.enter="promptOk" />
+          </div>
+          <div class="modal-foot">
+            <button class="ap-btn ghost" @click="promptCancel">取消</button>
+            <button class="ap-btn" @click="promptOk">确定</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 主题 toast -->
+      <div class="ap-toasts">
+        <TransitionGroup name="toast">
+          <div v-for="t in toasts" :key="t.id" class="ap-toast" :class="t.type">{{ t.msg }}</div>
+        </TransitionGroup>
+      </div>
     </main>
   </div>
 </template>
@@ -361,6 +394,31 @@ const menus = [
 ]
 const mod = ref('dash')
 const currentMenu = computed(() => menus.find(m => m.id === mod.value))
+
+// ── 自研弹窗/提示（替换默认 alert/confirm/prompt） ──
+const toasts = ref([])
+let toastId = 0
+const toast = (msg, type = 'ok') => {
+  const id = ++toastId
+  toasts.value.push({ id, msg, type })
+  setTimeout(() => { toasts.value = toasts.value.filter(t => t.id !== id) }, 2600)
+}
+const confirmState = ref(null)
+const confirmResolve = ref(null)
+const askConfirm = ({ title, msg, danger = false }) => new Promise(res => {
+  confirmResolve.value = res
+  confirmState.value = { title, msg, danger }
+})
+const confirmOk = () => { const r = confirmResolve.value; confirmState.value = null; confirmResolve.value = null; r?.(true) }
+const confirmCancel = () => { const r = confirmResolve.value; confirmState.value = null; confirmResolve.value = null; r?.(false) }
+const promptState = ref(null)
+const promptResolve = ref(null)
+const askPrompt = ({ title, placeholder = '' }) => new Promise(res => {
+  promptResolve.value = res
+  promptState.value = { title, placeholder, value: '' }
+})
+const promptOk = () => { const r = promptResolve.value; const v = promptState.value?.value ?? ''; promptState.value = null; promptResolve.value = null; r?.(v) }
+const promptCancel = () => { const r = promptResolve.value; promptState.value = null; promptResolve.value = null; r?.(null) }
 
 const goBack = () => router.push('/')
 
@@ -436,25 +494,27 @@ async function previewDoc(d) {
   }
 }
 
-async function banUser(u) { if (!confirm(`确认封禁 ${u.username}？`)) return; try { await api.post(`/admin/users/${u.id}/ban`); alert('已封禁'); loadUsers(uPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
-async function unbanUser(u) { try { await api.post(`/admin/users/${u.id}/unban`); alert('已解封'); loadUsers(uPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
-async function delUser(u) { if (!confirm(`确认删除用户 ${u.username}？其全部数据将被清除！`)) return; try { await api.delete(`/admin/users/${u.id}`); alert('已删除'); loadUsers(uPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
-function openManager(u) {
+async function banUser(u) { if (!(await askConfirm({ title: '封禁用户', msg: `确认封禁 ${u.username}？封禁后其公开笔记会隐藏。`, danger: true }))) return; try { await api.post(`/admin/users/${u.id}/ban`); toast('已封禁 ' + u.username); loadUsers(uPage.value) } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') } }
+async function unbanUser(u) { try { await api.post(`/admin/users/${u.id}/unban`); toast('已解封 ' + u.username); loadUsers(uPage.value) } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') } }
+async function delUser(u) { if (!(await askConfirm({ title: '删除用户', msg: `确认删除用户 ${u.username}？其全部笔记/评论/数据将被清除，不可恢复！`, danger: true }))) return; try { await api.delete(`/admin/users/${u.id}`); toast('已删除用户'); loadUsers(uPage.value) } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') } }
+async function openManager(u) {
   // 用户列表一键设为辅助管理员（默认：审核/笔记/评论），精细权限在「管理员」模块调整
-  if (!confirm(`确认将 ${u.username} 设为辅助管理员？（默认权限：审核/笔记/评论）`)) return
-  api.post('/admin/managers', { user_id: u.id, role: 'moderator', perms: ['audit', 'notes', 'comments'] })
-    .then(() => { alert('已设为辅助管理员，可在「管理员」模块调整其权限'); loadUsers(uPage.value) })
-    .catch(e => alert(e.response?.data?.error || '操作失败'))
+  if (!(await askConfirm({ title: '设为辅助管理员', msg: `确认将 ${u.username} 设为辅助管理员？（默认权限：审核/笔记/评论）` }))) return
+  try {
+    await api.post('/admin/managers', { user_id: u.id, role: 'moderator', perms: ['audit', 'notes', 'comments'] })
+    toast('已设为辅助管理员，可在「管理员」模块调整权限')
+    loadUsers(uPage.value)
+  } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 
-async function unpublishDoc(d) { if (!confirm(`确认下架「${d.title}」？`)) return; try { await api.post(`/admin/docs/${d.id}/unpublish`); alert('已下架'); loadDocs(dPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
-async function delDoc(d) { if (!confirm(`确认删除笔记「${d.title}」？`)) return; try { await api.delete(`/admin/docs/${d.id}`); alert('已删除'); loadDocs(dPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
+async function unpublishDoc(d) { if (!(await askConfirm({ title: '下架笔记', msg: `确认下架「${d.title}」？（转为私密）`, danger: true }))) return; try { await api.post(`/admin/docs/${d.id}/unpublish`); toast('已下架'); loadDocs(dPage.value) } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') } }
+async function delDoc(d) { if (!(await askConfirm({ title: '删除笔记', msg: `确认删除笔记「${d.title}」？不可恢复！`, danger: true }))) return; try { await api.delete(`/admin/docs/${d.id}`); toast('已删除笔记'); loadDocs(dPage.value) } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') } }
 
-async function approveAudit(a) { try { await api.post(`/admin/audits/${a.id}/approve`); alert('已通过'); loadAudits(aPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
+async function approveAudit(a) { try { await api.post(`/admin/audits/${a.id}/approve`); toast('已通过审核'); loadAudits(aPage.value) } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') } }
 async function rejectAudit(a) {
-  const reason = prompt('拒绝原因：', '违规内容')
-  if (reason === null) return
-  try { await api.post(`/admin/audits/${a.id}/reject`, { reason }); alert('已拒绝并下架'); loadAudits(aPage.value) } catch (e) { alert(e.response?.data?.error || '失败') }
+  const reason = await askPrompt({ title: '拒绝原因', placeholder: '违规内容（将记录并通知）' })
+  if (reason === null || !reason.trim()) return
+  try { await api.post(`/admin/audits/${a.id}/reject`, { reason }); toast('已拒绝并下架'); loadAudits(aPage.value) } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 
 // ── 评论管理 ──
@@ -471,8 +531,8 @@ async function loadComments(page) {
   } catch (e) { /* 权限不足 */ }
 }
 async function delComment(c) {
-  if (!confirm('确认删除该评论？')) return
-  try { await api.delete(`/admin/comments/${c.id}`); alert('已删除'); loadComments(cPage.value) } catch (e) { alert(e.response?.data?.error || '失败') }
+  if (!(await askConfirm({ title: '删除评论', msg: '确认删除该评论？', danger: true }))) return
+  try { await api.delete(`/admin/comments/${c.id}`); toast('已删除评论'); loadComments(cPage.value) } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 
 // ── 知屿币 ──
@@ -483,13 +543,13 @@ const coinLogs = ref([])
 const coinTotal = ref(0)
 const coinPage = ref(1)
 async function grantCoins() {
-  if (!coinUid.value || !coinAmount.value || coinAmount.value <= 0) { alert('请填写用户和数量'); return }
+  if (!coinUid.value || !coinAmount.value || coinAmount.value <= 0) { toast('请填写用户和数量', 'err'); return }
   try {
     await api.post('/admin/coins/grant', { user_id: Number(coinUid.value) || coinUid.value, amount: coinAmount.value, note: coinNote.value })
-    alert('发放成功，用户已收到通知')
+    toast(`已给用户发放 ${coinAmount.value} 知屿币`)
     coinNote.value = ''
     loadCoins(1)
-  } catch (e) { alert(e.response?.data?.error || '失败') }
+  } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 async function loadCoins(page) {
   coinPage.value = page || 1
@@ -509,13 +569,13 @@ const codeList = ref([])
 const codeTotal = ref(0)
 const codePage = ref(1)
 async function genCodes() {
-  if (!codeAmount.value || codeAmount.value <= 0) { alert('请填写面值'); return }
+  if (!codeAmount.value || codeAmount.value <= 0) { toast('请填写面值', 'err'); return }
   try {
     const r = (await api.post('/admin/codes/generate', { amount: codeAmount.value, count: codeCount.value, days: codeDays.value })).data
     newCodes.value = r.codes || []
-    alert(`已生成 ${newCodes.value.length} 个兑换码（可复制）`)
+    toast(`已生成 ${newCodes.value.length} 个兑换码`)
     loadCodes(1)
-  } catch (e) { alert(e.response?.data?.error || '失败') }
+  } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 async function loadCodes(page) {
   codePage.value = page || 1
@@ -525,10 +585,10 @@ async function loadCodes(page) {
     codeTotal.value = r.total || 0
   } catch (e) { /* 权限不足 */ }
 }
-function copyCode(c) { navigator.clipboard?.writeText(c).then(() => alert('已复制：' + c)) }
+function copyCode(c) { navigator.clipboard?.writeText(c).then(() => toast('已复制：' + c)) }
 function copyAllCodes() {
   const all = newCodes.value.join('\n')
-  navigator.clipboard?.writeText(all).then(() => alert('已复制全部兑换码'))
+  navigator.clipboard?.writeText(all).then(() => toast(`已复制全部 ${newCodes.value.length} 个兑换码`))
 }
 
 // ── 通知 ──
@@ -537,13 +597,13 @@ const noticeUid = ref('')
 const noticeTitle = ref('')
 const noticeContent = ref('')
 async function sendNotice() {
-  if (!noticeContent.value.trim()) { alert('通知内容不能为空'); return }
+  if (!noticeContent.value.trim()) { toast('通知内容不能为空', 'err'); return }
   try {
     const target = noticeTarget.value === 'all' ? 'all' : [Number(noticeUid.value)]
     const r = (await api.post('/admin/notices', { target, title: noticeTitle.value, content: noticeContent.value })).data
-    alert(`已发送给 ${r.sent} 位用户`)
+    toast(`已发送给 ${r.sent} 位用户`)
     noticeContent.value = ''
-  } catch (e) { alert(e.response?.data?.error || '失败') }
+  } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 
 // ── 管理员管理 ──
@@ -556,18 +616,18 @@ async function loadManagers() {
 }
 async function setManager(role, uid) {
   const target = uid || Number(mgrUid.value)
-  if (!target) { alert('请填写用户 ID'); return }
+  if (!target) { toast('请填写用户 ID 或用户名', 'err'); return }
   const perms = role === 'moderator' ? ['audit', 'notes', 'comments'] : []
   try {
     await api.post('/admin/managers', { user_id: target, role, perms })
-    alert(role === 'moderator' ? '已设为辅助管理员（默认：审核/笔记/评论）' : '已取消管理员')
+    toast(role === 'moderator' ? '已设为辅助管理员（默认：审核/笔记/评论）' : '已取消管理员')
     loadManagers()
-  } catch (e) { alert(e.response?.data?.error || '失败') }
+  } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 async function togglePerm(m, p) {
   const perms = new Set(m.perms || [])
   perms.has(p) ? perms.delete(p) : perms.add(p)
-  try { await api.post('/admin/managers', { user_id: m.id, role: 'moderator', perms: [...perms] }); loadManagers() } catch (e) { alert(e.response?.data?.error || '失败') }
+  try { await api.post('/admin/managers', { user_id: m.id, role: 'moderator', perms: [...perms] }); toast('权限已更新'); loadManagers() } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 
 // ── AI 日志 ──
@@ -586,7 +646,7 @@ async function loadAiLogs(page) {
 onMounted(async () => {
   // 非管理员/辅助管理员禁止进入
   if (!auth.isLogin || !['admin', 'moderator'].includes(auth.user?.role)) {
-    alert('无权限访问管理后台')
+    toast('无权限访问管理后台', 'err')
     router.replace('/')
     return
   }
@@ -634,7 +694,12 @@ onMounted(async () => {
 .stat-card.warn b { color: #f59e0b; }
 .trend-card, .audit-card { border: 1px solid var(--border); border-radius: 14px; background: var(--btn-bg); padding: 16px; margin-bottom: 12px; }
 .trend-card h3 { font-size: 14px; margin: 0 0 10px; color: var(--text1); }
-.toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+/* 主题风格分段筛选（替代原生 select） */
+.filter-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--btn-bg); border: 1px solid var(--border); }
+.filter-seg button { border: none; background: transparent; color: var(--text2); font-size: 12.5px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.filter-seg button:hover { color: var(--text1); }
+.filter-seg button.on { background: linear-gradient(120deg, var(--brand-1), var(--brand-2)); color: #fff; font-weight: 600; }
 .ap-input { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text1); font-size: 13px; outline: none; min-width: 180px; }
 .ap-input.sel { min-width: 120px; }
 .ap-btn { padding: 8px 16px; border: none; border-radius: 9px; cursor: pointer; font-size: 13px; background: linear-gradient(120deg, var(--brand-1), var(--brand-2)); color: #fff; font-weight: 600; }
@@ -683,7 +748,20 @@ onMounted(async () => {
 .modal-close { border: none; background: transparent; color: var(--text2); font-size: 16px; cursor: pointer; }
 .modal-body { padding: 16px 18px; overflow-y: auto; color: var(--text1); font-size: 13.5px; line-height: 1.7; }
 .preview-raw { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: inherit; color: var(--text1); }
-.modal-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+.modal-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+.modal.small { width: min(420px, 92vw); }
+.ap-input.w100 { width: 100%; box-sizing: border-box; }
+/* 主题 toast */
+.ap-toasts { position: fixed; top: 74px; right: 20px; z-index: 400; display: flex; flex-direction: column; gap: 8px; }
+.ap-toast {
+  padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .3);
+  max-width: 360px;
+}
+.ap-toast.err { border-color: #e5484d; color: #e5484d; }
+.toast-enter-active, .toast-leave-active { transition: opacity .25s, transform .25s; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(16px); }
 
 @media (max-width: 900px) {
   .admin-panel { flex-direction: column; padding: 0 12px 30px; }
