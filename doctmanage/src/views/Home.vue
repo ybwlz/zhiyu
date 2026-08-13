@@ -185,6 +185,7 @@
               <router-link to="/download" class="footer-link">下载客户端</router-link>
             </div>
           </div>
+          <div class="footer-copy">© 2026 知屿 · 保留所有权利</div>
           <div v-if="siteConfig.icp_no || siteConfig.gongan_no" class="footer-beian">
             <a v-if="siteConfig.icp_no" class="beian-link" :href="siteConfig.icp_link || 'https://beian.miit.gov.cn/'" target="_blank" rel="noopener">{{ siteConfig.icp_no }}</a>
             <a v-if="siteConfig.gongan_no" class="beian-link" :href="siteConfig.gongan_link || 'http://www.beian.gov.cn/'" target="_blank" rel="noopener">🛡 {{ siteConfig.gongan_no }}</a>
@@ -912,6 +913,7 @@ const updateSubjectsProgress = () => {
 .footer-link:hover { color: var(--brand-1); }
 .footer-tip { color: var(--text2); font-size: 13px; }
 /* 备案信息（ICP/公安） */
+.footer-copy { text-align: center; color: var(--text2); font-size: 12px; padding: 14px var(--layout-padding) 0; }
 .footer-beian { display: flex; justify-content: center; gap: 20px; margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
 .beian-link { color: var(--text2); font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
 .beian-link:hover { color: var(--text1); }
