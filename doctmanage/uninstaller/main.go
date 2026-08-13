@@ -1,9 +1,9 @@
-// 知屿卸载器：系统标准对话框，轻量 2MB，稳定可用
+// 知屿卸载器：系统标准对话框 + 可靠自删除（复制副本到临时目录 → 原进程退出 → 副本删整个目录）
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,6 +35,28 @@ func msgBox(title, text string, flags uintptr) int {
 	return int(r)
 }
 
+// 静默执行命令（不弹控制台窗口）
+func silent(name string, args ...string) {
+	cmd := exec.Command(name, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	cmd.Run()
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
+}
+
 // 从注册表读安装目录
 func readInstallRoot() string {
 	keys := []string{
@@ -46,8 +68,7 @@ func readInstallRoot() string {
 		if err != nil {
 			continue
 		}
-		lines := strings.Split(string(out), "\r\n")
-		for _, l := range lines {
+		for _, l := range strings.Split(string(out), "\r\n") {
 			if strings.Contains(l, "InstallLocation") {
 				if idx := strings.Index(l, "REG_SZ"); idx >= 0 {
 					v := strings.TrimSpace(l[idx+6:])
@@ -61,14 +82,34 @@ func readInstallRoot() string {
 	return ""
 }
 
+// --cleanup 模式：临时副本——延迟删除整个安装目录（原进程已退出），再删自己
+func cleanup(root string) {
+	time.Sleep(2000 * time.Millisecond)
+	os.RemoveAll(root)
+	// 删除临时副本自己（PowerShell 隐藏执行，路径为 ASCII）
+	ps := "Start-Sleep -Seconds 1; Remove-Item -LiteralPath '" + os.Args[0] + "' -Force -ErrorAction SilentlyContinue"
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	cmd.Start()
+}
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--cleanup" {
+		root := ""
+		if len(os.Args) > 2 {
+			root = os.Args[2]
+		}
+		cleanup(root)
+		return
+	}
+
 	root := readInstallRoot()
 	if root == "" {
 		root = "D:\\Software\\知屿"
 	}
 
 	// 先结束主程序
-	exec.Command("taskkill", "/f", "/im", "知屿.exe").Run()
+	silent("taskkill", "/f", "/im", "知屿.exe")
 	time.Sleep(500 * time.Millisecond)
 
 	r := msgBox("卸载知屿",
@@ -79,7 +120,7 @@ func main() {
 	}
 
 	// 结束主程序（再次确保）
-	exec.Command("taskkill", "/f", "/im", "知屿.exe").Run()
+	silent("taskkill", "/f", "/im", "知屿.exe")
 
 	// 删除桌面快捷方式（用户桌面 + 公共桌面）
 	for _, dir := range []string{os.Getenv("USERPROFILE") + `\Desktop`, `C:\Users\Public\Desktop`} {
@@ -87,31 +128,21 @@ func main() {
 	}
 
 	// 删除注册表卸载项 + 开机自启
-	exec.Command("reg", "delete", `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\知屿`, "/f").Run()
-	exec.Command("reg", "delete", `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\知屿`, "/f").Run()
-	exec.Command("reg", "delete", `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "知屿", "/f").Run()
+	silent("reg", "delete", `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\知屿`, "/f")
+	silent("reg", "delete", `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\知屿`, "/f")
+	silent("reg", "delete", `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "知屿", "/f")
 
-	msgBox("卸载完成", "知屿 已卸载完成。\n正在清理安装目录…", MB_OK|MB_ICONINFORMATION)
-
-	// 把卸载器自己移到临时目录（释放安装目录中的占用），再删除整个安装目录
-	tmpSelf := filepath.Join(os.TempDir(), "zhiyu-uninst-tmp.exe")
-	if err := os.Rename(os.Args[0], tmpSelf); err == nil {
-		os.RemoveAll(root)
-		// 延迟删除临时副本（本进程退出后）
-		cmd := exec.Command("cmd", "/c", "ping -n 3 127.0.0.1 >nul & del /f /q \""+tmpSelf+"\"")
+	// 复制自己到临时目录（--cleanup 副本），由它删除整个安装目录（此时原进程退出，文件无占用）
+	tmpSelf := filepath.Join(os.TempDir(), "zhiyu-uninst-cleanup.exe")
+	if err := copyFile(os.Args[0], tmpSelf); err == nil {
+		cmd := exec.Command(tmpSelf, "--cleanup", root)
 		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 		cmd.Start()
 	} else {
-		// 备用：PowerShell 延迟删除（UTF-16LE Base64 编码，中文路径安全）
-		ps := fmt.Sprintf("Start-Sleep -Seconds 2; Remove-Item -LiteralPath '%s' -Recurse -Force -ErrorAction SilentlyContinue", root)
-		u16 := syscall.StringToUTF16(ps)
-		b := make([]byte, 0, len(u16)*2)
-		for _, ch := range u16 {
-			b = append(b, byte(ch&0xff), byte(ch>>8))
-		}
-		enc := base64.StdEncoding.EncodeToString(b)
-		cmd := exec.Command("powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", enc)
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-		cmd.Start()
+		// 复制失败兜底：直接尝试删除（尽力而为）
+		os.RemoveAll(root)
 	}
+
+	msgBox("卸载完成", "知屿 已卸载完成。", MB_OK|MB_ICONINFORMATION)
+	fmt.Println("uninstalled")
 }
