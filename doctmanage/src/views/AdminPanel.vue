@@ -19,7 +19,7 @@
           <div class="stat-card"><div class="sc-icon">👥</div><b>{{ stats.users ?? '-' }}</b><span>用户总数</span></div>
           <div class="stat-card"><div class="sc-icon">📄</div><b>{{ stats.docs ?? '-' }}</b><span>笔记总数</span></div>
           <div class="stat-card"><div class="sc-icon">🌐</div><b>{{ stats.docs_public ?? '-' }}</b><span>公开笔记</span></div>
-          <div class="stat-card"><div class="sc-icon">🤖</div><b>{{ stats.ai_usage ?? '-' }}</b><span>AI 使用</span></div>
+          <div class="stat-card"><div class="sc-icon">🤖</div><b>{{ stats.ai_usage ?? '-' }}</b><span>AI 使用次数</span></div>
           <div class="stat-card warn" @click="mod = 'audits'"><div class="sc-icon">🔍</div><b>{{ stats.audit_pending ?? '-' }}</b><span>待审笔记</span></div>
         </div>
         <div class="dash-grid">
@@ -44,7 +44,7 @@
             <div ref="lineChartRef" class="echart-box tall"></div>
           </div>
           <div class="trend-card">
-            <h3>🥧 笔记结构</h3>
+            <h3>🥧 数据分布</h3>
             <div ref="pieRef" class="echart-box tall"></div>
           </div>
         </div>
@@ -607,17 +607,17 @@ function renderCharts() {
   // 折线图：近 7 天 用户/笔记/AI 趋势
   lineChart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['新增用户', '新增笔记', 'AI 使用'], textStyle: { color: 'var(--text2)' }, top: 0 },
+    legend: { data: ['新增用户', '新增笔记', 'AI 使用次数'], textStyle: { color: 'var(--text2)' }, top: 0 },
     grid: { left: 34, right: 12, top: 28, bottom: 4 },
     xAxis: { type: 'category', boundaryGap: false, data: days, axisLabel: { color: 'var(--text2)' }, axisLine: { lineStyle: { color: 'var(--border)' } } },
     yAxis: { type: 'value', minInterval: 1, axisLabel: { color: 'var(--text2)' }, splitLine: { lineStyle: { color: 'var(--border)' } } },
     series: [
       { name: '新增用户', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.users_7, d)), itemStyle: { color: '#3b82f6' }, areaStyle: { opacity: .08, color: '#3b82f6' } },
       { name: '新增笔记', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.docs_7, d)), itemStyle: { color: '#22c55e' }, areaStyle: { opacity: .08, color: '#22c55e' } },
-      { name: 'AI 使用', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.ai_7_daily, d)), itemStyle: { color: '#a855f7' }, areaStyle: { opacity: .08, color: '#a855f7' } },
+      { name: 'AI 使用次数', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.ai_7_daily, d)), itemStyle: { color: '#a855f7' }, areaStyle: { opacity: .08, color: '#a855f7' } },
     ],
   })
-  // 环形饼图：笔记结构（公开/私密/待审）
+  // 环形饼图：数据分布（公开/私密/待审/AI 使用次数）
   pieChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}: {c}（{d}%）' },
     legend: { bottom: 0, textStyle: { color: 'var(--text2)' } },
@@ -632,6 +632,7 @@ function renderCharts() {
         { value: stats.value.docs_public || 0, name: '公开笔记', itemStyle: { color: '#3b82f6' } },
         { value: stats.value.docs_private || 0, name: '私密笔记', itemStyle: { color: '#22c55e' } },
         { value: stats.value.audit_pending || 0, name: '待审笔记', itemStyle: { color: '#f59e0b' } },
+        { value: stats.value.ai_usage || 0, name: 'AI 使用次数', itemStyle: { color: '#a855f7' } },
       ],
     }],
   })
