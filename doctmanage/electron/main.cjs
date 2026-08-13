@@ -119,7 +119,9 @@ app.whenReady().then(() => {
     serveFile(res, target)
   })
 
-  server.listen(0, '127.0.0.1', () => {
+  // 固定本地端口：origin（含端口）稳定，localStorage 才能跨启动持久（随机端口会导致每次重开掉登录）
+  const LOCAL_PORT = 51780
+  server.listen(LOCAL_PORT, '127.0.0.1', () => {
     const port = server.address().port
     const win = new BrowserWindow({
       width: 1280,
