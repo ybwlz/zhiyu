@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -90,11 +91,27 @@ func main() {
 	exec.Command("reg", "delete", `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\知屿`, "/f").Run()
 	exec.Command("reg", "delete", `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "知屿", "/f").Run()
 
-	// 后台延迟删除整个安装目录（含卸载器自身），等本进程退出后执行
-	ps := fmt.Sprintf("Start-Sleep -Seconds 2; Remove-Item -LiteralPath '%s' -Recurse -Force -ErrorAction SilentlyContinue", root)
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	cmd.Start()
+	msgBox("卸载完成", "知屿 已卸载完成。\n正在清理安装目录…", MB_OK|MB_ICONINFORMATION)
 
-	msgBox("卸载完成", "知屿 已卸载完成。", MB_OK|MB_ICONINFORMATION)
+	// 把卸载器自己移到临时目录（释放安装目录中的占用），再删除整个安装目录
+	tmpSelf := filepath.Join(os.TempDir(), "zhiyu-uninst-tmp.exe")
+	if err := os.Rename(os.Args[0], tmpSelf); err == nil {
+		os.RemoveAll(root)
+		// 延迟删除临时副本（本进程退出后）
+		cmd := exec.Command("cmd", "/c", "ping -n 3 127.0.0.1 >nul & del /f /q \""+tmpSelf+"\"")
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+		cmd.Start()
+	} else {
+		// 备用：PowerShell 延迟删除（UTF-16LE Base64 编码，中文路径安全）
+		ps := fmt.Sprintf("Start-Sleep -Seconds 2; Remove-Item -LiteralPath '%s' -Recurse -Force -ErrorAction SilentlyContinue", root)
+		u16 := syscall.StringToUTF16(ps)
+		b := make([]byte, 0, len(u16)*2)
+		for _, ch := range u16 {
+			b = append(b, byte(ch&0xff), byte(ch>>8))
+		}
+		enc := base64.StdEncoding.EncodeToString(b)
+		cmd := exec.Command("powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", enc)
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+		cmd.Start()
+	}
 }
