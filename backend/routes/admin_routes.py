@@ -468,9 +468,29 @@ def admin_notice(user):
                 cur.execute("INSERT INTO notifications (user_id, actor_id, type, extra) VALUES (%s,%s,'admin_notice',%s)",
                             (uid, user['id'], extra))
         conn.commit()
-        log_admin(conn, user['id'], 'notice', 'user', f'x{len(uids)}', f'{title} | {content[:80]}')
+        log_admin(conn, user['id'], 'notice', 'user', f'x{len(uids)}', f'{title[:20]} | {content[:60]}')
         conn.commit()
         return jsonify({'ok': True, 'sent': len(uids)})
+    finally:
+        conn.close()
+
+
+@bp.route('/api/admin/digests', methods=['GET'])
+@require_perm('notes')
+def admin_digests(user):
+    """AI 每日摘要历史"""
+    page = max(1, int(request.args.get('page') or 1))
+    size = min(50, max(10, int(request.args.get('size') or 20)))
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) c FROM daily_digests")
+            total = cur.fetchone()['c']
+            cur.execute("""SELECT id, digest_date, summary, CAST(created_at AS CHAR) created_at
+                FROM daily_digests ORDER BY digest_date DESC LIMIT %s OFFSET %s""",
+                        (size, (page - 1) * size))
+            items = [dict(r) for r in cur.fetchall()]
+        return jsonify({'total': total, 'page': page, 'items': items})
     finally:
         conn.close()
 

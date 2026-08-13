@@ -203,7 +203,7 @@ const notiDetail = (n) => {
   try {
     const e = JSON.parse(n.extra || '{}')
     if (n.type === 'admin_notice') {
-      return `${e.title || '系统通知'}\n\n${e.content || ''}`
+      return e.content || ''
     }
     if (n.type === 'admin_coins') {
       return `站长给你发放了 ${e.amount || 0} 知屿币${e.note ? '，并给你留言：' + e.note : ''}`

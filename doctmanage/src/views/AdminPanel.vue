@@ -15,32 +15,52 @@
     <main class="ap-main">
       <!-- ── 仪表盘 ── -->
       <section v-if="mod === 'dash'">
-        <h2 class="ap-title">📊 仪表盘</h2>
         <div class="stat-grid">
-          <div class="stat-card"><b>{{ stats.users ?? '-' }}</b><span>用户总数</span></div>
-          <div class="stat-card"><b>{{ stats.docs ?? '-' }}</b><span>笔记总数</span></div>
-          <div class="stat-card"><b>{{ stats.docs_public ?? '-' }}</b><span>公开笔记</span></div>
-          <div class="stat-card"><b>{{ stats.ai_usage ?? '-' }}</b><span>AI 使用次数</span></div>
-          <div class="stat-card warn" @click="mod = 'audits'"><b>{{ stats.audit_pending ?? '-' }}</b><span>待审笔记</span></div>
+          <div class="stat-card"><div class="sc-icon">👥</div><b>{{ stats.users ?? '-' }}</b><span>用户总数</span></div>
+          <div class="stat-card"><div class="sc-icon">📄</div><b>{{ stats.docs ?? '-' }}</b><span>笔记总数</span></div>
+          <div class="stat-card"><div class="sc-icon">🌐</div><b>{{ stats.docs_public ?? '-' }}</b><span>公开笔记</span></div>
+          <div class="stat-card"><div class="sc-icon">🤖</div><b>{{ stats.ai_usage ?? '-' }}</b><span>AI 使用</span></div>
+          <div class="stat-card warn" @click="mod = 'audits'"><div class="sc-icon">🔍</div><b>{{ stats.audit_pending ?? '-' }}</b><span>待审笔记</span></div>
         </div>
-        <div class="trend-card">
-          <h3>近 7 天增长</h3>
-          <table class="ap-table">
-            <thead><tr><th>日期</th><th>新增用户</th><th>新增笔记</th></tr></thead>
-            <tbody>
-              <tr v-for="d in trendDays" :key="d">
-                <td>{{ d }}</td>
-                <td>{{ dayCount(stats.users_7, d) }}</td>
-                <td>{{ dayCount(stats.docs_7, d) }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="dash-grid">
+          <div class="trend-card">
+            <h3>📈 近 7 天增长</h3>
+            <div class="chart-row">
+              <div class="chart-col">
+                <div class="chart-label">新增用户</div>
+                <div class="bars">
+                  <div v-for="d in trendDays" :key="d" class="bar-wrap">
+                    <div class="bar" :style="{ height: barH(dayCount(stats.users_7, d), usersMax) + 'px' }" :title="d + ': ' + dayCount(stats.users_7, d)"></div>
+                    <span class="bar-day">{{ d.slice(5) }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="chart-col">
+                <div class="chart-label">新增笔记</div>
+                <div class="bars">
+                  <div v-for="d in trendDays" :key="d" class="bar-wrap">
+                    <div class="bar note" :style="{ height: barH(dayCount(stats.docs_7, d), docsMax) + 'px' }" :title="d + ': ' + dayCount(stats.docs_7, d)"></div>
+                    <span class="bar-day">{{ d.slice(5) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="trend-card">
+            <h3>⚡ 快捷入口</h3>
+            <div class="quick-list">
+              <button class="quick-item" @click="mod = 'audits'">🔍 待审队列（{{ stats.audit_pending ?? 0 }}）</button>
+              <button class="quick-item" @click="mod = 'users'">👥 用户管理</button>
+              <button class="quick-item" @click="mod = 'docs'">📄 笔记管理</button>
+              <button class="quick-item" @click="mod = 'codes'">🎫 生成兑换码</button>
+              <button class="quick-item" @click="mod = 'notices'">📢 发通知</button>
+            </div>
+          </div>
         </div>
       </section>
 
       <!-- ── 用户管理 ── -->
       <section v-else-if="mod === 'users'">
-        <h2 class="ap-title">👥 用户管理</h2>
         <div class="toolbar">
           <input v-model="uQuery" class="ap-input" placeholder="搜索用户名/昵称/邮箱" @keyup.enter="loadUsers(1)" />
           <button class="ap-btn" @click="loadUsers(1)">搜索</button>
@@ -75,7 +95,6 @@
 
       <!-- ── 笔记管理 ── -->
       <section v-else-if="mod === 'docs'">
-        <h2 class="ap-title">📄 笔记管理</h2>
         <div class="toolbar">
           <input v-model="dQuery" class="ap-input" placeholder="搜索标题/作者" @keyup.enter="loadDocs(1)" />
           <div class="filter-seg">
@@ -118,7 +137,7 @@
 
       <!-- ── 审核队列 ── -->
       <section v-else-if="mod === 'audits'">
-        <h2 class="ap-title">🔍 审核队列 <span class="ap-sub">（AI 不可用时先上架的笔记，人工复核）</span></h2>
+        <div class="audit-tip">⏳ AI 不可用时先上架的笔记，人工复核</div>
         <div v-if="!auditList.length" class="empty-tip">✅ 暂无待审笔记</div>
         <div v-for="a in auditList" :key="a.id" class="audit-card">
           <div class="audit-head">
@@ -139,9 +158,23 @@
         </div>
       </section>
 
+      <!-- ── AI 每日摘要 ── -->
+      <section v-else-if="mod === 'digests'">
+        <div class="audit-tip">📅 每日自动生成的站内摘要历史</div>
+        <div v-for="dg in digestList" :key="dg.id" class="digest-card">
+          <div class="digest-head"><b>📅 {{ dg.digest_date }}</b><span class="ap-meta">{{ dg.created_at }}</span></div>
+          <p class="digest-body">{{ dg.summary }}</p>
+        </div>
+        <div v-if="!digestList.length" class="empty-tip">暂无每日摘要</div>
+        <div class="page-bar" v-if="digestTotal > 20">
+          <button class="ap-btn sm" :disabled="dgPage <= 1" @click="loadDigests(dgPage - 1)">上一页</button>
+          <span>{{ dgPage }} / {{ Math.ceil(digestTotal / 20) }}</span>
+          <button class="ap-btn sm" :disabled="dgPage >= Math.ceil(digestTotal / 20)" @click="loadDigests(dgPage + 1)">下一页</button>
+        </div>
+      </section>
+
       <!-- ── 评论管理 ── -->
       <section v-else-if="mod === 'comments'">
-        <h2 class="ap-title">💬 评论管理</h2>
         <div class="toolbar">
           <input v-model="cQuery" class="ap-input" placeholder="搜索评论内容" @keyup.enter="loadComments(1)" />
           <button class="ap-btn" @click="loadComments(1)">搜索</button>
@@ -168,7 +201,6 @@
 
       <!-- ── 知屿币 ── -->
       <section v-else-if="mod === 'coins'">
-        <h2 class="ap-title">🪙 知屿币</h2>
         <div class="form-card">
           <h3>给用户发放知屿币</h3>
           <div class="form-row">
@@ -204,7 +236,6 @@
 
       <!-- ── 兑换码 ── -->
       <section v-else-if="mod === 'codes'">
-        <h2 class="ap-title">🎫 兑换码</h2>
         <div class="form-card">
           <h3>批量生成兑换码</h3>
           <div class="form-row">
@@ -243,7 +274,6 @@
 
       <!-- ── 通知 ── -->
       <section v-else-if="mod === 'notices'">
-        <h2 class="ap-title">📢 发送通知</h2>
         <div class="form-card">
           <div class="form-row">
             <VisibilitySelect v-model="noticeTarget" :options="noticeTargetOptions" class="ap-vis" />
@@ -279,7 +309,7 @@
 
       <!-- ── 管理员管理 ── -->
       <section v-else-if="mod === 'admins'">
-        <h2 class="ap-title">🛡️ 管理员管理 <span class="ap-sub">（在「用户管理」里设置辅助管理员，这里调整权限/取消）</span></h2>
+        <div class="audit-tip">🛡️ 在「用户管理」里设置辅助管理员，这里调整权限/取消</div>
         <table class="ap-table">
           <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>权限点</th><th>操作</th></tr></thead>
           <tbody>
@@ -303,7 +333,6 @@
 
       <!-- ── AI 日志 ── -->
       <section v-else-if="mod === 'ailogs'">
-        <h2 class="ap-title">🤖 AI 使用日志</h2>
         <table class="ap-table">
           <thead><tr><th>ID</th><th>用户</th><th>页面</th><th>时间</th></tr></thead>
           <tbody>
@@ -465,6 +494,7 @@ const menus = [
   { id: 'coins', icon: '🪙', label: '知屿币' },
   { id: 'codes', icon: '🎫', label: '兑换码' },
   { id: 'notices', icon: '📢', label: '通知' },
+  { id: 'digests', icon: '📅', label: 'AI 摘要' },
   { id: 'admins', icon: '🛡️', label: '管理员' },
   { id: 'ailogs', icon: '🤖', label: 'AI 日志' },
 ]
@@ -478,6 +508,7 @@ watch(mod, (v) => {
   if (v === 'codes') loadCodes(1)
   if (v === 'ailogs') loadAiLogs(1)
   if (v === 'notices') loadNoticeHistory()
+  if (v === 'digests') loadDigests(1)
 })
 
 // ── 自研弹窗/提示（替换默认 alert/confirm/prompt） ──
@@ -518,6 +549,10 @@ const trendDays = computed(() => {
   return days
 })
 const dayCount = (arr, d) => (arr || []).find(x => String(x.date).startsWith(d))?.count || 0
+// 柱状图高度（按最大值归一化）
+const usersMax = computed(() => Math.max(1, ...((stats.value.users_7) || []).map(x => x.count || 0)))
+const docsMax = computed(() => Math.max(1, ...((stats.value.docs_7) || []).map(x => x.count || 0)))
+const barH = (v, max) => Math.max(3, Math.round((v / max) * 120))
 
 // ── 用户 ──
 const uQuery = ref('')
@@ -842,6 +877,19 @@ async function removeManager(m) {
   } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 
+// ── AI 每日摘要 ──
+const digestList = ref([])
+const digestTotal = ref(0)
+const dgPage = ref(1)
+async function loadDigests(page) {
+  dgPage.value = page || 1
+  try {
+    const r = (await api.get('/admin/digests', { params: { page: dgPage.value, size: 20 } })).data
+    digestList.value = r.items || []
+    digestTotal.value = r.total || 0
+  } catch (e) { digestList.value = [] }
+}
+
 // ── AI 日志 ──
 const aiLogs = ref([])
 const aiLogTotal = ref(0)
@@ -900,12 +948,33 @@ onMounted(async () => {
 .ap-main { flex: 1; min-width: 0; margin-top: 0; margin-left: 240px; }
 .ap-title { font-size: 18px; font-weight: 700; color: var(--text1); margin: 4px 0 16px; }
 .ap-sub { font-size: 12.5px; color: var(--text2); font-weight: 400; }
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
-.stat-card { padding: 18px; border-radius: 14px; border: 1px solid var(--border); background: var(--btn-bg); }
+.stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 18px; }
+.stat-card { padding: 18px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--btn-bg); position: relative; overflow: hidden; }
+.sc-icon { font-size: 22px; margin-bottom: 8px; }
 .stat-card b { display: block; font-size: 26px; color: var(--text1); margin-bottom: 4px; }
 .stat-card span { font-size: 12.5px; color: var(--text2); }
 .stat-card.warn { cursor: pointer; }
 .stat-card.warn b { color: #f59e0b; }
+/* 仪表盘看板 */
+.dash-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }
+.chart-row { display: flex; gap: 24px; }
+.chart-col { flex: 1; }
+.chart-label { font-size: 12.5px; color: var(--text2); margin-bottom: 10px; }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 130px; }
+.bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bar { width: 60%; max-width: 26px; min-height: 2px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--brand-1), var(--brand-2)); transition: height .3s; }
+.bar.note { background: linear-gradient(180deg, #22c55e, #16a34a); }
+.bar-day { font-size: 10.5px; color: var(--text2); }
+.quick-list { display: flex; flex-direction: column; gap: 6px; }
+.quick-item { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text1); font-size: 13.5px; cursor: pointer; text-align: left; }
+.quick-item:hover { background: color-mix(in srgb, var(--brand-1) 12%, transparent); border-color: color-mix(in srgb, var(--brand-1) 40%, transparent); }
+/* 模块提示小字（替代标题） */
+.audit-tip { font-size: 12.5px; color: var(--text2); margin: 2px 0 14px; }
+/* AI 摘要卡片 */
+.digest-card { border: 1px solid var(--border); border-radius: 12px; background: var(--btn-bg); padding: 14px 16px; margin-bottom: 10px; }
+.digest-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.digest-head b { color: var(--text1); font-size: 13.5px; }
+.digest-body { margin: 0; color: var(--text2); font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
 .trend-card, .audit-card { border: 1px solid var(--border); border-radius: 14px; background: var(--btn-bg); padding: 16px; margin-bottom: 12px; }
 .trend-card h3 { font-size: 14px; margin: 0 0 10px; color: var(--text1); }
 .toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
