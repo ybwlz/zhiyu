@@ -44,13 +44,10 @@ const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
   <WindowControls />
   <UpdateNotice />
 
-  <!-- 卸载确认弹窗（卸载模式启动时，站内 modal 风格） -->
+  <!-- 卸载确认弹窗（卸载模式启动时，与安装器卸载页同款风格） -->
   <div v-if="showUninstall" class="uninstall-mask" @click.self="showUninstall = false">
     <div class="uninstall-modal">
-      <div class="um-head">
-        <b>卸载知屿？</b>
-        <button class="um-close" @click="showUninstall = false">✕</button>
-      </div>
+      <div class="um-head"><b>卸载知屿？</b><button class="um-close" @click="showUninstall = false">✕</button></div>
       <div class="um-body">
         <p>将删除安装目录下的程序文件、桌面快捷方式与开机自启项。<br>你的云端笔记数据不受影响（保存在服务器）。</p>
       </div>
@@ -63,7 +60,7 @@ const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
 </template>
 
 <style>
-/* 卸载确认弹窗（覆盖层，桌面版卸载模式，站内 modal 风格） */
+/* 卸载确认弹窗（覆盖层，桌面版卸载模式，与安装器卸载页同款：胶囊按钮） */
 .uninstall-mask {
   position: fixed;
   inset: 0;
@@ -77,8 +74,8 @@ const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
 .uninstall-modal {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  width: 360px;
+  border-radius: 16px;
+  width: 400px;
   max-width: 92vw;
   box-shadow: 0 24px 64px rgba(0, 0, 0, .4);
   overflow: hidden;
@@ -90,8 +87,9 @@ html[data-theme="minimal"] .uninstall-modal { background: #ffffff; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 18px 0;
-  font-size: 15px;
+  padding: 18px 20px 0;
+  font-size: 16px;
+  font-weight: 800;
   color: var(--text1);
 }
 .um-close {
@@ -104,22 +102,27 @@ html[data-theme="minimal"] .uninstall-modal { background: #ffffff; }
   border-radius: 6px;
 }
 .um-close:hover { background: rgba(255,255,255,.08); color: var(--text1); }
-.um-body { padding: 12px 18px 4px; font-size: 13px; color: var(--text2); line-height: 1.7; }
-.um-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px 16px; }
+.um-body { padding: 12px 20px 4px; font-size: 13.5px; color: var(--text2); line-height: 1.7; }
+.um-foot { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 20px 18px; }
+/* 与安装器一致的胶囊按钮 */
 .um-btn {
-  padding: 7px 18px;
-  border-radius: 8px;
-  border: none;
-  font-size: 13.5px;
+  padding: 10px 26px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  font-size: 14px;
   cursor: pointer;
-  background: var(--brand-1);
-  color: #fff;
-  transition: filter .15s;
+  background: rgba(255, 255, 255, .06);
+  color: var(--text1);
+  transition: background .18s;
 }
-.um-btn:hover { filter: brightness(1.08); }
-.um-btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text2); }
-.um-btn.danger { background: #e11d48; }
-.um-btn.danger:hover { filter: brightness(1.1); }
+.um-btn:hover { background: rgba(255, 255, 255, .12); }
+.um-btn.danger {
+  background: rgba(239, 68, 68, .16);
+  color: #f87171;
+  font-weight: 700;
+  border-color: rgba(239, 68, 68, .35);
+}
+.um-btn.danger:hover { background: rgba(239, 68, 68, .28); }
 
 /* 沉浸式阅读：隐藏全局导航 */
 body.immersive .kb-navbar {
