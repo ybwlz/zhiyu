@@ -671,12 +671,11 @@ onMounted(async () => {
   width: 220px; flex-shrink: 0;
   position: fixed; left: 0; top: 60px; bottom: 0;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--btn-bg) 55%, transparent);
+  background: transparent;
   padding: 14px 10px;
   z-index: 50;
   border-radius: 0;
   border: none;
-  backdrop-filter: blur(6px);
 }
 .ap-brand { font-weight: 700; font-size: 14px; padding: 6px 10px 14px; color: var(--text1); border-bottom: 1px solid var(--border); margin-bottom: 8px; }
 .ap-nav { display: flex; flex-direction: column; gap: 2px; }
