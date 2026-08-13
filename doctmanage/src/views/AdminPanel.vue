@@ -57,6 +57,48 @@
             </div>
           </div>
         </div>
+        <div class="rings-row">
+          <div class="ring-card">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="40" />
+                <circle class="ring-val" cx="50" cy="50" r="40" stroke="#3b82f6" :stroke-dasharray="`${pct(stats.docs_public, stats.docs) * 2.51} 251`" />
+              </svg>
+              <span class="ring-num">{{ pct(stats.docs_public, stats.docs) }}%</span>
+            </div>
+            <div class="ring-label">🌐 公开笔记</div>
+          </div>
+          <div class="ring-card">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="40" />
+                <circle class="ring-val" cx="50" cy="50" r="40" stroke="#22c55e" :stroke-dasharray="`${pct(stats.docs_private, stats.docs) * 2.51} 251`" />
+              </svg>
+              <span class="ring-num">{{ pct(stats.docs_private, stats.docs) }}%</span>
+            </div>
+            <div class="ring-label">🔒 私密笔记</div>
+          </div>
+          <div class="ring-card">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="40" />
+                <circle class="ring-val" cx="50" cy="50" r="40" stroke="#f59e0b" :stroke-dasharray="`${pct(stats.audit_pending, stats.docs) * 2.51} 251`" />
+              </svg>
+              <span class="ring-num">{{ pct(stats.audit_pending, stats.docs) }}%</span>
+            </div>
+            <div class="ring-label">🔍 待审占比</div>
+          </div>
+          <div class="ring-card">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="40" />
+                <circle class="ring-val" cx="50" cy="50" r="40" stroke="#a855f7" :stroke-dasharray="`${pct(stats.ai_7, stats.ai_usage) * 2.51} 251`" />
+              </svg>
+              <span class="ring-num">{{ pct(stats.ai_7, stats.ai_usage) }}%</span>
+            </div>
+            <div class="ring-label">🤖 AI 近7天占比</div>
+          </div>
+        </div>
         <div class="dash-bottom">
           <div class="trend-card">
             <h3>🆕 最新注册</h3>
@@ -596,6 +638,7 @@ const dayCount = (arr, d) => (arr || []).find(x => String(x.date).startsWith(d))
 const usersMax = computed(() => Math.max(1, ...((stats.value.users_7) || []).map(x => x.count || 0)))
 const docsMax = computed(() => Math.max(1, ...((stats.value.docs_7) || []).map(x => x.count || 0)))
 const barH = (v, max) => Math.max(3, Math.round((v / max) * 120))
+const pct = (a, b) => (b ? Math.round(((a || 0) / b) * 100) : 0)
 
 // ── 用户 ──
 const uQuery = ref('')
@@ -1027,6 +1070,15 @@ onMounted(async () => {
 .quick-item:hover { background: color-mix(in srgb, var(--brand-1) 12%, transparent); border-color: color-mix(in srgb, var(--brand-1) 40%, transparent); }
 /* 仪表盘底部：最新注册 / 最新笔记 */
 .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+/* 圆环图 */
+.rings-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 14px; }
+.ring-card { border: 1px solid var(--border); border-radius: 14px; background: var(--btn-bg); padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ring-wrap { position: relative; width: 84px; height: 84px; }
+.ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: color-mix(in srgb, var(--text2) 14%, transparent); stroke-width: 9; }
+.ring-val { fill: none; stroke-width: 9; stroke-linecap: round; transition: stroke-dasharray .4s; }
+.ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: var(--text1); }
+.ring-label { font-size: 12.5px; color: var(--text2); }
 .dash-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); font-size: 13px; }
 .dash-row:last-child { border-bottom: none; }
 .dr-name { flex: 1; min-width: 0; color: var(--text1); }
