@@ -258,15 +258,7 @@
 
       <!-- ── 管理员管理 ── -->
       <section v-else-if="mod === 'admins'">
-        <h2 class="ap-title">🛡️ 管理员管理</h2>
-        <div class="form-card">
-          <h3>设置辅助管理员</h3>
-          <div class="form-row">
-            <input v-model="mgrUid" class="ap-input" placeholder="用户 ID 或用户名" />
-            <button class="ap-btn" @click="setManager('moderator')">设为辅助管理员</button>
-            <button class="ap-btn ghost" @click="setManager('user')">取消管理员</button>
-          </div>
-        </div>
+        <h2 class="ap-title">🛡️ 管理员管理 <span class="ap-sub">（在「用户管理」里设置辅助管理员，这里调整权限/取消）</span></h2>
         <table class="ap-table">
           <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>权限点</th><th>操作</th></tr></thead>
           <tbody>
@@ -371,7 +363,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '@/utils/api.js'
 import { useAuthStore } from '@/stores/auth.js'
@@ -394,6 +386,14 @@ const menus = [
 ]
 const mod = ref('dash')
 const currentMenu = computed(() => menus.find(m => m.id === mod.value))
+// 切到管理员模块时刷新列表（在用户管理里设置后能看到）
+watch(mod, (v) => {
+  if (v === 'admins') loadManagers()
+  if (v === 'comments') loadComments(1)
+  if (v === 'coins') loadCoins(1)
+  if (v === 'codes') loadCodes(1)
+  if (v === 'ailogs') loadAiLogs(1)
+})
 
 // ── 自研弹窗/提示（替换默认 alert/confirm/prompt） ──
 const toasts = ref([])
@@ -669,11 +669,13 @@ onMounted(async () => {
 .admin-panel { display: flex; min-height: calc(100vh - 60px); max-width: 1680px; margin: 0 auto; padding: 20px 24px 40px; gap: 20px; }
 .ap-side {
   width: 220px; flex-shrink: 0;
-  position: fixed; left: 24px; top: 80px; bottom: 20px;
+  position: fixed; left: 0; top: 60px; bottom: 0;
   overflow-y: auto;
-  border-radius: 14px; border: 1px solid var(--border); background: var(--btn-bg);
+  background: var(--btn-bg);
   padding: 14px 10px;
   z-index: 50;
+  border-radius: 0;
+  border: none;
 }
 .ap-brand { font-weight: 700; font-size: 14px; padding: 6px 10px 14px; color: var(--text1); border-bottom: 1px solid var(--border); margin-bottom: 8px; }
 .ap-nav { display: flex; flex-direction: column; gap: 2px; }
@@ -683,7 +685,7 @@ onMounted(async () => {
 .ap-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .ap-back { width: 100%; padding: 8px; border: 1px solid var(--border); background: transparent; color: var(--text2); border-radius: 9px; cursor: pointer; font-size: 12.5px; }
 .ap-back:hover { color: var(--text1); }
-.ap-main { flex: 1; min-width: 0; margin-top: 0; margin-left: 244px; }
+.ap-main { flex: 1; min-width: 0; margin-top: 0; margin-left: 240px; }
 .ap-title { font-size: 18px; font-weight: 700; color: var(--text1); margin: 4px 0 16px; }
 .ap-sub { font-size: 12.5px; color: var(--text2); font-weight: 400; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -697,9 +699,9 @@ onMounted(async () => {
 .toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
 /* 主题风格分段筛选（替代原生 select） */
 .filter-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--btn-bg); border: 1px solid var(--border); }
-.filter-seg button { border: none; background: transparent; color: var(--text2); font-size: 12.5px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
-.filter-seg button:hover { color: var(--text1); }
-.filter-seg button.on { background: linear-gradient(120deg, var(--brand-1), var(--brand-2)); color: #fff; font-weight: 600; }
+.filter-seg button { border: none; background: transparent; color: var(--text2); font-size: 12.5px; padding: 5px 12px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+.filter-seg button:hover { color: var(--text1); background: color-mix(in srgb, var(--text2) 10%, transparent); }
+.filter-seg button.on { background: color-mix(in srgb, var(--brand-1) 16%, transparent); color: var(--brand-1); font-weight: 600; }
 .ap-input { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text1); font-size: 13px; outline: none; min-width: 180px; }
 .ap-input.sel { min-width: 120px; }
 .ap-btn { padding: 8px 16px; border: none; border-radius: 9px; cursor: pointer; font-size: 13px; background: linear-gradient(120deg, var(--brand-1), var(--brand-2)); color: #fff; font-weight: 600; }
