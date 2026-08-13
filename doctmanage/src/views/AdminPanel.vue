@@ -439,7 +439,13 @@ async function previewDoc(d) {
 async function banUser(u) { if (!confirm(`确认封禁 ${u.username}？`)) return; try { await api.post(`/admin/users/${u.id}/ban`); alert('已封禁'); loadUsers(uPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
 async function unbanUser(u) { try { await api.post(`/admin/users/${u.id}/unban`); alert('已解封'); loadUsers(uPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
 async function delUser(u) { if (!confirm(`确认删除用户 ${u.username}？其全部数据将被清除！`)) return; try { await api.delete(`/admin/users/${u.id}`); alert('已删除'); loadUsers(uPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
-function openManager(u) { router.push({ path: '/admin-panel', query: { mod: 'admins', focus: u.id } }) }
+function openManager(u) {
+  // 用户列表一键设为辅助管理员（默认：审核/笔记/评论），精细权限在「管理员」模块调整
+  if (!confirm(`确认将 ${u.username} 设为辅助管理员？（默认权限：审核/笔记/评论）`)) return
+  api.post('/admin/managers', { user_id: u.id, role: 'moderator', perms: ['audit', 'notes', 'comments'] })
+    .then(() => { alert('已设为辅助管理员，可在「管理员」模块调整其权限'); loadUsers(uPage.value) })
+    .catch(e => alert(e.response?.data?.error || '操作失败'))
+}
 
 async function unpublishDoc(d) { if (!confirm(`确认下架「${d.title}」？`)) return; try { await api.post(`/admin/docs/${d.id}/unpublish`); alert('已下架'); loadDocs(dPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
 async function delDoc(d) { if (!confirm(`确认删除笔记「${d.title}」？`)) return; try { await api.delete(`/admin/docs/${d.id}`); alert('已删除'); loadDocs(dPage.value) } catch (e) { alert(e.response?.data?.error || '失败') } }
