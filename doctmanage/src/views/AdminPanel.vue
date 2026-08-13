@@ -964,7 +964,7 @@ onMounted(async () => {
 .ap-back:hover { color: var(--text1); }
 .ap-main { flex: 1; min-width: 0; margin-top: 0; margin-left: 240px; }
 /* 去掉模块大标题后，内容顶部保留间距（不贴导航栏） */
-.ap-main > section { padding-top: 6px; }
+.ap-main > section { padding-top: 26px; }
 .ap-title { font-size: 18px; font-weight: 700; color: var(--text1); margin: 4px 0 16px; }
 .ap-sub { font-size: 12.5px; color: var(--text2); font-weight: 400; }
 .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 18px; }
