@@ -502,7 +502,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import { full as emoji } from 'markdown-it-emoji'
@@ -541,6 +541,15 @@ const mod = ref('dash')
 const currentMenu = computed(() => menus.find(m => m.id === mod.value))
 // 切到管理员模块时刷新列表（在用户管理里设置后能看到）
 watch(mod, (v) => {
+  if (v === 'dash') {
+    // 切回仪表盘：图表容器可能被 v-if 重建，等 DOM 更新后重置实例并重新渲染
+    nextTick(() => {
+      if (lineChart) { lineChart.dispose(); lineChart = null }
+      if (pieChart) { pieChart.dispose(); pieChart = null }
+      initCharts()
+      renderCharts()
+    })
+  }
   if (v === 'admins') loadManagers()
   if (v === 'comments') loadComments(1)
   if (v === 'coins') loadCoins(1)
