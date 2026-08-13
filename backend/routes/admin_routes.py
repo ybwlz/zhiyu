@@ -498,47 +498,32 @@ def admin_digests(user):
 @bp.route('/api/admin/notices/history', methods=['GET'])
 @require_perm('notices')
 def admin_notice_history(user):
-    """已发送通知的历史记录（type=notice 手动通知 / type=digest AI 每日摘要）"""
-    ntype = (request.args.get('type') or 'notice').strip()
+    """已发送通知的历史记录（从 notifications 聚合，含完整标题/内容/人数）"""
     page = max(1, int(request.args.get('page') or 1))
     size = min(50, max(10, int(request.args.get('size') or 20)))
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            if ntype == 'digest':
-                # AI 每日摘要通知：每天发给所有用户，按日期聚合
-                cur.execute("SELECT COUNT(DISTINCT DATE(created_at)) c FROM notifications WHERE type='digest'")
-                total = cur.fetchone()['c']
-                cur.execute("""SELECT DATE(created_at) d, COUNT(*) c, MAX(extra) extra, MAX(created_at) mt
-                    FROM notifications WHERE type='digest'
-                    GROUP BY DATE(created_at) ORDER BY mt DESC LIMIT %s OFFSET %s""",
-                            (size, (page - 1) * size))
-                items = []
-                for r in cur.fetchall():
-                    items.append({
-                        'id': str(r['d']), 'title': '📅 AI 每日摘要', 'content': (r['extra'] or '')[:120],
-                        'target_id': f'x{r["c"]}', 'created_at': str(r['mt'] or r['d']),
-                    })
-                return jsonify({'total': total, 'page': page, 'items': items})
-            cur.execute("SELECT COUNT(*) c FROM admin_logs WHERE action='notice'")
+            # 手动通知（admin_notice）：同一批（相同 extra + 同一天）聚合为一条
+            cur.execute("SELECT COUNT(DISTINCT CONCAT(extra, '-', DATE(created_at))) c FROM notifications WHERE type='admin_notice'")
             total = cur.fetchone()['c']
-            cur.execute("""SELECT l.id, l.admin_id, l.target_type, l.target_id, l.detail,
-                    CAST(l.created_at AS CHAR) created_at, u.username AS admin_username
-                FROM admin_logs l LEFT JOIN users u ON u.id=l.admin_id
-                WHERE l.action='notice' ORDER BY l.id DESC LIMIT %s OFFSET %s""",
+            cur.execute("""SELECT MAX(id) id, extra, COUNT(*) c, MAX(created_at) mt
+                FROM notifications WHERE type='admin_notice'
+                GROUP BY extra, DATE(created_at) ORDER BY mt DESC LIMIT %s OFFSET %s""",
                         (size, (page - 1) * size))
             items = []
             for r in cur.fetchall():
-                d = dict(r)
-                # detail 形如 "标题 | 内容摘要"，拆分展示
-                if ' | ' in (d.get('detail') or ''):
-                    parts = d['detail'].split(' | ', 1)
-                    d['title'] = parts[0]
-                    d['content'] = parts[1]
-                else:
-                    d['title'] = d.get('detail') or ''
-                    d['content'] = ''
-                items.append(d)
+                try:
+                    e = json.loads(r['extra'] or '{}')
+                    title = e.get('title') or '系统通知'
+                    content = e.get('content') or ''
+                except Exception:
+                    title = '系统通知'
+                    content = (r['extra'] or '')[:120]
+                items.append({
+                    'id': r['id'], 'title': title, 'content': content[:120],
+                    'target_id': f'x{r["c"]}', 'created_at': str(r['mt']),
+                })
         return jsonify({'total': total, 'page': page, 'items': items})
     finally:
         conn.close()
