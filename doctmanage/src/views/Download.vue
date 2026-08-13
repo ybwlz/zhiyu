@@ -67,7 +67,7 @@
     <div class="dl-steps">
       <h3 class="dl-sec-title">📦 安装步骤</h3>
       <ol class="dl-steps-list">
-        <li>点击上方「下载安装版」，得到安装包 <b>知屿-setup.exe</b>（约 90MB）；</li>
+        <li>点击上方「下载安装版」，得到安装包 <b>知屿安装器.exe</b>（约 220MB，安装向导 + 内置卸载器）；</li>
         <li>双击运行安装包，一路「下一步」即可（默认安装到 Program Files）；</li>
         <li>安装完成后自动创建<b>桌面快捷方式</b>与<b>开始菜单</b>入口，双击「知屿」启动；</li>
         <li>若 Windows 提示「无法验证发布者」：点「更多信息」→「仍要运行」即可（未签名软件的默认提示，不影响使用）；</li>
@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-const setupUrl = 'http://182.254.209.123/downloads/知屿-setup.exe'
+const setupUrl = 'http://182.254.209.123/downloads/知屿安装器.exe'
 const zipUrl = 'http://182.254.209.123/downloads/zhiyu-win32-x64.zip'
 // Electron 桌面版：隐藏下载入口，显示已安装提示
 const isDesktop = typeof document !== 'undefined' && document.documentElement.classList.contains('desktop-electron')
