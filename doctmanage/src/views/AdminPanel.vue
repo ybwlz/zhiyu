@@ -176,7 +176,6 @@
               <div v-if="userSelOpen.coin && coinUserResults.length" class="user-sel">
                 <div v-for="u in coinUserResults" :key="u.id" class="user-sel-item" @mousedown.prevent="pickUser('coin', u)">{{ u.nickname || u.username }} · {{ u.username }}</div>
               </div>
-              <div v-if="coinSel" class="user-picked">已选：{{ coinSel.name }}<button class="up-clear" @click="coinSel = null; coinUserQ = ''">✕</button></div>
             </div>
             <input v-model.number="coinAmount" class="ap-input" type="number" placeholder="数量（≥1）" />
             <input v-model="coinNote" class="ap-input" placeholder="备注（可选）" />
@@ -252,7 +251,6 @@
               <div v-if="userSelOpen.notice && noticeUserResults.length" class="user-sel">
                 <div v-for="u in noticeUserResults" :key="u.id" class="user-sel-item" @mousedown.prevent="pickUser('notice', u)">{{ u.nickname || u.username }} · {{ u.username }}</div>
               </div>
-              <div v-if="noticeSel" class="user-picked">已选：{{ noticeSel.name }}<button class="up-clear" @click="noticeSel = null; noticeUserQ = ''">✕</button></div>
             </div>
           </div>
           <div class="form-row">
