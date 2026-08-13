@@ -172,13 +172,18 @@
 
         <!-- ═══════ 底部 ═══════ -->
         <footer class="kb-footer">
-          <div class="footer-inner">
-            <span class="footer-brand">✦ {{ site.fullName }}</span>
-            <span class="footer-links">
+          <div class="footer-main">
+            <div class="footer-brand-col">
+              <div class="footer-brand">✦ {{ site.fullName }}</div>
+              <p class="footer-slogan">把散落的笔记、截图与灵感，汇成一座属于自己的知识岛</p>
+            </div>
+            <div class="footer-links-col">
               <router-link to="/terms" class="footer-link">服务条款</router-link>
               <router-link to="/privacy" class="footer-link">隐私协议</router-link>
-            </span>
-            <span class="footer-tip">用 知屿 沉淀每一份知识 ✨</span>
+              <router-link to="/guide" class="footer-link">使用引导</router-link>
+              <router-link to="/changelog" class="footer-link">更新日志</router-link>
+              <router-link to="/download" class="footer-link">下载客户端</router-link>
+            </div>
           </div>
           <div v-if="siteConfig.icp_no || siteConfig.gongan_no" class="footer-beian">
             <a v-if="siteConfig.icp_no" class="beian-link" :href="siteConfig.icp_link || 'https://beian.miit.gov.cn/'" target="_blank" rel="noopener">{{ siteConfig.icp_no }}</a>
@@ -881,17 +886,21 @@ const updateSubjectsProgress = () => {
 .kb-footer {
   padding: 36px 0 96px;
 }
-.footer-inner {
+.footer-inner, .footer-main {
   max-width: var(--layout-max-width);
   margin: 0 auto;
   padding: 20px var(--layout-padding);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 20px;
   flex-wrap: wrap;
   border-top: 1px solid var(--border);
 }
+.footer-main { align-items: flex-start; }
+.footer-brand-col { display: flex; flex-direction: column; gap: 6px; }
+.footer-slogan { margin: 0; color: var(--text2); font-size: 12.5px; max-width: 320px; line-height: 1.6; }
+.footer-links-col { display: flex; gap: 20px; flex-wrap: wrap; }
 .footer-brand { font-weight: 600; font-size: 14px; }
 .footer-links { display: flex; gap: 14px; }
 .footer-link {
