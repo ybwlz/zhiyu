@@ -340,16 +340,16 @@ onMounted(() => {
     store.fetchDocByKey(key)
   } else if (!auth.isLogin) {
     // 未登录：阅览室不加载任何文档（左侧与正文均提示登录）
-  } else {
-    // 无 key（顶部导航进 /docs）：列表加载后自动打开左侧第一篇（有笔记时；空列表则显示占位）
-    docsP.then(() => {
-      if (!route.params.key) {
-        const docs = store.getData() || []
-        const first = docs[0]
-        if (first && first.public_id) router.replace('/docs/' + first.public_id)
-      }
-    })
   }
+  // 无 key（顶部导航进 /docs）：等「已加入阅览室」的侧栏列表就绪后，自动打开侧栏第一篇
+  // （只打开加入书房的笔记；空列表则显示占位）
+  let autoOpenedFirst = false
+  watch([sideData, roomLoading], ([sd, rl]) => {
+    if (route.params.key || autoOpenedFirst || !auth.isLogin) return
+    if (rl) return
+    const first = sd[0]
+    if (first && first.public_id) { autoOpenedFirst = true; router.replace('/docs/' + first.public_id) }
+  })
 })
 
 onUnmounted(() => {

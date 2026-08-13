@@ -82,12 +82,12 @@ const doQuit = () => { remember('quit'); closeModal.value = false; window.deskto
 .modal-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, .45);
+  background: rgba(0, 0, 0, .62);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
 }
 .modal {
   background: var(--bg-1);
