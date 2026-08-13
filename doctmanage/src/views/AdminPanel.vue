@@ -606,8 +606,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.admin-panel { display: flex; min-height: calc(100vh - 60px); max-width: var(--layout-max-width); margin: 0 auto; padding: 0 var(--layout-padding) 40px; gap: 20px; }
-.ap-side { width: 210px; flex-shrink: 0; margin-top: 20px; border-radius: 14px; border: 1px solid var(--border); background: var(--btn-bg); padding: 14px 10px; position: sticky; top: 80px; height: fit-content; }
+.admin-panel { display: flex; min-height: calc(100vh - 60px); max-width: 1680px; margin: 0 auto; padding: 20px 24px 40px; gap: 20px; }
+.ap-side {
+  width: 220px; flex-shrink: 0;
+  position: fixed; left: 24px; top: 80px; bottom: 20px;
+  overflow-y: auto;
+  border-radius: 14px; border: 1px solid var(--border); background: var(--btn-bg);
+  padding: 14px 10px;
+  z-index: 50;
+}
 .ap-brand { font-weight: 700; font-size: 14px; padding: 6px 10px 14px; color: var(--text1); border-bottom: 1px solid var(--border); margin-bottom: 8px; }
 .ap-nav { display: flex; flex-direction: column; gap: 2px; }
 .ap-nav-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: none; background: transparent; color: var(--text2); font-size: 13.5px; cursor: pointer; border-radius: 9px; text-align: left; }
@@ -616,7 +623,7 @@ onMounted(async () => {
 .ap-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .ap-back { width: 100%; padding: 8px; border: 1px solid var(--border); background: transparent; color: var(--text2); border-radius: 9px; cursor: pointer; font-size: 12.5px; }
 .ap-back:hover { color: var(--text1); }
-.ap-main { flex: 1; min-width: 0; margin-top: 20px; }
+.ap-main { flex: 1; min-width: 0; margin-top: 0; margin-left: 244px; }
 .ap-title { font-size: 18px; font-weight: 700; color: var(--text1); margin: 4px 0 16px; }
 .ap-sub { font-size: 12.5px; color: var(--text2); font-weight: 400; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -680,9 +687,9 @@ onMounted(async () => {
 
 @media (max-width: 900px) {
   .admin-panel { flex-direction: column; padding: 0 12px 30px; }
-  .ap-side { width: 100%; position: static; margin-top: 10px; }
+  .ap-side { width: 100%; position: static; margin-top: 10px; max-height: none; overflow-y: visible; }
   .ap-nav { flex-direction: row; flex-wrap: wrap; }
-  .ap-main { margin-top: 10px; }
+  .ap-main { margin-top: 10px; margin-left: 0; }
   .ap-table { font-size: 12px; }
   .ops { flex-direction: column; }
 }
