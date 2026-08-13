@@ -24,7 +24,7 @@
         </div>
         <div class="chart-pair" style="margin-bottom: 14px;">
           <div class="trend-card wide">
-            <h3>💬 互动趋势（近 7 天）</h3>
+            <h3>📊 近 7 天增长</h3>
             <div ref="interactChartRef" class="echart-box tall"></div>
           </div>
           <div class="trend-card">
@@ -633,17 +633,17 @@ function renderCharts() {
       { name: 'AI 使用次数', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.ai_7_daily, d)), itemStyle: { color: '#a855f7' }, areaStyle: { opacity: .08, color: '#a855f7' } },
     ],
   })
-  // 互动趋势：近 7 天 评论/点赞/收藏
+  // 柱状图：近 7 天 评论/点赞/收藏 堆叠增长（每天一根粗柱）
   interactChart.setOption({
     tooltip: { trigger: 'axis' },
     legend: { data: ['新增评论', '新增点赞', '新增收藏'], textStyle: { color: 'var(--text2)' }, top: 0 },
     grid: { left: 34, right: 12, top: 28, bottom: 4 },
-    xAxis: { type: 'category', boundaryGap: false, data: days, axisLabel: { color: 'var(--text2)' }, axisLine: { lineStyle: { color: 'var(--border)' } } },
+    xAxis: { type: 'category', data: days, axisLabel: { color: 'var(--text2)' }, axisLine: { lineStyle: { color: 'var(--border)' } } },
     yAxis: { type: 'value', minInterval: 1, axisLabel: { color: 'var(--text2)' }, splitLine: { lineStyle: { color: 'var(--border)' } } },
     series: [
-      { name: '新增评论', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.comments_7, d)), itemStyle: { color: '#f59e0b' } },
-      { name: '新增点赞', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.likes_7, d)), itemStyle: { color: '#ec4899' } },
-      { name: '新增收藏', type: 'line', smooth: true, data: trendDays.value.map(d => dayCount(stats.value.favorites_7, d)), itemStyle: { color: '#06b6d4' } },
+      { name: '新增评论', type: 'bar', stack: 'total', data: trendDays.value.map(d => dayCount(stats.value.comments_7, d)), itemStyle: { color: '#f59e0b' }, barWidth: 22 },
+      { name: '新增点赞', type: 'bar', stack: 'total', data: trendDays.value.map(d => dayCount(stats.value.likes_7, d)), itemStyle: { color: '#ec4899' }, barWidth: 22 },
+      { name: '新增收藏', type: 'bar', stack: 'total', data: trendDays.value.map(d => dayCount(stats.value.favorites_7, d)), itemStyle: { color: '#06b6d4' }, barWidth: 22 },
     ],
   })
   // 环形饼图：数据分布（公开/私密/待审/AI 使用次数）
