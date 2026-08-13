@@ -29,11 +29,16 @@
         </svg>
       </div>
       <h2 class="dl-name">知屿 · Windows 客户端</h2>
-      <p class="dl-meta">版本 v1.2.0 · 2026-08-12 · 约 200MB</p>
-      <a class="dl-btn desktop-only" :href="downloadUrl" download>
-        ⬇ 下载 Windows 版
-      </a>
-      <p class="dl-hint desktop-only">下载后解压，双击「知屿.exe」即可使用</p>
+      <p class="dl-meta">版本 v1.2.0 · 2026-08-12</p>
+      <div class="dl-btns">
+        <a class="dl-btn" :href="setupUrl" download>
+          ⬇ 下载安装版（推荐）
+        </a>
+        <a class="dl-btn ghost" :href="zipUrl" download>
+          绿色免安装版
+        </a>
+      </div>
+      <p class="dl-hint desktop-only">安装版走安装向导（自动创建桌面快捷方式）；绿色版解压即用</p>
       <!-- 移动端提示：不提供客户端下载，引导用网页版 -->
       <div class="dl-mobile-tip">
         📱 移动端无需下载客户端<br />
@@ -62,17 +67,17 @@
     <div class="dl-steps">
       <h3 class="dl-sec-title">📦 安装步骤</h3>
       <ol class="dl-steps-list">
-        <li>点击上方「下载 Windows 版」，得到压缩包（约 200MB）；</li>
-        <li>解压到任意目录（建议 D 盘或桌面文件夹）；</li>
-        <li>双击文件夹里的「知屿.exe」启动；</li>
+        <li>点击上方「下载安装版」，得到安装包 <b>知屿-setup.exe</b>（约 90MB）；</li>
+        <li>双击运行安装包，一路「下一步」即可（默认安装到 Program Files）；</li>
+        <li>安装完成后自动创建<b>桌面快捷方式</b>与<b>开始菜单</b>入口，双击「知屿」启动；</li>
         <li>若 Windows 提示「无法验证发布者」：点「更多信息」→「仍要运行」即可（未签名软件的默认提示，不影响使用）；</li>
-        <li>用网页版同一账号登录，即可同步全部笔记。</li>
+        <li>用网页版同一账号登录，即可同步全部笔记；以后有新版，启动时自动提示、应用内一键更新。</li>
       </ol>
     </div>
 
     <div class="dl-steps" v-if="!isDesktop">
       <h3 class="dl-sec-title">⚠️ 被 Windows「智能应用控制」拦截？</h3>
-      <p class="dl-text">新版 Windows 的「智能应用控制」会直接阻止无法验证发布者的应用（包括知屿下载器/客户端）。</p>
+      <p class="dl-text">新版 Windows 的「智能应用控制」会直接阻止无法验证发布者的应用（包括知屿安装包/客户端）。</p>
       <div class="sacl-steps">
         <div class="sacl-step" v-for="(s, i) in saclSteps" :key="i">
           <div class="sacl-no">{{ i + 1 }}</div>
@@ -95,7 +100,8 @@
 </template>
 
 <script setup>
-const downloadUrl = 'http://182.254.209.123/downloads/zhiyu-win32-x64.zip'
+const setupUrl = 'http://182.254.209.123/downloads/知屿-setup.exe'
+const zipUrl = 'http://182.254.209.123/downloads/zhiyu-win32-x64.zip'
 // Electron 桌面版：隐藏下载入口，显示已安装提示
 const isDesktop = typeof document !== 'undefined' && document.documentElement.classList.contains('desktop-electron')
 // 智能应用控制关闭步骤（图片来自 public/sacl-guide/）
@@ -139,6 +145,15 @@ const saclSteps = [
   transition: transform .2s, box-shadow .2s;
 }
 .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(59, 130, 246, .45); }
+.dl-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.dl-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--c-border, rgba(255,255,255,.14));
+  color: var(--c-text-1, #e8ecf8);
+  box-shadow: none;
+  font-size: 14px;
+}
+.dl-btn.ghost:hover { box-shadow: none; background: var(--c-btn-bg, rgba(255,255,255,.06)); }
 .dl-hint { color: var(--c-text-2, #9aa4bd); font-size: 13px; margin: 14px 0 0; }
 .dl-mobile-tip { display: none; }
 @media (max-width: 720px) {
