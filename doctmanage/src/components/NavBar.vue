@@ -60,7 +60,7 @@
                 <span class="bell-time">{{ n.created_at?.slice(5, 16) }}</span>
                 <button class="bell-del" data-tip="删除" @click.stop="delNoti(n)">✕</button>
                 <div v-if="n.type === 'digest' && expandedDigest === n.id" class="bell-digest">{{ n.extra }}</div>
-                <div v-if="(n.type === 'admin_coins' || n.type === 'redeem') && expandedDigest === n.id" class="bell-digest">{{ notiDetail(n) }}</div>
+                <div v-if="(n.type === 'admin_notice' || n.type === 'admin_coins' || n.type === 'redeem') && expandedDigest === n.id" class="bell-digest">{{ notiDetail(n) }}</div>
               </div>
             </div>
           </Transition>
@@ -164,8 +164,8 @@ const openNoti = async (n) => {
     n.is_read = 1
     unread.value = Math.max(0, unread.value - 1)
   }
-  // 每日摘要 / 站长发币：面板内展开文字，不跳转
-  if (n.type === 'digest' || n.type === 'admin_coins' || n.type === 'redeem') {
+  // 每日摘要 / 系统通知 / 站长发币 / 兑换码：面板内展开文字，不跳转
+  if (n.type === 'digest' || n.type === 'admin_notice' || n.type === 'admin_coins' || n.type === 'redeem') {
     expandedDigest.value = expandedDigest.value === n.id ? null : n.id
     return
   }
@@ -180,7 +180,7 @@ const notiText = (n) => {
   if (n.type === 'digest') return '每日摘要'
   // 管理员通知 / 发币 / 兑换码：读取 extra（JSON）
   if (n.type === 'admin_notice') {
-    try { const e = JSON.parse(n.extra || '{}'); return `系统通知：${e.title || ''} ${e.content || ''}`.trim() } catch (err) { return '系统通知' }
+    try { const e = JSON.parse(n.extra || '{}'); return `📢 ${e.title || '系统通知'}` } catch (err) { return '📢 系统通知' }
   }
   if (n.type === 'admin_coins') {
     try { const e = JSON.parse(n.extra || '{}'); return `站长给你发放了 ${e.amount || 0} 知屿币` } catch (err) { return '收到站长发放的知屿币' }
@@ -202,6 +202,9 @@ const notiText = (n) => {
 const notiDetail = (n) => {
   try {
     const e = JSON.parse(n.extra || '{}')
+    if (n.type === 'admin_notice') {
+      return `${e.title || '系统通知'}\n\n${e.content || ''}`
+    }
     if (n.type === 'admin_coins') {
       return `站长给你发放了 ${e.amount || 0} 知屿币${e.note ? '，并给你留言：' + e.note : ''}`
     }
