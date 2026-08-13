@@ -943,7 +943,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.admin-panel { display: flex; min-height: calc(100vh - 60px); max-width: 1680px; margin: 0 auto; padding: 20px 24px 40px; gap: 20px; }
+.admin-panel { display: flex; min-height: calc(100vh - 60px); max-width: 1680px; margin: 0 auto; padding: 66px 24px 40px; gap: 20px; }
 .ap-side {
   width: 232px; flex-shrink: 0;
   position: fixed; left: 0; top: 60px; bottom: 0;
@@ -963,8 +963,8 @@ onMounted(async () => {
 .ap-back { width: 100%; padding: 8px; border: 1px solid var(--border); background: transparent; color: var(--text2); border-radius: 9px; cursor: pointer; font-size: 12.5px; }
 .ap-back:hover { color: var(--text1); }
 .ap-main { flex: 1; min-width: 0; margin-top: 0; margin-left: 240px; }
-/* 去掉模块大标题后，内容顶部保留间距（不贴导航栏） */
-.ap-main > section { padding-top: 26px; }
+/* 去掉模块大标题后，内容顶部保留间距（与侧边栏同高，不贴导航栏） */
+.ap-main > section { padding-top: 14px; }
 .ap-title { font-size: 18px; font-weight: 700; color: var(--text1); margin: 4px 0 16px; }
 .ap-sub { font-size: 12.5px; color: var(--text2); font-weight: 400; }
 .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 18px; }
@@ -1111,7 +1111,7 @@ onMounted(async () => {
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(16px); }
 
 @media (max-width: 900px) {
-  .admin-panel { flex-direction: column; padding: 0 12px 30px; }
+  .admin-panel { flex-direction: column; padding: 70px 12px 30px; }
   .ap-side { width: 100%; position: static; margin-top: 10px; max-height: none; overflow-y: visible; }
   .ap-nav { flex-direction: row; flex-wrap: wrap; }
   .ap-main { margin-top: 10px; margin-left: 0; }
