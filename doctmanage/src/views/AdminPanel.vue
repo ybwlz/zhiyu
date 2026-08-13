@@ -612,11 +612,14 @@ function initCharts() {
 function resizeCharts() { lineChart?.resize(); pieChart?.resize() }
 function renderCharts() {
   if (!lineChart) return
-  const days = trendDays.value.map(d => d.slice(5))
+  try {
+    const days = trendDays.value.map(d => d.slice(5))
   // 折线图：近 7 天 用户/笔记/AI 趋势
+  const hasTrend = trendDays.value.some(d => dayCount(stats.value.users_7, d) || dayCount(stats.value.docs_7, d) || dayCount(stats.value.ai_7_daily, d))
   lineChart.setOption({
     tooltip: { trigger: 'axis' },
     legend: { data: ['新增用户', '新增笔记', 'AI 使用次数'], textStyle: { color: 'var(--text2)' }, top: 0 },
+    graphic: hasTrend ? [] : [{ type: 'text', left: 'center', top: 'middle', style: { text: '近 7 天暂无新增数据', fill: '#9aa4bd', fontSize: 13 } }],
     grid: { left: 34, right: 12, top: 28, bottom: 4 },
     xAxis: { type: 'category', boundaryGap: false, data: days, axisLabel: { color: 'var(--text2)' }, axisLine: { lineStyle: { color: 'var(--border)' } } },
     yAxis: { type: 'value', minInterval: 1, axisLabel: { color: 'var(--text2)' }, splitLine: { lineStyle: { color: 'var(--border)' } } },
@@ -645,6 +648,7 @@ function renderCharts() {
       ],
     }],
   })
+  } catch (e) { console.error('图表渲染失败', e) }
 }
 // 柱状图高度（按最大值归一化）
 const usersMax = computed(() => Math.max(1, ...((stats.value.users_7) || []).map(x => x.count || 0)))
