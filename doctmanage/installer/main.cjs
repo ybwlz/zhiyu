@@ -97,11 +97,18 @@ ipcMain.handle('install', async (e, payload) => {
     })(src)
     const total = allFiles.length
     let done = 0
+    let skipped = 0
     for (const fp of allFiles) {
       const rel = path.relative(src, fp)
       const dest = path.join(target, rel)
-      await fsp.mkdir(path.dirname(dest), { recursive: true })
-      await fsp.copyFile(fp, dest)
+      try {
+        await fsp.mkdir(path.dirname(dest), { recursive: true })
+        await fsp.copyFile(fp, dest)
+      } catch (err) {
+        // 个别文件复制失败（如符号链接/路径异常）不中断安装
+        skipped++
+        try { if (fs.existsSync(dest)) fs.rmSync(dest, { force: true }) } catch (e) { /* 忽略 */ }
+      }
       done++
       const pct = 8 + Math.round((done / total) * 62) // 8% → 70%
       if (done % 50 === 0 || done === total) send('copy', pct, `正在复制文件… ${done}/${total}`)

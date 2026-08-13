@@ -40,10 +40,16 @@ $('btnThNext').onclick = async () => {
 
 // ④ 配置页
 $('btnBack').onclick = () => showPage('pageTheme')
-// 浏览选择安装目录
+// 浏览选择安装目录（自动补 \知屿 子目录）
 $('btnBrowse').onclick = async () => {
   const dir = await api.chooseDir()
-  if (dir) { targetDir = dir; $('dirInput').value = dir }
+  if (dir) {
+    const clean = dir.replace(/[\\/]+$/, '')
+    const parts = clean.split(/[\\/]/)
+    const last = parts[parts.length - 1]
+    targetDir = last === '知屿' ? clean : clean + '\\知屿'
+    $('dirInput').value = targetDir
+  }
 }
 // 条款勾选控制安装按钮
 $('optAgree').onchange = () => {
