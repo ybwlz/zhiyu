@@ -180,6 +180,10 @@
             </span>
             <span class="footer-tip">用 知屿 沉淀每一份知识 ✨</span>
           </div>
+          <div v-if="siteConfig.icp_no || siteConfig.gongan_no" class="footer-beian">
+            <a v-if="siteConfig.icp_no" class="beian-link" :href="siteConfig.icp_link || 'https://beian.miit.gov.cn/'" target="_blank" rel="noopener">{{ siteConfig.icp_no }}</a>
+            <a v-if="siteConfig.gongan_no" class="beian-link" :href="siteConfig.gongan_link || 'http://www.beian.gov.cn/'" target="_blank" rel="noopener">🛡 {{ siteConfig.gongan_no }}</a>
+          </div>
         </footer>
       </main>
     </div>
@@ -250,9 +254,15 @@ const communityStats = computed(() => {
   }
 })
 
+const siteConfig = ref({})
+async function loadSiteConfig() {
+  try { siteConfig.value = (await api.get('/site-config')).data || {} } catch (e) { /* 忽略 */ }
+}
+
 onMounted(() => {
   store.fetchDocs()
   loadToday()
+  loadSiteConfig()
   // 科目图谱：PC = 下滑驱动横移；平板/手机 = 原生横向滚动（进度条由模板 @scroll 更新）
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('mousemove', onMouseMove, { passive: true })
@@ -892,6 +902,10 @@ const updateSubjectsProgress = () => {
 }
 .footer-link:hover { color: var(--brand-1); }
 .footer-tip { color: var(--text2); font-size: 13px; }
+/* 备案信息（ICP/公安） */
+.footer-beian { display: flex; justify-content: center; gap: 20px; margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.beian-link { color: var(--text2); font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.beian-link:hover { color: var(--text1); }
 
 /* ═══════════ 响应式 ═══════════ */
 @media (max-width: 1024px) {

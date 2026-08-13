@@ -433,6 +433,12 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             KEY idx_admin (admin_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
+    # ── 站点配置（ICP/公安备案号等，主页页脚展示） ──
+    with conn.cursor() as cur:
+        cur.execute("""CREATE TABLE IF NOT EXISTS site_config (
+            k VARCHAR(64) PRIMARY KEY,
+            v TEXT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
 
     conn.commit()
     conn.close()

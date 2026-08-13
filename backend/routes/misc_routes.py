@@ -206,6 +206,18 @@ MALL_GOODS = {
     3: {'name': '专属徽章·学霸', 'cost': 500, 'type': 'badge', 'value': 1},
 }
 
+@bp.route('/api/site-config', methods=['GET'])
+def site_config():
+    """公开：站点备案配置（主页页脚展示 ICP/公安备案号）"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT k, v FROM site_config")
+            return jsonify({r['k']: r['v'] for r in cur.fetchall()})
+    finally:
+        conn.close()
+
+
 @bp.route('/api/mall/redeem', methods=['POST'])
 @require_login
 def mall_redeem(user=None):

@@ -589,6 +589,33 @@ def admin_set_manager(user):
         conn.close()
 
 
+@bp.route('/api/admin/site-config', methods=['GET', 'POST'])
+@require_role('admin')
+def admin_site_config(user):
+    """站点备案配置（站长专属）：ICP/公安备案号与链接，主页页脚展示"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            if request.method == 'GET':
+                cur.execute("SELECT k, v FROM site_config")
+                cfg = {r['k']: r['v'] for r in cur.fetchall()}
+                return jsonify(cfg)
+            data = request.get_json(silent=True) or {}
+            keys = ['icp_no', 'icp_link', 'gongan_no', 'gongan_link']
+            for k in keys:
+                v = str(data.get(k) or '').strip()[:255]
+                if v:
+                    cur.execute("INSERT INTO site_config (k, v) VALUES (%s, %s) ON DUPLICATE KEY UPDATE v=VALUES(v)", (k, v))
+                else:
+                    cur.execute("DELETE FROM site_config WHERE k=%s", (k,))
+        conn.commit()
+        log_admin(conn, user['id'], 'site_config', 'site', '', '备案配置更新')
+        conn.commit()
+        return jsonify({'ok': True})
+    finally:
+        conn.close()
+
+
 # ─────────────────── AI 使用日志 ───────────────────
 @bp.route('/api/admin/ai-logs', methods=['GET'])
 @require_perm('notes')

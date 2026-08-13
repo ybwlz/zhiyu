@@ -348,6 +348,30 @@
         </table>
       </section>
 
+      <!-- ── 备案管理 ── -->
+      <section v-else-if="mod === 'beian'">
+        <div class="audit-tip">📇 填写网站备案信息（ICP/公安），保存后主页页脚自动展示</div>
+        <div class="form-card">
+          <div class="form-row">
+            <label class="beian-label">ICP 备案号</label>
+            <input v-model="beian.icp_no" class="ap-input" placeholder="如：粤ICP备2025000000号" />
+          </div>
+          <div class="form-row">
+            <label class="beian-label">ICP 链接</label>
+            <input v-model="beian.icp_link" class="ap-input" placeholder="如：https://beian.miit.gov.cn/（留空用默认）" />
+          </div>
+          <div class="form-row">
+            <label class="beian-label">公安备案号</label>
+            <input v-model="beian.gongan_no" class="ap-input" placeholder="如：粤公网安备 44030000000000号" />
+          </div>
+          <div class="form-row">
+            <label class="beian-label">公安链接</label>
+            <input v-model="beian.gongan_link" class="ap-input" placeholder="如：http://www.beian.gov.cn/（留空用默认）" />
+          </div>
+          <button class="ap-btn" @click="saveBeian">保存备案信息</button>
+        </div>
+      </section>
+
       <!-- ── AI 日志 ── -->
       <section v-else-if="mod === 'ailogs'">
         <table class="ap-table">
@@ -512,8 +536,9 @@ const menus = [
   { id: 'codes', icon: '🎫', label: '兑换码' },
   { id: 'notices', icon: '📢', label: '通知' },
   { id: 'digests', icon: '📅', label: 'AI 摘要' },
-  { id: 'admins', icon: '🛡️', label: '管理员' },
   { id: 'ailogs', icon: '🤖', label: 'AI 日志' },
+  { id: 'beian', icon: '📇', label: '备案管理' },
+  { id: 'admins', icon: '🛡️', label: '管理员' },
 ]
 const mod = ref('dash')
 const currentMenu = computed(() => menus.find(m => m.id === mod.value))
@@ -526,6 +551,7 @@ watch(mod, (v) => {
   if (v === 'ailogs') loadAiLogs(1)
   if (v === 'notices') loadNoticeHistory()
   if (v === 'digests') loadDigests(1)
+  if (v === 'beian') loadBeian()
 })
 
 // ── 自研弹窗/提示（替换默认 alert/confirm/prompt） ──
@@ -907,6 +933,18 @@ async function loadDigests(page) {
   } catch (e) { digestList.value = [] }
 }
 
+// ── 备案管理 ──
+const beian = ref({ icp_no: '', icp_link: '', gongan_no: '', gongan_link: '' })
+async function loadBeian() {
+  try { Object.assign(beian.value, (await api.get('/admin/site-config')).data) } catch (e) { /* 权限不足 */ }
+}
+async function saveBeian() {
+  try {
+    await api.post('/admin/site-config', beian.value)
+    toast('备案信息已保存，主页页脚将展示')
+  } catch (e) { toast(e.response?.data?.error || '保存失败', 'err') }
+}
+
 // ── AI 日志 ──
 const aiLogs = ref([])
 const aiLogTotal = ref(0)
@@ -1052,6 +1090,7 @@ onMounted(async () => {
 .form-row .ap-input { flex: 1; min-width: 140px; }
 .ap-input.ta { min-height: 140px; resize: vertical; width: 100%; font-size: 14px; line-height: 1.7; }
 .nowrap { white-space: nowrap; }
+.beian-label { width: 90px; flex-shrink: 0; font-size: 13px; color: var(--text2); display: flex; align-items: center; }
 .ap-sec { font-size: 14px; margin: 16px 0 10px; color: var(--text1); }
 .mono { font-family: Consolas, monospace; letter-spacing: .5px; }
 .code-box { margin-top: 12px; padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--brand-1) 8%, transparent); border: 1px dashed color-mix(in srgb, var(--brand-1) 40%, transparent); }
