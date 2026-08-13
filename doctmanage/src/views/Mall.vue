@@ -8,6 +8,20 @@ const auth = useAuthStore()
 const points = ref(0)
 const logs = ref([])
 const loading = ref(true)
+const redeemCode = ref('')
+
+const redeem = async () => {
+  if (!auth.isLogin) { ElMessage.warning('请先登录'); return }
+  if (!redeemCode.value.trim()) { ElMessage.warning('请输入兑换码'); return }
+  try {
+    const res = await api.post('/mall/redeem', { code: redeemCode.value })
+    ElMessage.success(`兑换成功！获得 ${res.data.amount} 知屿币`)
+    redeemCode.value = ''
+    load()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.error || '兑换失败')
+  }
+}
 
 const GOODS = [
   { id: 1, name: 'AI 助手额度 ×5', desc: '额外 5 次 DeepSeek 智能问答额度', cost: 100, icon: '🤖' },
@@ -88,7 +102,18 @@ onMounted(load)
         <div class="goods-icon">{{ g.icon }}</div>
         <h4>{{ g.name }}</h4>
         <p>{{ g.desc }}</p>
+
         <button class="exchange-btn" @click="exchange(g)">兑换 · {{ g.cost }} 知屿币</button>
+      </div>
+    </div>
+
+    <!-- 兑换码兑换 -->
+    <div class="redeem-card">
+      <h3 class="section-title">🎫 兑换码</h3>
+      <p class="redeem-tip">输入兑换码领取知屿币（兑换码由管理员发放）</p>
+      <div class="redeem-row">
+        <input v-model="redeemCode" class="redeem-input" placeholder="请输入兑换码" @keyup.enter="redeem" />
+        <button class="exchange-btn" @click="redeem">兑换</button>
       </div>
     </div>
 
@@ -137,6 +162,13 @@ onMounted(load)
 .balance-label { font-size: 13.5px; color: var(--text2); margin: 4px 0 10px; }
 .balance-tip { font-size: 12.5px; color: var(--text2); margin: 0; }
 .section-title { font-size: 16px; font-weight: 700; margin: 26px 0 14px; color: var(--text1); }
+/* 兑换码 */
+.redeem-card { margin-top: 6px; padding: 16px; border-radius: 14px; border: 1px dashed var(--border); background: var(--btn-bg); }
+.redeem-card .section-title { margin: 0 0 6px; }
+.redeem-tip { color: var(--text2); font-size: 12.5px; margin: 0 0 12px; }
+.redeem-row { display: flex; gap: 10px; max-width: 460px; }
+.redeem-input { flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text1); font-size: 14px; letter-spacing: 1px; text-transform: uppercase; outline: none; }
+.redeem-input:focus { border-color: var(--brand-1); }
 .goods-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
 .goods-card {
   background: var(--card-bg); border: 1px solid var(--border);

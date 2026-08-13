@@ -132,6 +132,8 @@ def init_db():
             ("likes_public", "TINYINT NOT NULL DEFAULT 1"),
             ("favorites_public", "TINYINT NOT NULL DEFAULT 1"),
             ("username_changed_at", "DATETIME DEFAULT NULL"),
+            ("banned", "TINYINT NOT NULL DEFAULT 0"),
+            ("admin_perms", "TEXT NULL"),
         ]:
             try:
                 cur.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
@@ -163,6 +165,8 @@ def init_db():
             ("downloads_count", "INT NOT NULL DEFAULT 0"),
             ("pinned_until", "DATETIME DEFAULT NULL"),
             ("origin_id", "BIGINT DEFAULT NULL"),
+            ("audit_status", "VARCHAR(16) NOT NULL DEFAULT ''"),
+            ("audit_reason", "VARCHAR(255) DEFAULT NULL"),
         ]:
             try:
                 cur.execute(f"ALTER TABLE docs ADD COLUMN {col} {ddl}")
@@ -403,5 +407,32 @@ def init_db():
                 cur.execute("UPDATE users SET public_id=%s WHERE id=%s", (gen_public_id(), row['id']))
     except Exception:
         pass
+
+    # ── 管理后台：知屿币兑换码 ──
+    with conn.cursor() as cur:
+        cur.execute("""CREATE TABLE IF NOT EXISTS redeem_codes (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            code VARCHAR(32) NOT NULL UNIQUE,
+            amount INT NOT NULL,
+            created_by BIGINT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME DEFAULT NULL,
+            used_by BIGINT DEFAULT NULL,
+            used_at DATETIME DEFAULT NULL,
+            KEY idx_used (used_by)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
+    # ── 管理后台：操作审计（谁删了评论/发了币/改了权限，可追溯） ──
+    with conn.cursor() as cur:
+        cur.execute("""CREATE TABLE IF NOT EXISTS admin_logs (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            admin_id BIGINT NOT NULL,
+            action VARCHAR(32) NOT NULL,
+            target_type VARCHAR(32) DEFAULT '',
+            target_id VARCHAR(64) DEFAULT '',
+            detail VARCHAR(255) DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_admin (admin_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
+
     conn.commit()
     conn.close()

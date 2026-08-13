@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """阅览室 / 收费购买 / 首页动态流 / 更新日志聚合 / 积分商城"""
+import json
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 
 from db import get_conn
 from auth import require_login
-from utils import DOC_SELECT
+from utils import DOC_SELECT, grant_points
 
 bp = Blueprint('misc', __name__)
 
@@ -204,6 +205,36 @@ MALL_GOODS = {
     2: {'name': '笔记广场置顶 24h', 'cost': 200, 'type': 'pin', 'value': 1},
     3: {'name': '专属徽章·学霸', 'cost': 500, 'type': 'badge', 'value': 1},
 }
+
+@bp.route('/api/mall/redeem', methods=['POST'])
+@require_login
+def mall_redeem(user=None):
+    """用户兑换兑换码（管理员在后台生成，面值知屿币）"""
+    data = request.get_json(silent=True) or {}
+    code = (data.get('code') or '').strip().upper()
+    if not code:
+        return jsonify({'error': '请输入兑换码'}), 400
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, amount, expires_at, used_by FROM redeem_codes WHERE code=%s", (code,))
+            rc = cur.fetchone()
+            if not rc:
+                return jsonify({'error': '兑换码不存在'}), 404
+            if rc['used_by']:
+                return jsonify({'error': '兑换码已被使用'}), 400
+            if rc['expires_at'] and rc['expires_at'] < datetime.now():
+                return jsonify({'error': '兑换码已过期'}), 400
+            # 发币 + 标记已用
+            grant_points(conn, user['id'], rc['amount'], 'redeem_code')
+            cur.execute("UPDATE redeem_codes SET used_by=%s, used_at=NOW() WHERE id=%s", (user['id'], rc['id']))
+            cur.execute("INSERT INTO notifications (user_id, actor_id, type, extra) VALUES (%s,%s,'redeem',%s)",
+                        (user['id'], user['id'], json.dumps({'amount': rc['amount']}, ensure_ascii=False)))
+        conn.commit()
+        return jsonify({'ok': True, 'amount': rc['amount']})
+    finally:
+        conn.close()
+
 
 @bp.route('/api/mall/exchange', methods=['POST'])
 @require_login

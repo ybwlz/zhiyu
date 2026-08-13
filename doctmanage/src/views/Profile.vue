@@ -297,6 +297,8 @@ watch(() => route.params.key, () => {
           </div>
           <h2 class="nickname">
             {{ profile.nickname || profile.username }}
+            <span v-if="profile.role === 'admin'" class="badge-scholar admin-badge" data-tip="站长">🔰 站长</span>
+            <span v-else-if="profile.role === 'moderator'" class="admin-badge" data-tip="辅助管理员">🛡 管理员</span>
             <span v-if="profile.badge === 'scholar'" class="badge-scholar" data-tip="学霸徽章">🏅 学霸</span>
           </h2>
           <div v-if="isMe" class="my-id" data-tip="点击复制我的 ID" @click="copyId">ID: {{ profile.username }} 📋</div>
@@ -673,6 +675,17 @@ html[data-theme="starlight"] .profile-bg { opacity: .32; }
   border: 1px solid #e6a800;
   box-shadow: 0 2px 8px rgba(255, 179, 0, .35);
   mix-blend-mode: normal; /* 防止继承父级 difference 混合导致金色变蓝 */
+  margin-left: 8px;
+}
+.admin-badge {
+  font-size: 11.5px; font-weight: 700;
+  padding: 3px 12px; border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border: 1px solid #1d4ed8;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, .35);
+  mix-blend-mode: normal;
+  margin-left: 8px;
 }
 .bio { color: var(--text2); font-size: 14px; margin: 4px 0; }
 .interests { color: var(--text2); font-size: 13px; margin: 4px 0; }

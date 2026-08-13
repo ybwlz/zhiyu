@@ -34,7 +34,7 @@ def user_profile(uid):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT id, username, nickname, avatar, cover, bio, interests, points, read_seconds, badge, public_id,
+            cur.execute("""SELECT id, username, nickname, avatar, cover, bio, interests, points, read_seconds, badge, public_id, role,
                 likes_public, favorites_public,
                 CAST(created_at AS CHAR) AS created_at FROM users WHERE id=%s""", (uid,))
             u = cur.fetchone()

@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """纯工具函数（不依赖 db/auth），供共享层与各路由使用。"""
 import re
+import json
 import secrets
+import urllib.request
 from datetime import datetime
+
+from config import DEEPSEEK_API_KEY, DEEPSEEK_RESPONSES_URL, DEEPSEEK_RESPONSES_MODEL
 
 def gen_public_id():
     """生成对外展示用的不可猜测短 ID（去掉易混淆字符 O/0/I/l/1）。"""
@@ -82,3 +86,72 @@ def notify(conn, user_id, actor_id, ntype, doc_id=None):
     with conn.cursor() as cur:
         cur.execute("INSERT INTO notifications (user_id, actor_id, type, doc_id) VALUES (%s, %s, %s, %s)",
                     (user_id, actor_id, ntype, doc_id))
+
+
+# ═══════════════ 管理后台：内容审核与审计 ═══════════════
+
+# 内置敏感词库（免费秒拦的第一道防线；AI 负责更精细的二审）
+SENSITIVE_WORDS = [
+    '赌博', '博彩', '六合彩', '时时彩', '外围赌球', '棋牌代理',
+    '裸聊', '约炮', '卖淫', '嫖娼', '援交', '包养', '一夜情',
+    '代开发票', '发票代开', '办证', '假证', '代孕', '卵子交易',
+    '刷单', '兼职日结', '打字员日结', '加QQ', '加微信', '加vx', 'v信',
+    '传销', '资金盘', '庞氏', '拉人头', '直销模式',
+    '冰毒', '海洛因', '摇头丸', '大麻出售', '毒品', '制毒',
+    '枪支', '弹药', '军火', '爆炸物', '雷管', '手榴弹',
+    '法轮', '邪教', '全能神', '颠覆', '恐怖袭击', 'isis', '基地组织',
+    '儿童色情', '幼女', '强奸', '迷奸', '诈骗', '电信诈骗', '洗钱',
+]
+# 拼音/变体常见绕过词（简单覆盖，AI 兜底更全）
+SENSITIVE_WORDS += ['du博', 'dubo', 'piao娼', 'maiyin', 'dupin', 'qiangzhi']
+
+def check_sensitive(text):
+    """第一道防线：内置敏感词匹配，命中返回词，未命中返回 None"""
+    if not text:
+        return None
+    for w in SENSITIVE_WORDS:
+        if w in text:
+            return w
+    return None
+
+def ai_moderate(text, max_len=3000):
+    """AI 内容审核（第二道防线）。返回 {'pass': bool, 'reason': str}；
+    AI 不可用（无 key/超时/接口异常）返回 None → 由调用方走"先上架+待审"。"""
+    if not DEEPSEEK_API_KEY:
+        return None
+    content = text[:max_len] if text else ''
+    if not content.strip():
+        return {'pass': True, 'reason': ''}
+    system = ('你是内容安全审核员。判断用户内容是否违规，违规类别：政治敏感、色情低俗、'
+              '暴力恐怖、毒品枪支、赌博、诈骗、广告导流（留联系方式引流）、辱骂攻击他人。'
+              '仅输出 JSON，格式：{"pass": true} 或 {"pass": false, "reason": "简短违规原因（20字内）"}。')
+    try:
+        payload = json.dumps({
+            'model': DEEPSEEK_RESPONSES_MODEL,
+            'instructions': system,
+            'input': content,
+        }).encode('utf-8')
+        req = urllib.request.Request(DEEPSEEK_RESPONSES_URL, data=payload, headers={
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + DEEPSEEK_API_KEY,
+        })
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        # responses 接口：取 output_text
+        out = data.get('output_text') or ''
+        m = re.search(r'\{.*\}', out, re.S)
+        if m:
+            obj = json.loads(m.group(0))
+            return {'pass': bool(obj.get('pass', True)), 'reason': obj.get('reason', '')[:60]}
+        return {'pass': True, 'reason': ''}
+    except Exception:
+        return None
+
+def log_admin(conn, admin_id, action, target_type='', target_id='', detail=''):
+    """记录管理操作（审计留痕）"""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO admin_logs (admin_id, action, target_type, target_id, detail) VALUES (%s,%s,%s,%s,%s)",
+                        (admin_id, action, target_type, str(target_id), detail[:255]))
+    except Exception:
+        pass

@@ -15,7 +15,7 @@
         <span class="brand-name">知屿</span>
       </router-link>
 
-      <!-- 居中导航：五个页面入口 -->
+      <!-- 居中导航：五个页面入口 + 管理后台（管理员可见） -->
       <div class="nav-links">
         <router-link
           v-for="link in links"
@@ -24,6 +24,7 @@
           :class="{ active: isNavActive(link) }"
           :to="link.to"
         >{{ link.label }}</router-link>
+        <router-link v-if="isManager()" to="/admin-panel" class="nav-link admin-entry" :class="{ active: isNavActive({ to: '/admin-panel' }) }">管理后台</router-link>
       </div>
 
       <div class="nav-right" :class="{ 'logged-out': !auth.isLogin }">
@@ -173,9 +174,19 @@ const openNoti = async (n) => {
   else if (n.type === 'friend_request') window.location.href = '/zhiyu/friends'
   else if (n.actor_id) window.location.href = '/zhiyu/user/' + (n.actor_public_id || n.actor_id)
 }
-const notiIcon = (t) => ({ like: '👍', favorite: '⭐', comment: '💬', friend_request: '👋', digest: '🤖', message: '✉️' }[t] || '🔔')
+const notiIcon = (t) => ({ like: '👍', favorite: '⭐', comment: '💬', friend_request: '👋', digest: '🤖', message: '✉️', admin_notice: '📢', admin_coins: '🪙', redeem: '🎫' }[t] || '🔔')
 const notiText = (n) => {
   if (n.type === 'digest') return '每日摘要'
+  // 管理员通知 / 发币 / 兑换码：读取 extra（JSON）
+  if (n.type === 'admin_notice') {
+    try { const e = JSON.parse(n.extra || '{}'); return `系统通知：${e.title || ''} ${e.content || ''}`.trim() } catch (err) { return '系统通知' }
+  }
+  if (n.type === 'admin_coins') {
+    try { const e = JSON.parse(n.extra || '{}'); return `站长发放了 ${e.amount || 0} 知屿币${e.note ? '（' + e.note + '）' : ''}` } catch (err) { return '收到站长发放的知屿币' }
+  }
+  if (n.type === 'redeem') {
+    try { const e = JSON.parse(n.extra || '{}'); return `兑换码兑换成功，获得 ${e.amount || 0} 知屿币` } catch (err) { return '兑换码兑换成功' }
+  }
   const who = n.nickname || n.username || '有人'
   const t = {
     like: `点赞了你的笔记「${(n.doc_title || '').slice(0, 12)}」`,
@@ -208,6 +219,8 @@ const links = [
   { to: '/activity', label: '修改记录' },
   { to: '/changelog', label: '更新日志' },
 ]
+// 管理后台入口（站长/辅助管理员可见，与书房链接同款样式）
+const isManager = () => auth.isLogin && ['admin', 'moderator'].includes(auth.user?.role)
 </script>
 
 <style scoped>

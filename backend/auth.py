@@ -2,6 +2,7 @@
 """认证与会话：邮箱验证码、token 签发/校验、登录装饰器。"""
 import re
 import secrets
+import json
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
@@ -70,7 +71,7 @@ def get_current_user():
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT u.id, u.username, u.role, u.nickname, u.email, u.avatar, u.cover, u.public_id, u.likes_public, u.favorites_public
+            cur.execute("""SELECT u.id, u.username, u.role, u.nickname, u.email, u.avatar, u.cover, u.public_id, u.likes_public, u.favorites_public, u.admin_perms, u.banned
                 FROM tokens t JOIN users u ON u.id = t.user_id
                 WHERE t.token=%s""", (token,))
             row = cur.fetchone()
@@ -91,5 +92,57 @@ def require_login(f):
         user = get_current_user()
         if not user:
             return jsonify({'error': 'unauthorized'}), 401
+        if user.get('banned'):
+            return jsonify({'error': '账号已被封禁，如有疑问请联系站长'}), 403
         return f(user=user, *args, **kwargs)
     return wrapper
+
+# ── 角色与权限（管理后台） ──
+# 角色：user（普通）/ moderator（辅助管理员，按 admin_perms 勾选权限）/ admin（站长，全权限）
+ALL_PERMS = ['audit', 'notes', 'comments', 'coins', 'codes', 'users', 'notices', 'admins']
+
+def user_can(user, perm):
+    """按角色+权限点判断：admin 全权限；moderator 按 users.admin_perms（JSON 数组）"""
+    if not user:
+        return False
+    if user['role'] == 'admin':
+        return True
+    if user['role'] == 'moderator':
+        try:
+            perms = json.loads(user.get('admin_perms') or '[]')
+            return perm in perms
+        except Exception:
+            return False
+    return False
+
+def require_role(*roles):
+    """仅指定角色可访问（同时校验封禁）"""
+    def deco(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            if not user:
+                return jsonify({'error': 'unauthorized'}), 401
+            if user.get('banned'):
+                return jsonify({'error': '账号已被封禁，如有疑问请联系站长'}), 403
+            if user['role'] not in roles:
+                return jsonify({'error': 'forbidden'}), 403
+            return f(user=user, *args, **kwargs)
+        return wrapper
+    return deco
+
+def require_perm(perm):
+    """角色为 admin/moderator 且拥有指定权限点"""
+    def deco(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            if not user:
+                return jsonify({'error': 'unauthorized'}), 401
+            if user.get('banned'):
+                return jsonify({'error': '账号已被封禁，如有疑问请联系站长'}), 403
+            if user['role'] not in ('admin', 'moderator') or not user_can(user, perm):
+                return jsonify({'error': 'forbidden'}), 403
+            return f(user=user, *args, **kwargs)
+        return wrapper
+    return deco

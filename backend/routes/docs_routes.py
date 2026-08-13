@@ -12,7 +12,7 @@ from db import get_conn
 from auth import get_current_user, require_login
 from shared import fetch_doc_visible
 from utils import (IMG_RE, DOC_SELECT, can_view_doc, make_slug, ensure_unique_slug,
-                   gen_public_id, grant_points, daily_points, bump_doc_count)
+                   gen_public_id, check_sensitive, ai_moderate, grant_points, daily_points, bump_doc_count)
 
 bp = Blueprint('docs', __name__)
 
@@ -199,6 +199,16 @@ def create_doc(user=None):
             fmt = (request.json.get('format') or 'md')[:16]
             if request.json.get('attachment'):
                 attachment = request.json.get('attachment')[:255]
+        # ── 公开笔记内容审核（敏感词秒拦 → AI 二审；AI 不可用先上架+待审） ──
+        audit_status = ''
+        if visibility == 'public' and content_val:
+            bad = check_sensitive(content_val)
+            if bad:
+                return jsonify({'error': f'内容含敏感词「{bad}」，无法公开。请修改内容或保存为私密'}), 400
+            ai = ai_moderate(content_val)
+            if ai is not None and not ai['pass']:
+                return jsonify({'error': f'内容审核未通过：{ai["reason"]}。请修改内容或保存为私密'}), 400
+            audit_status = 'approved' if ai is not None else 'pending'
         conn = get_conn()
         try:
             with conn.cursor() as cur:
@@ -206,8 +216,8 @@ def create_doc(user=None):
                 slug_val = ensure_unique_slug(conn, base_slug)
                 pid_val = gen_public_id()
                 cur.execute(
-                    "INSERT INTO docs (type, title, slug, public_id, content, user_id, visibility, format, attachment, downloadable, price, preview_only, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (type_val, title_val, slug_val, pid_val, content_val, user['id'], visibility, fmt, attachment, downloadable, price, preview_only, datetime.now(), datetime.now())
+                    "INSERT INTO docs (type, title, slug, public_id, content, user_id, visibility, audit_status, format, attachment, downloadable, price, preview_only, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (type_val, title_val, slug_val, pid_val, content_val, user['id'], visibility, audit_status, fmt, attachment, downloadable, price, preview_only, datetime.now(), datetime.now())
                 )
                 new_id = cur.lastrowid
             if visibility == 'public' and daily_points(conn, user['id'], 'note_published', 9) < 9:
@@ -321,6 +331,16 @@ def update_doc(doc_id: int, user=None):
         if type_val is None or title_val is None or content_val is None:
             return jsonify({'error': 'bad_request'}), 400
         visibility = data.get('visibility')
+        # ── 公开审核（敏感词秒拦 → AI 二审；AI 不可用先上架+待审；转私密清空审核状态） ──
+        audit_status = ''
+        if visibility == 'public' and content_val:
+            bad = check_sensitive(content_val)
+            if bad:
+                return jsonify({'error': f'内容含敏感词「{bad}」，无法公开。请修改内容或保存为私密'}), 400
+            ai = ai_moderate(content_val)
+            if ai is not None and not ai['pass']:
+                return jsonify({'error': f'内容审核未通过：{ai["reason"]}。请修改内容或保存为私密'}), 400
+            audit_status = 'approved' if ai is not None else 'pending'
         conn = get_conn()
         try:
             with conn.cursor() as cur:
@@ -346,8 +366,8 @@ def update_doc(doc_id: int, user=None):
                     return jsonify({'error': '价格需在 0~99999 之间'}), 400
                 if visibility in ('public', 'private'):
                     cur.execute(
-                        "UPDATE docs SET type=%s, title=%s, slug=%s, content=%s, visibility=%s, downloadable=%s, price=%s, preview_only=%s, updated_at=%s WHERE id=%s",
-                        (type_val, title_val, slug_val, content_val, visibility,
+                        "UPDATE docs SET type=%s, title=%s, slug=%s, content=%s, visibility=%s, audit_status=%s, downloadable=%s, price=%s, preview_only=%s, updated_at=%s WHERE id=%s",
+                        (type_val, title_val, slug_val, content_val, visibility, audit_status,
                          1 if dl is None else (1 if dl else 0),
                          new_price,
                          1 if pv else 0, datetime.now(), doc_id)

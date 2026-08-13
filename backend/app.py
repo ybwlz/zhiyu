@@ -27,6 +27,7 @@ from routes.messages_routes import bp as messages_bp
 from routes.ai_routes import bp as ai_bp
 from routes.misc_routes import bp as misc_bp
 from routes.annotation_routes import bp as annotation_bp
+from routes.admin_routes import bp as admin_bp
 
 app = Flask(__name__)
 # CORS 白名单（仅允许前端站点跨域）——只注册一次，避免第二次 CORS(app) 用默认全放行覆盖白名单
@@ -37,7 +38,7 @@ CORS(app, resources={r"/api/*": {"origins": [
 # 请求体上限（防磁盘/内存耗尽；正常笔记/上传远小于此）
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
-for _bp in (auth_bp, docs_bp, notes_bp, users_bp, social_bp, messages_bp, ai_bp, misc_bp, annotation_bp):
+for _bp in (auth_bp, docs_bp, notes_bp, users_bp, social_bp, messages_bp, ai_bp, misc_bp, annotation_bp, admin_bp):
     app.register_blueprint(_bp)
 
 @app.after_request
