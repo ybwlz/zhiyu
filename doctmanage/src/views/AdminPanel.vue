@@ -365,7 +365,7 @@
             <input v-model="pickQ" class="ap-input w100" placeholder="搜索用户名/昵称（可选，不搜就翻列表）" @input="loadPickUsers(1)" />
             <div class="pick-list">
               <label v-for="u in pickUsers" :key="u.id" class="pick-item">
-                <input type="checkbox" :checked="pickAll.some(x => x.id === u.id)" @change="togglePick(u, $event.target.checked)" />
+                <input type="checkbox" :value="u.id" v-model="pickedIds" @change="syncPick(u)" />
                 <span>{{ u.nickname || u.username }} · {{ u.username }}</span>
               </label>
               <div v-if="!pickUsers.length" class="empty-tip">暂无用户</div>
@@ -717,6 +717,7 @@ const pickUsers = ref([])
 const pickTotal = ref(0)
 const pickPage = ref(1)
 const pickAll = ref([])
+const pickedIds = ref([])
 async function loadPickUsers(page) {
   pickPage.value = page || 1
   try {
@@ -727,12 +728,14 @@ async function loadPickUsers(page) {
 }
 function openUserPick() {
   pickAll.value = [...noticeSelList.value]
+  pickedIds.value = pickAll.value.map(x => x.id)
   pickQ.value = ''
   userPickModal.value = true
   loadPickUsers(1)
 }
-function togglePick(u, checked) {
-  if (checked) {
+function syncPick(u) {
+  const has = pickedIds.value.includes(u.id)
+  if (has) {
     if (!pickAll.value.some(x => x.id === u.id)) pickAll.value.push({ id: u.id, name: u.nickname || u.username })
   } else {
     pickAll.value = pickAll.value.filter(x => x.id !== u.id)
