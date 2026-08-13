@@ -3,7 +3,7 @@
 //   - 静态文件：dist-electron 产物（module 脚本在 http 下正常执行）
 //   - /api、/uploads：代理到本地后端（http://localhost:5000）
 //   - /zhiyu/*：前端路由回落 index.html
-const { app, BrowserWindow, shell, ipcMain, net } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, net, Tray, Menu, nativeImage } = require('electron')
 const http = require('http')
 const path = require('path')
 const fs = require('fs')
@@ -79,9 +79,24 @@ function serveFile(res, file) {
   }).pipe(res)
 }
 
+let isQuiting = false
+let tray = null
+function createTray() {
+  try {
+    const iconPath = path.join(process.resourcesPath, 'icon.ico')
+    tray = new Tray(nativeImage.createFromPath(iconPath))
+    tray.setToolTip('知屿')
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: '显示知屿', click: () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { w.show(); w.focus() } } },
+      { type: 'separator' },
+      { label: '退出', click: () => { isQuiting = true; app.quit() } },
+    ]))
+    tray.on('click', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { w.show(); w.focus() } })
+  } catch (e) { /* 托盘创建失败不阻塞 */ }
+}
+
 app.whenReady().then(() => {
-  const server = http.createServer((req, res) => {
-    const u = new URL(req.url, 'http://127.0.0.1')
+  const server = http.createServer((req, res) => {    const u = new URL(req.url, 'http://127.0.0.1')
     const p = decodeURIComponent(u.pathname)
 
     // 1) API 与上传 -> 后端代理（方法/请求体原样转发）
@@ -276,6 +291,13 @@ app.whenReady().then(() => {
       if (upd && !win.isDestroyed()) win.webContents.send('update-available', upd)
     }, 8000)
     win.loadURL('http://127.0.0.1:' + port + '/')
+    // ── 系统托盘：点 × 隐藏到托盘（菜单栏常驻），托盘菜单可退出 ──
+    win.on('close', (e) => {
+      if (!isQuiting) { e.preventDefault(); win.hide() }
+    })
+    createTray()
+    ipcMain.on('hide-to-tray', () => { win.hide() })
+    ipcMain.on('quit-app', () => { isQuiting = true; app.quit() })
   })
 })
 

@@ -22,6 +22,9 @@ Copy-Item "$inst\renderer" $appDir -Recurse -Force
 Write-Output '复制绿色版（215MB，稍等）…'
 Copy-Item "$root\release\知屿-win32-x64" "$out\resources\知屿-win32-x64" -Recurse -Force
 
+# 托盘图标（主程序 resources/icon.ico）
+Copy-Item "$inst\icon.ico" "$out\resources\icon.ico" -Force
+
 # 4. exe 图标（rcedit）+ 改名
 Write-Output '设置图标…'
 $rcedit = "$root\node_modules\rcedit\bin\rcedit-x64.exe"

@@ -317,6 +317,8 @@ const toggleRightSidebar = () => { rightSidebarCollapsed.value = !rightSidebarCo
 
 // 右键菜单随全局点击关闭（原有 handleGlobalClick 已有类似逻辑）
 onMounted(() => {
+  // 列表模式（无 key）清掉阅读页残留的 currentDoc，避免广场/阅读页的笔记串进阅览室
+  if (!route.params.key) currentDoc.value = null
   window.addEventListener('resize', updateWidth)
   window.addEventListener('scroll', onScroll) // 监听窗口滚动
   window.addEventListener('click', handleGlobalClick) // 全局点击：关闭右键菜单/复制/锚点
@@ -1263,7 +1265,11 @@ const nextDoc = computed(() => {
 .docs-layout.immersive .left-sidebar,
 .docs-layout.immersive .right-sidebar { display: none; }
 .docs-layout.immersive .doc-tools .tool-btn { display: none; }
-.docs-layout.immersive .main-wrapper {
+/* 沉浸：强制单列全宽（覆盖收起态的三列，否则正文会被塞进 48px 第一列变竖条） */
+.docs-layout.immersive .main-wrapper,
+.docs-layout.immersive .main-wrapper.sidebar-collapsed,
+.docs-layout.immersive .main-wrapper.right-collapsed,
+.docs-layout.immersive .main-wrapper.sidebar-collapsed.right-collapsed {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: 'main';
 }

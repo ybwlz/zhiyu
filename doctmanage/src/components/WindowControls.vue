@@ -13,10 +13,17 @@
 </template>
 
 <script setup>
+import { ElMessageBox } from 'element-plus'
 const isElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron')
 const minimize = () => window.desktop?.windowControls?.minimize()
 const maximize = () => window.desktop?.windowControls?.maximize()
-const close = () => window.desktop?.windowControls?.close()
+// 关闭：弹提示（缩小到托盘 / 直接退出）
+const close = () => {
+  ElMessageBox.confirm('关闭后知屿将缩小到系统托盘，仍在后台运行。', '知屿', {
+    confirmButtonText: '缩小到托盘', cancelButtonText: '直接退出', type: 'warning',
+  }).then(() => { window.desktop?.hideToTray?.() })
+    .catch((action) => { if (action === 'cancel') window.desktop?.quitApp?.() })
+}
 </script>
 
 <style scoped>

@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('desktop', {
   // 开机自启动
   setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
+  // 系统托盘
+  hideToTray: () => ipcRenderer.send('hide-to-tray'),
+  quitApp: () => ipcRenderer.send('quit-app'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   onUpdateAvailable: (cb) => {
     ipcRenderer.on('update-available', (_e, data) => cb(data))
