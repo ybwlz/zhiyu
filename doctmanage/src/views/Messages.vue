@@ -104,6 +104,7 @@
               </div>
             </div>
             <button class="ch-go" @click="goUser(peer.public_id || peer.id)">查看主页 →</button>
+            <button class="ch-go" style="margin-left:8px;" @click="clearChat">🗑 清空</button>
           </div>
           <div class="chat-body" ref="chatBody">
             <div v-if="!msgs.length" class="center empty"><div class="empty-emoji">👋</div>还没有消息，打个招呼吧</div>
@@ -148,7 +149,7 @@
 
 <script>
 import api from '@/utils/api.js'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth.js'
 
 export default {
@@ -293,6 +294,18 @@ export default {
       this.active = null
       this.activeGroup = null
       this.peer = null
+    },
+    clearChat() {
+      const name = (this.peer && (this.peer.nickname || this.peer.username)) || '对方'
+      ElMessageBox.confirm(`确定清空与「${name}」的聊天记录吗？此操作不可恢复。`, '清空聊天记录', {
+        confirmButtonText: '清空', cancelButtonText: '取消', type: 'warning',
+      }).then(async () => {
+        try {
+          await api.post('/messages/clear', { to_user_id: this.active })
+          this.msgs = []
+          ElMessage.success('聊天记录已清空')
+        } catch (e) { ElMessage.error(e.response?.data?.error || '清空失败') }
+      }).catch(() => {})
     },
     async loadMsgs() {
       try {

@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('desktop', {
   },
   // 版本与更新检查
   appVersion: () => ipcRenderer.invoke('get-app-version'),
+  // 开机自启动
+  setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
+  getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   onUpdateAvailable: (cb) => {
     ipcRenderer.on('update-available', (_e, data) => cb(data))

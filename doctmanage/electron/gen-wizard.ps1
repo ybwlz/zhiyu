@@ -33,13 +33,13 @@ function New-GradientBmp($w, $h, $title, $sub) {
   return $bmp
 }
 
-# 左侧大横幅 164x314
+# 左侧大横幅 164x314（Inno 对 JPG 支持更稳，BMP 位深容易不显示）
 $b1 = New-GradientBmp 164 314 '知屿' '让知识成为岛屿'
-$b1.Save("$dir\wizard-image.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+$b1.Save("$dir\wizard-image.jpg", [System.Drawing.Imaging.ImageFormat]::Jpeg)
 $b1.Dispose()
 # 左上小图 55x55
 $b2 = New-GradientBmp 55 55 '知' ''
-$b2.Save("$dir\wizard-small.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+$b2.Save("$dir\wizard-small.jpg", [System.Drawing.Imaging.ImageFormat]::Jpeg)
 $b2.Dispose()
-Write-Output "BMP 已生成:"
-Get-Item "$dir\wizard-image.bmp", "$dir\wizard-small.bmp" | Select-Object Name, Length
+Write-Output "JPG 已生成:"
+Get-Item "$dir\wizard-image.jpg", "$dir\wizard-small.jpg" | Select-Object Name, Length

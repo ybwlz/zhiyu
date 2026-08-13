@@ -85,6 +85,14 @@
     <!-- 通用 -->
     <div class="set-card">
       <h3>通用</h3>
+      <!-- 开机自启动（仅桌面版） -->
+      <div v-if="isDesktop" class="set-row">
+        <div class="set-row-txt">
+          <div class="set-row-title">开机自启动</div>
+          <div class="set-row-sub">登录 Windows 后自动启动知屿桌面版</div>
+        </div>
+        <button class="switch" :class="{ on: autoLaunch }" @click="toggleAutoLaunch"><i></i></button>
+      </div>
       <div class="set-actions"><button class="set-btn danger" @click="doLogout">🚪 退出登录</button></div>
     </div>
 
@@ -136,6 +144,15 @@ export default {
       idForm: { username: '' },
       pwd: { old: '', nw: '', confirm: '' },
       privacy: { likes_public: u.likes_public !== 0, favorites_public: u.favorites_public !== 0 },
+      // 桌面版：开机自启动开关
+      autoLaunch: false,
+      isDesktop: false,
+    }
+  },
+  async mounted() {
+    this.isDesktop = !!window.desktop
+    if (this.isDesktop && window.desktop.getAutoLaunch) {
+      try { this.autoLaunch = await window.desktop.getAutoLaunch() } catch (e) { /* 忽略 */ }
     }
   },
   created() {
@@ -252,6 +269,15 @@ export default {
     async doLogout() {
       await this.auth.logout()
       this.$router.push('/login')
+    },
+    async toggleAutoLaunch() {
+      if (!window.desktop?.setAutoLaunch) return
+      const next = !this.autoLaunch
+      try {
+        await window.desktop.setAutoLaunch(next)
+        this.autoLaunch = next
+        ElMessage.success(next ? '已开启开机自启动' : '已关闭开机自启动')
+      } catch (e) { ElMessage.error('操作失败') }
     },
   },
 }

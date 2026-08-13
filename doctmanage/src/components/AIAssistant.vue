@@ -26,6 +26,7 @@
               </div>
             </div>
           </div>
+          <button class="ai-close" type="button" data-tip="清空对话" @click="clearChat">🗑</button>
           <button class="ai-close" type="button" @click="open = false">✕</button>
         </header>
 
@@ -84,7 +85,7 @@ import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { kbConfig } from '@/constants/homeConfig.js'
 import api from '@/utils/api.js'
 import { useAuthStore } from '@/stores/auth.js'
@@ -204,6 +205,17 @@ const messages = ref([
 
 const hasUserMessage = computed(() => messages.value.some((m) => m.role === 'user'))
 const online = computed(() => !!localStorage.getItem('kb_token'))
+// 清空当前 AI 对话（回到欢迎消息）
+const clearChat = () => {
+  if (!hasUserMessage.value) return
+  ElMessageBox.confirm('确定清空与 AI 助手的本次对话吗？', '清空对话', {
+    confirmButtonText: '清空', cancelButtonText: '取消', type: 'warning',
+  }).then(() => {
+    messages.value = [{ role: 'assistant', content: welcomeMsg() }]
+    input.value = ''
+    ElMessage.success('对话已清空')
+  }).catch(() => {})
+}
 
 const scrollToBottom = async () => {
   await nextTick()

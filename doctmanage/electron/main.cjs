@@ -155,6 +155,9 @@ app.whenReady().then(() => {
     ipcMain.on('window-close', () => win.close())
     // 版本与更新检查
     ipcMain.handle('get-app-version', () => app.getVersion())
+  // 开机自启动（Windows 登录时自动运行）
+  ipcMain.handle('set-auto-launch', (e, enabled) => { app.setLoginItemSettings({ openAtLogin: !!enabled }) })
+  ipcMain.handle('get-auto-launch', () => app.getLoginItemSettings().openAtLogin)
     ipcMain.handle('check-update', async () => await checkForUpdate())
 
     // ── 应用内下载并自动安装更新（支持暂停/继续/取消，断点续传） ──

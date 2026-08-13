@@ -62,6 +62,24 @@ def message_send(user=None):
         conn.close()
     return jsonify({'success': True, 'id': msg_id})
 
+@bp.route('/api/messages/clear', methods=['POST'])
+@require_login
+def message_clear(user):
+    """清空与某人的私信记录（双方消息都删）"""
+    data = request.get_json(silent=True) or {}
+    to_user_id = int(data.get('to_user_id') or 0)
+    if not to_user_id:
+        return jsonify({'error': '参数错误'}), 400
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM messages WHERE (sender_id=%s AND receiver_id=%s) OR (sender_id=%s AND receiver_id=%s)",
+                (user['id'], to_user_id, to_user_id, user['id']))
+    finally:
+        conn.close()
+    return jsonify({'success': True})
+
 def _ai_reply(user_id, content):
     """AI 官方账号回复：带上与 AI 的最近对话作多轮上下文，返回回复文本（失败返回 None）"""
     if not DEEPSEEK_API_KEY:

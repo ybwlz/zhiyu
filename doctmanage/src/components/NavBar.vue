@@ -91,14 +91,15 @@
 
 <script setup>
 import ThemeDropdown from '@/components/ThemeDropdown.vue'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
 
 import api from '@/utils/api.js'
 
 const auth = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 
 // 导航高亮：vue-router 内置 active 要求 name 相等，带参数子路由（如 /docs/:key）会让父入口（/docs）不亮。
 // 改为按路径匹配：exact 项（首页）精确匹配，其余前缀匹配。
@@ -170,10 +171,10 @@ const openNoti = async (n) => {
     return
   }
   bellOpen.value = false
-  if (n.type === 'message') { window.location.href = '/zhiyu/messages?with=' + (n.actor_public_id || n.actor_id); return }
-  if (n.doc_id) window.location.href = '/zhiyu/notes/' + (n.public_id || n.doc_id) + '?focus=' + n.type
-  else if (n.type === 'friend_request') window.location.href = '/zhiyu/friends'
-  else if (n.actor_id) window.location.href = '/zhiyu/user/' + (n.actor_public_id || n.actor_id)
+  if (n.type === 'message') { router.push('/messages?with=' + (n.actor_public_id || n.actor_id)); return }
+  if (n.doc_id) router.push('/notes/' + (n.public_id || n.doc_id) + '?focus=' + n.type)
+  else if (n.type === 'friend_request') router.push('/friends')
+  else if (n.actor_id) router.push('/user/' + (n.actor_public_id || n.actor_id))
 }
 const notiIcon = (t) => ({ like: '👍', favorite: '⭐', comment: '💬', friend_request: '👋', digest: '🤖', message: '✉️', admin_notice: '📢', admin_coins: '🪙', redeem: '🎫' }[t] || '🔔')
 const notiText = (n) => {
@@ -216,6 +217,8 @@ const notiDetail = (n) => {
 // 登录后定时刷新未读数（60s）
 let notiTimer = null
 onMounted(() => { loadNoti(); notiTimer = setInterval(loadNoti, 60000) })
+// 登录态就绪/变化后立即加载未读数（onMounted 时 auth 可能尚未初始化完成）
+watch(() => auth.isLogin, (v) => { if (v) loadNoti() }, { immediate: true })
 onMounted(() => {
   document.addEventListener('click', onAnyOutside)
   document.addEventListener('wheel', onAnyWheel, { passive: true })
