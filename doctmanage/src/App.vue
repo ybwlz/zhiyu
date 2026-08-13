@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth.js'
 import NavBar from '@/components/NavBar.vue'
 import { themeState } from '@/utils/theme.js'
@@ -15,6 +15,16 @@ const auth = useAuthStore()
 // 启动时用最新 /auth/me 刷新登录用户信息（后端字段有更新时，localStorage 旧缓存也能补上 public_id 等新字段）
 onMounted(() => { auth.fetchMe() })
 
+// ── 卸载模式（双击 知屿卸载.exe / --uninstall 启动）：弹出卸载确认 ──
+const showUninstall = ref(false)
+onMounted(async () => {
+  if (window.desktop?.isUninstallMode) {
+    try {
+      if (await window.desktop.isUninstallMode()) showUninstall.value = true
+    } catch (e) { /* 忽略 */ }
+  }
+})
+const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
 </script>
 
 <template>
@@ -33,9 +43,64 @@ onMounted(() => { auth.fetchMe() })
   <ToolBall />
   <WindowControls />
   <UpdateNotice />
+
+  <!-- 卸载确认弹窗（卸载模式启动时） -->
+  <div v-if="showUninstall" class="uninstall-mask">
+    <div class="uninstall-modal">
+      <div class="um-head"><b>卸载知屿？</b></div>
+      <div class="um-body">
+        <p>将删除安装目录下的程序文件、桌面快捷方式与开机自启项。<br>你的云端笔记数据不受影响（保存在服务器）。</p>
+      </div>
+      <div class="um-foot">
+        <button class="um-btn ghost" @click="showUninstall = false">取消</button>
+        <button class="um-btn danger" @click="confirmUninstall">确认卸载</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style>
+/* 卸载确认弹窗（覆盖层，桌面版卸载模式） */
+.uninstall-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .62);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+.uninstall-modal {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 400px;
+  max-width: 92vw;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .4);
+  overflow: hidden;
+}
+html[data-theme="starlight"] .uninstall-modal { background: #0d1220; }
+html[data-theme="sky"] .uninstall-modal,
+html[data-theme="minimal"] .uninstall-modal { background: #ffffff; }
+.um-head { padding: 18px 22px 0; font-size: 16px; color: var(--text1); }
+.um-body { padding: 12px 22px 6px; font-size: 13.5px; color: var(--text2); line-height: 1.7; }
+.um-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px 18px; }
+.um-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  background: var(--brand-1);
+  color: #fff;
+  transition: filter .15s;
+}
+.um-btn:hover { filter: brightness(1.08); }
+.um-btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+.um-btn.danger { background: #e11d48; }
+.um-btn.danger:hover { filter: brightness(1.1); }
+
 /* 沉浸式阅读：隐藏全局导航 */
 body.immersive .kb-navbar {
   display: none !important;

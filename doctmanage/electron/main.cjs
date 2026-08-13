@@ -7,7 +7,11 @@ const { app, BrowserWindow, shell, ipcMain, net, Tray, Menu, nativeImage } = req
 const http = require('http')
 const path = require('path')
 const fs = require('fs')
-const { exec } = require('child_process')
+const os = require('os')
+const { exec, execFile } = require('child_process')
+
+// 卸载模式：--uninstall 参数，或 exe 文件名含「卸载」（双击 知屿卸载.exe 直接进卸载确认）
+const isUninstallMode = process.argv.includes('--uninstall') || path.basename(process.execPath).includes('卸载')
 
 // ── 更新检查：对比服务器 version.json（放 /downloads/version.json） ──
 // 注：域名 www.zhiyur.cn 备案通过前会被腾讯云拦截，故更新检查用 IP 直连
@@ -315,6 +319,20 @@ app.whenReady().then(() => {
     createTray()
     ipcMain.on('hide-to-tray', () => { win.hide() })
     ipcMain.on('quit-app', () => { isQuiting = true; app.quit() })
+    ipcMain.handle('is-uninstall-mode', () => isUninstallMode)
+    // ── 卸载：删注册表/快捷方式/开机自启，后台延迟删除整个安装目录（含自身）后退出 ──
+    ipcMain.on('uninstall-app', () => {
+      execFile('reg', ['delete', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\知屿', '/f'], () => {})
+      execFile('reg', ['delete', 'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\知屿', '/f'], () => {})
+      execFile('reg', ['delete', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', '知屿', '/f'], () => {})
+      for (const dir of [path.join(os.homedir(), 'Desktop'), path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')]) {
+        try { const p = path.join(dir, '知屿.lnk'); if (fs.existsSync(p)) fs.rmSync(p, { force: true }) } catch (e) { /* 忽略 */ }
+      }
+      const root = path.dirname(process.execPath)
+      const ps = `Start-Sleep -Seconds 2; Remove-Item -LiteralPath '${root}' -Recurse -Force -ErrorAction SilentlyContinue`
+      execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps], { detached: true, stdio: 'ignore' }).unref()
+      app.exit(0)
+    })
   })
 })
 } // end single-instance lock

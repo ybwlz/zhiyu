@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('desktop', {
   // 系统托盘
   hideToTray: () => ipcRenderer.send('hide-to-tray'),
   quitApp: () => ipcRenderer.send('quit-app'),
+  // 卸载
+  isUninstallMode: () => ipcRenderer.invoke('is-uninstall-mode'),
+  uninstallApp: () => ipcRenderer.send('uninstall-app'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   onUpdateAvailable: (cb) => {
     ipcRenderer.on('update-available', (_e, data) => cb(data))

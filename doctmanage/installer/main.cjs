@@ -111,10 +111,9 @@ ipcMain.handle('install', async (e, payload) => {
   const send = (stage, pct, msg) => win.webContents.send('install-progress', { stage, pct, msg })
   try {
     const src = greenDir()
-    // 二级目录结构：<root>\知屿\（主程序）+ <root>\卸载器\（卸载入口）
-    const root = payload.targetDir
-    const target = path.join(root, '知屿')
-    const uninstallDir = path.join(root, '卸载器')
+    // 单目录结构：所有文件直接装到用户选择的目录（<root>\），卸载入口是主程序 exe 的副本「知屿卸载.exe」
+    const target = payload.targetDir
+    const uninstallDir = target
     if (!fs.existsSync(src)) throw new Error('安装资源缺失：' + src)
 
     // 1. 创建目标目录
@@ -176,22 +175,15 @@ ipcMain.handle('install', async (e, payload) => {
       await setAutoStart(path.join(target, '知屿.exe'))
     }
 
-    // 6. 卸载入口：复制安装器完整运行文件（exe + dll + resources，排除绿色版）→ <root>\卸载器\
-    //    统一命名为「知屿卸载.exe」（不复制原「知屿安装器.exe」，避免同文件两份）
+    // 6. 卸载入口：复制主程序 exe 为「知屿卸载.exe」（同一程序副本，共用 resources；双击即进卸载界面）
     send('copy', 90, '创建卸载入口…')
     try {
-      await fsp.mkdir(uninstallDir, { recursive: true })
-      const selfName = path.basename(process.execPath)
-      await fsp.cp(path.dirname(process.execPath), uninstallDir, {
-        recursive: true,
-        force: true,
-        filter: (src) => !src.includes('知屿-win32-x64') && path.basename(src) !== selfName,
-      })
-      await fsp.copyFile(process.execPath, path.join(uninstallDir, '知屿卸载.exe'))
+      const appExe = path.join(target, '知屿.exe')
+      if (fs.existsSync(appExe)) await fsp.copyFile(appExe, path.join(target, '知屿卸载.exe'))
     } catch (e) { /* 复制失败不中断 */ }
 
-    // 7. 注册卸载信息（控制面板「程序和功能」可卸载）
-    await registerUninstall(root, target, uninstallDir)
+    // 7. 注册卸载信息（控制面板「程序和功能」可卸载，指向 知屿卸载.exe）
+    await registerUninstall(target, target, uninstallDir)
 
     send('copy', 95, '完成安装配置…')
     await new Promise(r => setTimeout(r, 300))
@@ -226,9 +218,9 @@ function setAutoStart(exe) {
   })
 }
 
-// ── 安装完成：启动知屿（可选，exe 在 <root>\知屿\ 子目录） ──
+// ── 安装完成：启动知屿（可选，exe 直接位于安装目录） ──
 ipcMain.handle('launch-app', (e, root) => {
-  const exe = path.join(root, '知屿', '知屿.exe')
+  const exe = path.join(root, '知屿.exe')
   if (fs.existsSync(exe)) execFile(exe, [], { detached: true, stdio: 'ignore' }).unref()
   return true
 })
