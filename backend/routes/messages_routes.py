@@ -3,6 +3,7 @@
 from flask import Blueprint, request, jsonify
 import json
 import urllib.request
+import pymysql
 
 from pymysql.cursors import DictCursor
 
