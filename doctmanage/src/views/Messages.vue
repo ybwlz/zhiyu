@@ -103,8 +103,7 @@
                 <div class="ch-id">@{{ peer.username }}</div>
               </div>
             </div>
-            <button class="ch-go" @click="goUser(peer.public_id || peer.id)">查看主页 →</button>
-            <button class="ch-go" style="margin-left:8px;" @click="clearChat">🗑 清空</button>
+            <button class="ch-clear" data-tip="清空聊天记录" @click="clearOpen = true">🗑</button>
           </div>
           <div class="chat-body" ref="chatBody">
             <div v-if="!msgs.length" class="center empty"><div class="empty-emoji">👋</div>还没有消息，打个招呼吧</div>
@@ -144,6 +143,18 @@
         </div>
       </div>
     </div>
+
+    <!-- 清空聊天记录弹窗 -->
+    <div v-if="clearOpen" class="g-modal" @click.self="clearOpen = false">
+      <div class="g-dialog g-clear-dialog">
+        <h3>🗑 清空聊天记录</h3>
+        <p class="g-clear-tip">确定清空与「{{ (peer && (peer.nickname || peer.username)) || '对方' }}」的聊天记录吗？此操作不可恢复。</p>
+        <div class="g-foot">
+          <button class="g-cancel" @click="clearOpen = false">取消</button>
+          <button class="g-create danger" @click="doClear">清空</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -169,6 +180,7 @@ export default {
       sending: false,
       timer: null,
       groupModal: false,
+      clearOpen: false,
       groupName: '',
       groupFriends: [],
       groupPick: [],
@@ -296,16 +308,15 @@ export default {
       this.peer = null
     },
     clearChat() {
-      const name = (this.peer && (this.peer.nickname || this.peer.username)) || '对方'
-      ElMessageBox.confirm(`确定清空与「${name}」的聊天记录吗？此操作不可恢复。`, '清空聊天记录', {
-        confirmButtonText: '清空', cancelButtonText: '取消', type: 'warning',
-      }).then(async () => {
-        try {
-          await api.post('/messages/clear', { to_user_id: this.active })
-          this.msgs = []
-          ElMessage.success('聊天记录已清空')
-        } catch (e) { ElMessage.error(e.response?.data?.error || '清空失败') }
-      }).catch(() => {})
+      this.clearOpen = true
+    },
+    async doClear() {
+      try {
+        await api.post('/messages/clear', { to_user_id: this.active })
+        this.msgs = []
+        this.clearOpen = false
+        ElMessage.success('聊天记录已清空')
+      } catch (e) { ElMessage.error(e.response?.data?.error || '清空失败') }
     },
     async loadMsgs() {
       try {
@@ -442,6 +453,8 @@ export default {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--brand-1) 7%, transparent), transparent);
 }
+/* 头像+名字块：占据中间并居中（返回在左、清空在右） */
+.chat-head .ch-user { flex: 1; justify-content: center; }
 .ch-user { display: flex; align-items: center; gap: 11px; cursor: pointer; }
 .ch-avatar {
   width: 42px; height: 42px; border-radius: 50%; overflow: hidden;
@@ -459,6 +472,15 @@ export default {
   background: transparent; color: var(--brand-1); font-size: 12.5px; transition: background .18s;
 }
 .ch-go:hover { background: color-mix(in srgb, var(--brand-1) 12%, transparent); }
+.ch-clear {
+  padding: 6px 10px; border-radius: 999px; cursor: pointer;
+  border: none; background: transparent; color: var(--text2); font-size: 15px; transition: background .18s;
+}
+.ch-clear:hover { background: color-mix(in srgb, var(--brand-1) 12%, transparent); color: var(--brand-1); }
+/* 清空聊天记录弹窗 */
+.g-clear-dialog { max-width: 340px; }
+.g-clear-tip { color: var(--text2); font-size: 13.5px; line-height: 1.7; margin: 6px 0 0; }
+.g-create.danger { background: linear-gradient(120deg, #ef4444, #dc2626); box-shadow: 0 8px 20px rgba(239, 68, 68, .25); }
 
 .chat-body {
   flex: 1; overflow-y: auto; padding: 18px 20px;
