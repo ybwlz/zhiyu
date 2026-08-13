@@ -283,12 +283,15 @@ ipcMain.handle('uninstall', async (e, { root }) => {
   }
 })
 
-// ── 卸载收尾：复制自己到临时目录，静默删除整个安装目录（含卸载器自身）后退出 ──
+// ── 卸载收尾：后台延迟删除整个安装目录（含卸载器自身）后立即退出 ──
+// 之前复制 exe 到 TEMP 再删：复制 225MB 慢（点完成卡顿），且 TEMP 副本缺 icudtl/dll 启动失败导致删不掉
+// 改为：spawn 一个隐藏 PowerShell，延迟 2 秒（等本进程退出）后 Remove-Item 整个目录
 ipcMain.handle('finish-uninstall', async (e, { root }) => {
   try {
-    const tmp = path.join(os.tmpdir(), 'zhiyu-uninstall-tmp.exe')
-    await fsp.copyFile(process.execPath, tmp)
-    execFile(tmp, ['--finalize', '--root=' + root], { detached: true, stdio: 'ignore' }).unref()
+    if (root) {
+      const ps = `Start-Sleep -Seconds 2; Remove-Item -LiteralPath '${root}' -Recurse -Force -ErrorAction SilentlyContinue`
+      execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps], { detached: true, stdio: 'ignore' }).unref()
+    }
   } catch (e) { /* 忽略 */ }
   app.exit(0)
 })
