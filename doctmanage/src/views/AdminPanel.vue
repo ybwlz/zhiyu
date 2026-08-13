@@ -3,7 +3,7 @@
     <aside class="ap-side">
       <div class="ap-brand">⚙️ 知屿管理后台</div>
       <nav class="ap-nav">
-        <button v-for="m in menus" :key="m.id" class="ap-nav-item" :class="{ on: mod === m.id }" @click="mod = m.id">
+        <button v-for="m in visibleMenus" :key="m.id" class="ap-nav-item" :class="{ on: mod === m.id }" @click="mod = m.id">
           {{ m.icon }} {{ m.label }}
         </button>
       </nav>
@@ -525,19 +525,31 @@ const md = new MarkdownIt({ breaks: true, linkify: true, html: false }).use(emoj
 
 const menus = [
   { id: 'dash', icon: '📊', label: '仪表盘' },
-  { id: 'users', icon: '👥', label: '用户管理' },
-  { id: 'docs', icon: '📄', label: '笔记管理' },
-  { id: 'audits', icon: '🔍', label: '审核队列' },
-  { id: 'comments', icon: '💬', label: '评论管理' },
-  { id: 'coins', icon: '🪙', label: '知屿币' },
-  { id: 'codes', icon: '🎫', label: '兑换码' },
-  { id: 'notices', icon: '📢', label: '通知' },
-  { id: 'digests', icon: '📅', label: 'AI 摘要' },
-  { id: 'ailogs', icon: '🤖', label: 'AI 日志' },
-  { id: 'beian', icon: '📇', label: '备案管理' },
-  { id: 'admins', icon: '🛡️', label: '管理员' },
+  { id: 'users', icon: '👥', label: '用户管理', perm: 'users' },
+  { id: 'docs', icon: '📄', label: '笔记管理', perm: 'notes' },
+  { id: 'audits', icon: '🔍', label: '审核队列', perm: 'audit' },
+  { id: 'comments', icon: '💬', label: '评论管理', perm: 'comments' },
+  { id: 'coins', icon: '🪙', label: '知屿币', perm: 'coins' },
+  { id: 'codes', icon: '🎫', label: '兑换码', perm: 'codes' },
+  { id: 'notices', icon: '📢', label: '通知', perm: 'notices' },
+  { id: 'digests', icon: '📅', label: 'AI 摘要', perm: 'notes' },
+  { id: 'ailogs', icon: '🤖', label: 'AI 日志', perm: 'notes' },
+  { id: 'beian', icon: '📇', label: '备案管理', perm: '__admin__' },
+  { id: 'admins', icon: '🛡️', label: '管理员', perm: 'admins' },
 ]
 const mod = ref('dash')
+// 侧边栏按角色/权限过滤：admin 全显示；moderator 只显示勾选权限的模块（备案管理仅 admin）
+const visibleMenus = computed(() => {
+  const u = auth.user
+  if (!u) return [menus[0]]
+  if (u.role === 'admin') return menus
+  if (u.role === 'moderator') {
+    let perms = []
+    try { perms = JSON.parse(u.admin_perms || '[]') } catch (e) { perms = [] }
+    return menus.filter(m => !m.perm || perms.includes(m.perm))
+  }
+  return [menus[0]]
+})
 const currentMenu = computed(() => menus.find(m => m.id === mod.value))
 // 切到管理员模块时刷新列表（在用户管理里设置后能看到）
 watch(mod, (v) => {

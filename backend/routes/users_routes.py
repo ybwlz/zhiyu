@@ -18,7 +18,7 @@ def user_by_key(key: str):
         conn = get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT id FROM users WHERE public_id=%s LIMIT 1", (key,))
+                cur.execute("SELECT id FROM users WHERE public_id=%s OR username=%s OR id=%s LIMIT 1", (key, key, key))
                 r = cur.fetchone()
         finally:
             conn.close()

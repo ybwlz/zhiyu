@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 
 from db import get_conn
-from auth import require_perm, require_role, user_can, ALL_PERMS
+from auth import require_perm, require_role, require_backend, user_can, ALL_PERMS
 from utils import grant_points, log_admin, check_sensitive, ai_moderate
 
 bp = Blueprint('admin', __name__)
@@ -19,7 +19,7 @@ PERM_LABELS = {
 
 # ─────────────────── 仪表盘 ───────────────────
 @bp.route('/api/admin/stats', methods=['GET'])
-@require_perm('notes')
+@require_backend
 def admin_stats(user):
     conn = get_conn()
     try:

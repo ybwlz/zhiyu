@@ -131,6 +131,20 @@ def require_role(*roles):
         return wrapper
     return deco
 
+def require_backend(f):
+    """后台通用装饰器：admin 或 moderator（不限权限点，用于仪表盘等基础页面）"""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'unauthorized'}), 401
+        if user.get('banned'):
+            return jsonify({'error': '账号已被封禁，如有疑问请联系站长'}), 403
+        if user['role'] not in ('admin', 'moderator'):
+            return jsonify({'error': 'forbidden'}), 403
+        return f(user=user, *args, **kwargs)
+    return wrapper
+
 def require_perm(perm):
     """角色为 admin/moderator 且拥有指定权限点"""
     def deco(f):

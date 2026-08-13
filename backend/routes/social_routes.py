@@ -201,7 +201,7 @@ def user_followers(uid):
     try:
         with conn.cursor() as cur:
             viewer = get_current_user()
-            cur.execute("""SELECT u.id, u.username, u.nickname, u.avatar, u.points, u.bio, u.public_id
+            cur.execute("""SELECT u.id, u.username, u.nickname, u.avatar, u.points, u.bio, u.public_id, u.public_id AS other_public_id
                 FROM follows f JOIN users u ON u.id=f.follower_id
                 WHERE f.followee_id=%s ORDER BY f.created_at DESC LIMIT 200""", (uid,))
             rows = cur.fetchall()
@@ -222,7 +222,7 @@ def user_following(uid):
     try:
         with conn.cursor() as cur:
             viewer = get_current_user()
-            cur.execute("""SELECT u.id, u.username, u.nickname, u.avatar, u.points, u.bio, u.public_id
+            cur.execute("""SELECT u.id, u.username, u.nickname, u.avatar, u.points, u.bio, u.public_id, u.public_id AS other_public_id
                 FROM follows f JOIN users u ON u.id=f.followee_id
                 WHERE f.follower_id=%s ORDER BY f.created_at DESC LIMIT 200""", (uid,))
             rows = cur.fetchall()
