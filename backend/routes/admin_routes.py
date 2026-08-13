@@ -468,9 +468,42 @@ def admin_notice(user):
                 cur.execute("INSERT INTO notifications (user_id, actor_id, type, extra) VALUES (%s,%s,'admin_notice',%s)",
                             (uid, user['id'], extra))
         conn.commit()
-        log_admin(conn, user['id'], 'notice', 'user', f'x{len(uids)}', title)
+        log_admin(conn, user['id'], 'notice', 'user', f'x{len(uids)}', f'{title} | {content[:80]}')
         conn.commit()
         return jsonify({'ok': True, 'sent': len(uids)})
+    finally:
+        conn.close()
+
+
+@bp.route('/api/admin/notices/history', methods=['GET'])
+@require_perm('notices')
+def admin_notice_history(user):
+    """已发送通知的历史记录（含标题/内容摘要/目标人数）"""
+    page = max(1, int(request.args.get('page') or 1))
+    size = min(50, max(10, int(request.args.get('size') or 20)))
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) c FROM admin_logs WHERE action='notice'")
+            total = cur.fetchone()['c']
+            cur.execute("""SELECT l.id, l.admin_id, l.target_type, l.target_id, l.detail,
+                    CAST(l.created_at AS CHAR) created_at, u.username AS admin_username
+                FROM admin_logs l LEFT JOIN users u ON u.id=l.admin_id
+                WHERE l.action='notice' ORDER BY l.id DESC LIMIT %s OFFSET %s""",
+                        (size, (page - 1) * size))
+            items = []
+            for r in cur.fetchall():
+                d = dict(r)
+                # detail 形如 "标题 | 内容摘要"，拆分展示
+                if ' | ' in (d.get('detail') or ''):
+                    parts = d['detail'].split(' | ', 1)
+                    d['title'] = parts[0]
+                    d['content'] = parts[1]
+                else:
+                    d['title'] = d.get('detail') or ''
+                    d['content'] = ''
+                items.append(d)
+        return jsonify({'total': total, 'page': page, 'items': items})
     finally:
         conn.close()
 

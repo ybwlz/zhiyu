@@ -262,6 +262,19 @@
           </div>
           <button class="ap-btn" @click="sendNotice">发送通知</button>
         </div>
+        <h3 class="ap-sec">📜 历史通知</h3>
+        <table class="ap-table">
+          <thead><tr><th>时间</th><th>标题</th><th>内容摘要</th><th>发给</th></tr></thead>
+          <tbody>
+            <tr v-for="h in noticeHistory" :key="h.id">
+              <td class="nowrap">{{ h.created_at }}</td>
+              <td class="ellipsis" style="max-width:180px">{{ h.title }}</td>
+              <td class="ellipsis" style="max-width:320px">{{ h.content }}</td>
+              <td>{{ h.target_id }}</td>
+            </tr>
+            <tr v-if="!noticeHistory.length"><td colspan="4" class="empty-tip">暂无历史通知</td></tr>
+          </tbody>
+        </table>
       </section>
 
       <!-- ── 管理员管理 ── -->
@@ -464,6 +477,7 @@ watch(mod, (v) => {
   if (v === 'coins') loadCoins(1)
   if (v === 'codes') loadCodes(1)
   if (v === 'ailogs') loadAiLogs(1)
+  if (v === 'notices') loadNoticeHistory()
 })
 
 // ── 自研弹窗/提示（替换默认 alert/confirm/prompt） ──
@@ -746,6 +760,11 @@ function confirmPick() {
   userPickModal.value = false
 }
 
+const noticeHistory = ref([])
+async function loadNoticeHistory() {
+  try { noticeHistory.value = ((await api.get('/admin/notices/history', { params: { size: 20 } })).data?.items) || [] } catch (e) { /* 权限不足 */ }
+}
+
 const noticeTitle = ref('')
 const noticeContent = ref('')
 async function sendNotice() {
@@ -935,7 +954,8 @@ onMounted(async () => {
 .form-card h3 { font-size: 14px; margin: 0 0 12px; color: var(--text1); }
 .form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .form-row .ap-input { flex: 1; min-width: 140px; }
-.ap-input.ta { min-height: 300px; resize: vertical; width: 100%; font-size: 14px; line-height: 1.7; }
+.ap-input.ta { min-height: 140px; resize: vertical; width: 100%; font-size: 14px; line-height: 1.7; }
+.nowrap { white-space: nowrap; }
 .ap-sec { font-size: 14px; margin: 16px 0 10px; color: var(--text1); }
 .mono { font-family: Consolas, monospace; letter-spacing: .5px; }
 .code-box { margin-top: 12px; padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--brand-1) 8%, transparent); border: 1px dashed color-mix(in srgb, var(--brand-1) 40%, transparent); }
