@@ -60,6 +60,7 @@
                 <span class="bell-time">{{ n.created_at?.slice(5, 16) }}</span>
                 <button class="bell-del" data-tip="删除" @click.stop="delNoti(n)">✕</button>
                 <div v-if="n.type === 'digest' && expandedDigest === n.id" class="bell-digest">{{ n.extra }}</div>
+                <div v-if="(n.type === 'admin_coins' || n.type === 'redeem') && expandedDigest === n.id" class="bell-digest">{{ notiDetail(n) }}</div>
               </div>
             </div>
           </Transition>
@@ -163,8 +164,8 @@ const openNoti = async (n) => {
     n.is_read = 1
     unread.value = Math.max(0, unread.value - 1)
   }
-  // 每日摘要：面板内展开文字，不跳转
-  if (n.type === 'digest') {
+  // 每日摘要 / 站长发币：面板内展开文字，不跳转
+  if (n.type === 'digest' || n.type === 'admin_coins' || n.type === 'redeem') {
     expandedDigest.value = expandedDigest.value === n.id ? null : n.id
     return
   }
@@ -182,7 +183,7 @@ const notiText = (n) => {
     try { const e = JSON.parse(n.extra || '{}'); return `系统通知：${e.title || ''} ${e.content || ''}`.trim() } catch (err) { return '系统通知' }
   }
   if (n.type === 'admin_coins') {
-    try { const e = JSON.parse(n.extra || '{}'); return `站长发放了 ${e.amount || 0} 知屿币${e.note ? '（' + e.note + '）' : ''}` } catch (err) { return '收到站长发放的知屿币' }
+    try { const e = JSON.parse(n.extra || '{}'); return `站长给你发放了 ${e.amount || 0} 知屿币` } catch (err) { return '收到站长发放的知屿币' }
   }
   if (n.type === 'redeem') {
     try { const e = JSON.parse(n.extra || '{}'); return `兑换码兑换成功，获得 ${e.amount || 0} 知屿币` } catch (err) { return '兑换码兑换成功' }
@@ -196,6 +197,17 @@ const notiText = (n) => {
     message: '给你发来一条私信',
   }[n.type]
   return who + ' ' + (t || '有新动态')
+}
+// 站长发币/兑换码通知的展开详情（点开查看备注留言）
+const notiDetail = (n) => {
+  try {
+    const e = JSON.parse(n.extra || '{}')
+    if (n.type === 'admin_coins') {
+      return `站长给你发放了 ${e.amount || 0} 知屿币${e.note ? '，并给你留言：' + e.note : ''}`
+    }
+    if (n.type === 'redeem') return `兑换码兑换成功，获得 ${e.amount || 0} 知屿币`
+  } catch (err) { /* 忽略 */ }
+  return n.extra || ''
 }
 
 // 登录后定时刷新未读数（60s）
