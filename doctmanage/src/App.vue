@@ -44,10 +44,13 @@ const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
   <WindowControls />
   <UpdateNotice />
 
-  <!-- 卸载确认弹窗（卸载模式启动时） -->
-  <div v-if="showUninstall" class="uninstall-mask">
+  <!-- 卸载确认弹窗（卸载模式启动时，站内 modal 风格） -->
+  <div v-if="showUninstall" class="uninstall-mask" @click.self="showUninstall = false">
     <div class="uninstall-modal">
-      <div class="um-head"><b>卸载知屿？</b></div>
+      <div class="um-head">
+        <b>卸载知屿？</b>
+        <button class="um-close" @click="showUninstall = false">✕</button>
+      </div>
       <div class="um-body">
         <p>将删除安装目录下的程序文件、桌面快捷方式与开机自启项。<br>你的云端笔记数据不受影响（保存在服务器）。</p>
       </div>
@@ -60,7 +63,7 @@ const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
 </template>
 
 <style>
-/* 卸载确认弹窗（覆盖层，桌面版卸载模式） */
+/* 卸载确认弹窗（覆盖层，桌面版卸载模式，站内 modal 风格） */
 .uninstall-mask {
   position: fixed;
   inset: 0;
@@ -74,8 +77,8 @@ const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
 .uninstall-modal {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  width: 400px;
+  border-radius: 14px;
+  width: 360px;
   max-width: 92vw;
   box-shadow: 0 24px 64px rgba(0, 0, 0, .4);
   overflow: hidden;
@@ -83,14 +86,31 @@ const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
 html[data-theme="starlight"] .uninstall-modal { background: #0d1220; }
 html[data-theme="sky"] .uninstall-modal,
 html[data-theme="minimal"] .uninstall-modal { background: #ffffff; }
-.um-head { padding: 18px 22px 0; font-size: 16px; color: var(--text1); }
-.um-body { padding: 12px 22px 6px; font-size: 13.5px; color: var(--text2); line-height: 1.7; }
-.um-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px 18px; }
+.um-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 0;
+  font-size: 15px;
+  color: var(--text1);
+}
+.um-close {
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.um-close:hover { background: rgba(255,255,255,.08); color: var(--text1); }
+.um-body { padding: 12px 18px 4px; font-size: 13px; color: var(--text2); line-height: 1.7; }
+.um-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px 16px; }
 .um-btn {
-  padding: 8px 20px;
+  padding: 7px 18px;
   border-radius: 8px;
   border: none;
-  font-size: 14px;
+  font-size: 13.5px;
   cursor: pointer;
   background: var(--brand-1);
   color: #fff;
