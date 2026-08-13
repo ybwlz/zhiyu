@@ -48,10 +48,9 @@ ipcMain.on('win-toggle-max', () => {
   if (w.isMaximized()) w.unmaximize(); else w.maximize()
 })
 
-// ── 获取安装默认目录（Program Files\知屿，无权限则用户目录） ──
+// ── 获取安装默认目录（用户级 LOCALAPPDATA，无需管理员权限） ──
 ipcMain.handle('get-default-dir', () => {
-  const pf = process.env.ProgramFiles || 'C:\\Program Files'
-  const dir = path.join(pf, '知屿')
+  const dir = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), '知屿')
   const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
   if (win) win.__defaultDir = dir
   return dir
