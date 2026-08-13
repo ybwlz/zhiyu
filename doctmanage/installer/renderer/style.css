@@ -210,6 +210,7 @@ body {
 .progress-pct { margin-top: 6px; font-size: 22px; font-weight: 900; }
 
 /* 完成页 */
+.page#pageDone h2 { text-align: center; margin-bottom: 6px; }
 .done-icon {
   width: 84px; height: 84px; margin: 10px auto 18px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; font-size: 38px; color: #fff;

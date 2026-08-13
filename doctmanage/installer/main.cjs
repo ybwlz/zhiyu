@@ -111,7 +111,7 @@ ipcMain.handle('install', async (e, payload) => {
       }
       done++
       const pct = 8 + Math.round((done / total) * 62) // 8% → 70%
-      if (done % 50 === 0 || done === total) send('copy', pct, `正在复制文件… ${done}/${total}`)
+      if (done % 100 === 0 || done === total) send('copy', pct, '正在安装核心组件…')
     }
 
     // 3. 主题写入本地配置（桌面端启动读取）
