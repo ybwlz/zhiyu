@@ -25,6 +25,8 @@ const (
 	IDYES              = 6
 )
 
+var logF, _ = os.OpenFile(filepath.Join(os.TempDir(), "zhiyu-uninst.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+func lg(s string) { fmt.Fprintln(logF, time.Now().Format("15:04:05.000")+" "+s) }
 func msgBox(title, text string, flags uintptr) int {
 	r, _, _ := procMessageBox.Call(
 		0,
@@ -103,18 +105,19 @@ func main() {
 		return
 	}
 
-	root := readInstallRoot()
-	if root == "" {
-		root = "D:\\Software\\知屿"
-	}
+	root := filepath.Dir(os.Args[0]) // 卸载器就位于安装目录内，自己所在目录即安装目录
+	lg("start root=" + root)
 
 	// 先结束主程序
+	lg("before taskkill")
 	silent("taskkill", "/f", "/im", "知屿.exe")
+	lg("after taskkill")
 	time.Sleep(500 * time.Millisecond)
 
 	r := msgBox("卸载知屿",
 		"确定要卸载知屿吗？\n\n将删除程序文件、桌面快捷方式与开机自启项。\n你的云端笔记数据不受影响（保存在服务器）。",
 		MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2)
+	lg("msgbox ret=" + fmt.Sprint(r))
 	if r != IDYES {
 		return
 	}

@@ -25,6 +25,12 @@ Copy-Item "$root\release\知屿-win32-x64" "$out\resources\知屿-win32-x64" -Re
 # 托盘图标（主程序 resources/icon.ico）
 Copy-Item "$inst\icon.ico" "$out\resources\icon.ico" -Force
 
+# 编译 Go 卸载器（2MB）放入 resources（安装时复制为 知屿卸载.exe）
+Write-Output '编译卸载器（Go 2MB）…'
+pushd "$root\uninstaller"
+go build -ldflags "-s -w -H windowsgui" -o "$out\resources\zhiyu-uninstaller.exe" .
+popd
+
 # 4. exe 图标（rcedit）+ 改名
 Write-Output '设置图标…'
 $rcedit = "$root\node_modules\rcedit\bin\rcedit-x64.exe"
