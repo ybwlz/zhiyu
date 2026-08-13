@@ -1,4 +1,4 @@
-; 知屿 Windows 安装器脚本（Inno Setup 6）
+﻿; 知屿 Windows 安装器脚本（Inno Setup 6）
 ; 源：release\知屿-win32-x64\  输出：release\知屿-setup.exe
 #define MyAppName "知屿"
 #define MyAppVersion "1.8.0"
@@ -72,7 +72,7 @@ procedure CurPageChanged(CurPageID: Integer);
 var
   ex: LongInt;
 begin
-  ex := GetWindowLong(SetupForm.Handle, GWL_EXSTYLE);
-  SetWindowLong(SetupForm.Handle, GWL_EXSTYLE, ex or WS_EX_LAYERED);
-  SetLayeredWindowAttributes(SetupForm.Handle, 0, 238, LWA_ALPHA);
+  ex := GetWindowLong(WizardForm.Handle, GWL_EXSTYLE);
+  SetWindowLong(WizardForm.Handle, GWL_EXSTYLE, ex or WS_EX_LAYERED);
+  SetLayeredWindowAttributes(WizardForm.Handle, 0, 238, LWA_ALPHA);
 end;
