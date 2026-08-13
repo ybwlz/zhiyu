@@ -344,7 +344,7 @@ onMounted(() => {
   // 无 key（顶部导航进 /docs）：等「已加入阅览室」的侧栏列表就绪后，自动打开侧栏第一篇
   // （只打开加入书房的笔记；空列表则显示占位）
   let autoOpenedFirst = false
-  watch([sideData, roomLoading], ([sd, rl]) => {
+  watch([sidebarDocs, roomLoading], ([sd, rl]) => {
     if (route.params.key || autoOpenedFirst || !auth.isLogin) return
     if (rl) return
     const first = sd[0]
