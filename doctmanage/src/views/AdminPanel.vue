@@ -171,7 +171,13 @@
         <div class="form-card">
           <h3>给用户发放知屿币</h3>
           <div class="form-row">
-            <input v-model="coinUid" class="ap-input" placeholder="用户 ID 或用户名" />
+            <div class="user-pick">
+              <input v-model="coinUserQ" class="ap-input" placeholder="搜索用户（用户名/昵称）" @input="searchUsers('coin')" @focus="userSelOpen.coin = true" @blur="setTimeout(() => userSelOpen.coin = false, 200)" />
+              <div v-if="userSelOpen.coin && coinUserResults.length" class="user-sel">
+                <div v-for="u in coinUserResults" :key="u.id" class="user-sel-item" @mousedown.prevent="pickUser('coin', u)">{{ u.nickname || u.username }} · {{ u.username }}</div>
+              </div>
+              <div v-if="coinSel" class="user-picked">已选：{{ coinSel.name }}<button class="up-clear" @click="coinSel = null; coinUserQ = ''">✕</button></div>
+            </div>
             <input v-model.number="coinAmount" class="ap-input" type="number" placeholder="数量（≥1）" />
             <input v-model="coinNote" class="ap-input" placeholder="备注（可选）" />
             <button class="ap-btn" @click="grantCoins">发放</button>
@@ -244,7 +250,13 @@
               <option value="all">全站用户</option>
               <option value="one">指定用户</option>
             </select>
-            <input v-if="noticeTarget === 'one'" v-model="noticeUid" class="ap-input" placeholder="用户 ID" />
+            <div v-if="noticeTarget === 'one'" class="user-pick">
+              <input v-model="noticeUserQ" class="ap-input" placeholder="搜索用户（用户名/昵称）" @input="searchUsers('notice')" @focus="userSelOpen.notice = true" @blur="setTimeout(() => userSelOpen.notice = false, 200)" />
+              <div v-if="userSelOpen.notice && noticeUserResults.length" class="user-sel">
+                <div v-for="u in noticeUserResults" :key="u.id" class="user-sel-item" @mousedown.prevent="pickUser('notice', u)">{{ u.nickname || u.username }} · {{ u.username }}</div>
+              </div>
+              <div v-if="noticeSel" class="user-picked">已选：{{ noticeSel.name }}<button class="up-clear" @click="noticeSel = null; noticeUserQ = ''">✕</button></div>
+            </div>
           </div>
           <div class="form-row">
             <input v-model="noticeTitle" class="ap-input" placeholder="标题（默认：系统通知）" />
@@ -317,8 +329,8 @@
             <b>{{ previewDocData.title }}</b>
             <button class="modal-close" @click="previewDocData = null">✕</button>
           </div>
-          <div class="modal-body">
-            <pre class="preview-raw">{{ previewDocData.content }}</pre>
+          <div class="modal-body markdown-body">
+            <div v-html="previewHtml"></div>
           </div>
           <div class="modal-foot">
             <button class="ap-btn sm ghost" @click="previewDocData = null">关闭</button>
@@ -365,12 +377,17 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import MarkdownIt from 'markdown-it'
+import { full as emoji } from 'markdown-it-emoji'
+import mdImgSize from '@/utils/mdImgSize.js'
 import api from '@/utils/api.js'
 import { useAuthStore } from '@/stores/auth.js'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+// 预览用 markdown 渲染（与阅读页一致，图片走 /uploads 代理可显示）
+const md = new MarkdownIt({ breaks: true, linkify: true, html: false }).use(emoji).use(mdImgSize)
 
 const menus = [
   { id: 'dash', icon: '📊', label: '仪表盘' },
@@ -448,6 +465,7 @@ const docList = ref([])
 const docTotal = ref(0)
 const dPage = ref(1)
 const previewDocData = ref(null)
+const previewHtml = ref('')
 
 // ── 审核 ──
 const auditList = ref([])
@@ -489,8 +507,10 @@ async function previewDoc(d) {
   try {
     const r = (await api.get('/docs/' + d.id)).data
     previewDocData.value = { ...d, ...r }
+    previewHtml.value = md.render(r.content || '')
   } catch (e) {
     previewDocData.value = d
+    previewHtml.value = '<p style="color:#999">（无法加载正文）</p>'
   }
 }
 
@@ -536,18 +556,53 @@ async function delComment(c) {
 }
 
 // ── 知屿币 ──
-const coinUid = ref('')
+const coinUserQ = ref('')
+const coinUserResults = ref([])
+const coinSel = ref(null)
+const noticeUserQ = ref('')
+const noticeUserResults = ref([])
+const noticeSel = ref(null)
+const userSelOpen = ref({ coin: false, notice: false })
+async function searchUsers(which) {
+  const q = which === 'coin' ? coinUserQ.value : noticeUserQ.value
+  if (!q.trim()) {
+    if (which === 'coin') coinUserResults.value = []
+    else noticeUserResults.value = []
+    return
+  }
+  try {
+    const r = (await api.get('/admin/users', { params: { q: q.trim(), size: 8 } })).data
+    const items = r.items || []
+    if (which === 'coin') coinUserResults.value = items
+    else noticeUserResults.value = items
+  } catch (e) {
+    if (which === 'coin') coinUserResults.value = []
+    else noticeUserResults.value = []
+  }
+}
+function pickUser(which, u) {
+  if (which === 'coin') {
+    coinSel.value = { id: u.id, name: u.nickname || u.username }
+    coinUserQ.value = u.nickname || u.username
+  } else {
+    noticeSel.value = { id: u.id, name: u.nickname || u.username }
+    noticeUserQ.value = u.nickname || u.username
+  }
+  userSelOpen.value[which] = false
+}
 const coinAmount = ref(100)
 const coinNote = ref('')
 const coinLogs = ref([])
 const coinTotal = ref(0)
 const coinPage = ref(1)
 async function grantCoins() {
-  if (!coinUid.value || !coinAmount.value || coinAmount.value <= 0) { toast('请填写用户和数量', 'err'); return }
+  if (!coinSel.value || !coinAmount.value || coinAmount.value <= 0) { toast('请先选择用户并填写数量', 'err'); return }
   try {
-    await api.post('/admin/coins/grant', { user_id: Number(coinUid.value) || coinUid.value, amount: coinAmount.value, note: coinNote.value })
-    toast(`已给用户发放 ${coinAmount.value} 知屿币`)
+    await api.post('/admin/coins/grant', { user_id: coinSel.value.id, amount: coinAmount.value, note: coinNote.value })
+    toast(`已给 ${coinSel.value.name} 发放 ${coinAmount.value} 知屿币`)
     coinNote.value = ''
+    coinSel.value = null
+    coinUserQ.value = ''
     loadCoins(1)
   } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
@@ -598,11 +653,14 @@ const noticeTitle = ref('')
 const noticeContent = ref('')
 async function sendNotice() {
   if (!noticeContent.value.trim()) { toast('通知内容不能为空', 'err'); return }
+  if (noticeTarget.value === 'one' && !noticeSel.value) { toast('请先选择要通知的用户', 'err'); return }
   try {
-    const target = noticeTarget.value === 'all' ? 'all' : [Number(noticeUid.value)]
+    const target = noticeTarget.value === 'all' ? 'all' : [noticeSel.value.id]
     const r = (await api.post('/admin/notices', { target, title: noticeTitle.value, content: noticeContent.value })).data
     toast(`已发送给 ${r.sent} 位用户`)
     noticeContent.value = ''
+    noticeSel.value = null
+    noticeUserQ.value = ''
   } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 
@@ -668,20 +726,20 @@ onMounted(async () => {
 <style scoped>
 .admin-panel { display: flex; min-height: calc(100vh - 60px); max-width: 1680px; margin: 0 auto; padding: 20px 24px 40px; gap: 20px; }
 .ap-side {
-  width: 220px; flex-shrink: 0;
+  width: 232px; flex-shrink: 0;
   position: fixed; left: 0; top: 60px; bottom: 0;
   overflow-y: auto;
   background: transparent;
-  padding: 14px 10px;
+  padding: 18px 14px;
   z-index: 50;
   border-radius: 0;
   border: none;
 }
 .ap-brand { font-weight: 700; font-size: 14px; padding: 6px 10px 14px; color: var(--text1); border-bottom: 1px solid var(--border); margin-bottom: 8px; }
-.ap-nav { display: flex; flex-direction: column; gap: 2px; }
-.ap-nav-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: none; background: transparent; color: var(--text2); font-size: 13.5px; cursor: pointer; border-radius: 9px; text-align: left; }
-.ap-nav-item:hover { background: var(--btn-bg-hover); color: var(--text1); }
-.ap-nav-item.on { background: color-mix(in srgb, var(--brand-1) 18%, transparent); color: var(--brand-1); font-weight: 600; }
+.ap-nav { display: flex; flex-direction: column; gap: 6px; }
+.ap-nav-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: none; background: transparent; color: var(--text2); font-size: 14px; cursor: pointer; border-radius: 10px; text-align: left; line-height: 1.4; }
+.ap-nav-item:hover { background: color-mix(in srgb, var(--text2) 10%, transparent); color: var(--text1); }
+.ap-nav-item.on { background: color-mix(in srgb, var(--brand-1) 16%, transparent); color: var(--brand-1); font-weight: 600; }
 .ap-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .ap-back { width: 100%; padding: 8px; border: 1px solid var(--border); background: transparent; color: var(--text2); border-radius: 9px; cursor: pointer; font-size: 12.5px; }
 .ap-back:hover { color: var(--text1); }
@@ -714,6 +772,19 @@ onMounted(async () => {
 .ap-table td { padding: 9px 10px; color: var(--text1); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
 .ap-table .ellipsis { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ops { display: flex; gap: 6px; flex-wrap: wrap; }
+/* 表格操作列按钮：淡雅描边风（不再用大红块/大蓝块） */
+.ops .ap-btn.sm {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--text2) 32%, transparent);
+  color: var(--text2);
+  padding: 3px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  transition: all .15s;
+}
+.ops .ap-btn.sm:hover { color: var(--text1); border-color: var(--text1); background: color-mix(in srgb, var(--text2) 8%, transparent); }
+.ops .ap-btn.sm.danger { color: #e5484d; border-color: color-mix(in srgb, #e5484d 45%, transparent); }
+.ops .ap-btn.sm.danger:hover { background: color-mix(in srgb, #e5484d 12%, transparent); border-color: #e5484d; }
 .role-tag { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; }
 .role-tag.admin { background: color-mix(in srgb, #f59e0b 20%, transparent); color: #f59e0b; }
 .role-tag.moderator { background: color-mix(in srgb, var(--brand-1) 20%, transparent); color: var(--brand-1); }
@@ -738,6 +809,18 @@ onMounted(async () => {
 .perm-cell { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .perm-item { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text2); cursor: pointer; }
 .perm-item input { accent-color: var(--brand-1); }
+/* 用户选择器（搜索下拉） */
+.user-pick { position: relative; flex: 1; min-width: 160px; }
+.user-pick .ap-input { width: 100%; box-sizing: border-box; }
+.user-sel {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  max-height: 220px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+}
+.user-sel-item { padding: 9px 12px; font-size: 13px; color: var(--text1); cursor: pointer; }
+.user-sel-item:hover { background: color-mix(in srgb, var(--brand-1) 14%, transparent); }
+.user-picked { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; color: var(--brand-1); background: color-mix(in srgb, var(--brand-1) 14%, transparent); padding: 4px 10px; border-radius: 999px; }
+.up-clear { border: none; background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
 .empty-tip { color: var(--text2); font-size: 13.5px; padding: 30px; text-align: center; }
 .audit-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .audit-head b { color: var(--text1); }
