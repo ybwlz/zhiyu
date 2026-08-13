@@ -171,7 +171,7 @@
         <div class="form-card">
           <h3>给用户发放知屿币</h3>
           <div class="form-row">
-            <input v-model="coinUid" class="ap-input" placeholder="用户 ID（或用户名）" />
+            <input v-model="coinUid" class="ap-input" placeholder="用户 ID 或用户名" />
             <input v-model.number="coinAmount" class="ap-input" type="number" placeholder="数量（≥1）" />
             <input v-model="coinNote" class="ap-input" placeholder="备注（可选）" />
             <button class="ap-btn" @click="grantCoins">发放</button>
@@ -262,7 +262,7 @@
         <div class="form-card">
           <h3>设置辅助管理员</h3>
           <div class="form-row">
-            <input v-model="mgrUid" class="ap-input" placeholder="用户 ID（或用户名）" />
+            <input v-model="mgrUid" class="ap-input" placeholder="用户 ID 或用户名" />
             <button class="ap-btn" @click="setManager('moderator')">设为辅助管理员</button>
             <button class="ap-btn ghost" @click="setManager('user')">取消管理员</button>
           </div>
@@ -384,7 +384,7 @@ const uPage = ref(1)
 
 // ── 笔记 ──
 const dQuery = ref('')
-const dVis = ref('')
+const dVis = ref('public')
 const dAudit = ref('')
 const docList = ref([])
 const docTotal = ref(0)

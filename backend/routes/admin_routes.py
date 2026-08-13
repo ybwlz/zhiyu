@@ -96,12 +96,12 @@ def admin_ban_user(user, uid):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT role FROM users WHERE id=%s", (uid,))
+            cur.execute("SELECT id, role FROM users WHERE id=%s", (uid,))
             row = cur.fetchone()
             if not row:
                 return jsonify({'error': '用户不存在'}), 404
-            if row['role'] == 'admin':
-                return jsonify({'error': '不能封禁站长'}), 400
+            if row['id'] == user['id']:
+                return jsonify({'error': '不能封禁自己'}), 400
             cur.execute("UPDATE users SET banned=1 WHERE id=%s", (uid,))
         conn.commit()
         log_admin(conn, user['id'], 'ban_user', 'user', uid)
@@ -132,12 +132,12 @@ def admin_delete_user(user, uid):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT role FROM users WHERE id=%s", (uid,))
+            cur.execute("SELECT id, role FROM users WHERE id=%s", (uid,))
             row = cur.fetchone()
             if not row:
                 return jsonify({'error': '用户不存在'}), 404
-            if row['role'] == 'admin':
-                return jsonify({'error': '不能删除站长'}), 400
+            if row['id'] == user['id']:
+                return jsonify({'error': '不能删除自己'}), 400
             # 级联清理
             for t in ('tokens', 'notifications', 'point_logs', 'reading_list', 'follows', 'friendships', 'messages'):
                 try:
@@ -345,19 +345,25 @@ def admin_grant_coins(user):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT username, nickname FROM users WHERE id=%s", (uid,))
-            if not cur.fetchone():
+            # 支持 ID 或用户名
+            if str(uid).isdigit():
+                cur.execute("SELECT id, username, nickname FROM users WHERE id=%s", (int(uid),))
+            else:
+                cur.execute("SELECT id, username, nickname FROM users WHERE username=%s", (str(uid),))
+            row = cur.fetchone()
+            if not row:
                 return jsonify({'error': '用户不存在'}), 404
-        grant_points(conn, uid, amount, 'admin_grant')
+            target_id = row['id']
+        grant_points(conn, target_id, amount, 'admin_grant')
         # 通知用户
         try:
             with conn.cursor() as cur:
                 cur.execute("INSERT INTO notifications (user_id, actor_id, type, extra) VALUES (%s,%s,'admin_coins',%s)",
-                            (uid, user['id'], json_dumps({'amount': amount, 'note': note})))
+                            (target_id, user['id'], json_dumps({'amount': amount, 'note': note})))
         except Exception:
             pass
         conn.commit()
-        log_admin(conn, user['id'], 'grant_coins', 'user', uid, f'+{amount} {note}')
+        log_admin(conn, user['id'], 'grant_coins', 'user', target_id, f'+{amount} {note}')
         conn.commit()
         return jsonify({'ok': True})
     finally:
@@ -506,19 +512,24 @@ def admin_set_manager(user):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT role FROM users WHERE id=%s", (uid,))
+            # 支持 ID 或用户名
+            if str(uid).isdigit():
+                cur.execute("SELECT id, role FROM users WHERE id=%s", (int(uid),))
+            else:
+                cur.execute("SELECT id, role FROM users WHERE username=%s", (str(uid),))
             row = cur.fetchone()
             if not row:
                 return jsonify({'error': '用户不存在'}), 404
-            if row['role'] == 'admin':
-                return jsonify({'error': '不能修改站长角色'}), 400
+            if row['id'] == user['id']:
+                return jsonify({'error': '不能修改自己的角色'}), 400
+            # 站长可降级/取消其他管理员（包括其他 admin），但不能动自己
             if role == 'moderator':
                 cur.execute("UPDATE users SET role='moderator', admin_perms=%s WHERE id=%s",
-                            (json_dumps(valid), uid))
+                            (json_dumps(valid), row['id']))
             else:
-                cur.execute("UPDATE users SET role='user', admin_perms=NULL WHERE id=%s", (uid,))
+                cur.execute("UPDATE users SET role='user', admin_perms=NULL WHERE id=%s", (row['id'],))
         conn.commit()
-        log_admin(conn, user['id'], 'set_manager', 'user', uid, f'{role} {valid}')
+        log_admin(conn, user['id'], 'set_manager', 'user', row['id'], f'{role} {valid}')
         conn.commit()
         return jsonify({'ok': True})
     finally:
