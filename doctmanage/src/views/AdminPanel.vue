@@ -38,9 +38,15 @@
             </div>
           </div>
         </div>
-        <div class="trend-card" style="margin-top: 14px;">
-          <h3>🥧 内容结构（点击放大高亮）</h3>
-          <div ref="pieChartRef" class="echart-box tall"></div>
+        <div class="chart-pair">
+          <div class="trend-card">
+            <h3>🥧 笔记结构</h3>
+            <div ref="pie1Ref" class="echart-box"></div>
+          </div>
+          <div class="trend-card">
+            <h3>👥 用户角色</h3>
+            <div ref="pie2Ref" class="echart-box"></div>
+          </div>
         </div>
         <div class="dash-bottom">
           <div class="trend-card">
@@ -585,16 +591,19 @@ const trendDays = computed(() => {
 const dayCount = (arr, d) => (arr || []).find(x => String(x.date).startsWith(d))?.count || 0
 // ECharts 图表
 const barChartRef = ref(null)
-const pieChartRef = ref(null)
+const pie1Ref = ref(null)
+const pie2Ref = ref(null)
 let barChart = null
-let pieChart = null
+let pieChart1 = null
+let pieChart2 = null
 function initCharts() {
   if (!barChartRef.value || barChart) return
   barChart = echarts.init(barChartRef.value)
-  pieChart = echarts.init(pieChartRef.value)
+  pieChart1 = echarts.init(pie1Ref.value)
+  pieChart2 = echarts.init(pie2Ref.value)
   window.addEventListener('resize', resizeCharts)
 }
-function resizeCharts() { barChart?.resize(); pieChart?.resize() }
+function resizeCharts() { barChart?.resize(); pieChart1?.resize(); pieChart2?.resize() }
 function renderCharts() {
   if (!barChart) return
   const days = trendDays.value.map(d => d.slice(5))
@@ -610,23 +619,39 @@ function renderCharts() {
       { name: '新增笔记', type: 'bar', data: trendDays.value.map(d => dayCount(stats.value.docs_7, d)), itemStyle: { color: '#22c55e', borderRadius: [3, 3, 0, 0] }, barWidth: 12 },
     ],
   })
-  // 环形饼图：内容结构（点击高亮放大）
-  pieChart.setOption({
+  // 环形饼图1：笔记结构（公开/私密）
+  pieChart1.setOption({
     tooltip: { trigger: 'item', formatter: '{b}: {c}（{d}%）' },
     legend: { bottom: 0, textStyle: { color: 'var(--text2)' } },
     series: [{
       type: 'pie',
       radius: ['42%', '68%'],
       center: ['50%', '44%'],
-      avoidLabelOverlap: true,
       itemStyle: { borderRadius: 6, borderColor: 'var(--bg)', borderWidth: 2 },
       label: { show: false },
       emphasis: { scale: true, scaleSize: 8, label: { show: true, fontSize: 14, fontWeight: 700, formatter: '{b}\n{c}' } },
       data: [
         { value: stats.value.docs_public || 0, name: '公开笔记', itemStyle: { color: '#3b82f6' } },
         { value: stats.value.docs_private || 0, name: '私密笔记', itemStyle: { color: '#22c55e' } },
-        { value: stats.value.audit_pending || 0, name: '待审笔记', itemStyle: { color: '#f59e0b' } },
-        { value: stats.value.ai_usage || 0, name: 'AI 使用', itemStyle: { color: '#a855f7' } },
+      ],
+    }],
+  })
+  // 环形饼图2：用户角色
+  const roles = stats.value.users_roles || {}
+  pieChart2.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: {c}（{d}%）' },
+    legend: { bottom: 0, textStyle: { color: 'var(--text2)' } },
+    series: [{
+      type: 'pie',
+      radius: ['42%', '68%'],
+      center: ['50%', '44%'],
+      itemStyle: { borderRadius: 6, borderColor: 'var(--bg)', borderWidth: 2 },
+      label: { show: false },
+      emphasis: { scale: true, scaleSize: 8, label: { show: true, fontSize: 14, fontWeight: 700, formatter: '{b}\n{c}' } },
+      data: [
+        { value: roles.user || 0, name: '普通用户', itemStyle: { color: '#3b82f6' } },
+        { value: roles.moderator || 0, name: '辅助管理员', itemStyle: { color: '#a855f7' } },
+        { value: roles.admin || 0, name: '站长', itemStyle: { color: '#f59e0b' } },
       ],
     }],
   })
@@ -1029,7 +1054,8 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', resizeCharts)
   barChart?.dispose()
-  pieChart?.dispose()
+  pieChart1?.dispose()
+  pieChart2?.dispose()
 })
 </script>
 
@@ -1082,7 +1108,7 @@ onUnmounted(() => {
 .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
 /* 圆环图 */
 .echart-box { width: 100%; height: 240px; }
-.echart-box.tall { height: 300px; }
+.chart-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
 .rings-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 14px; }
 .ring-card { border: 1px solid var(--border); border-radius: 14px; background: var(--btn-bg); padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .ring-wrap { position: relative; width: 84px; height: 84px; }
