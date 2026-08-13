@@ -511,7 +511,7 @@ def admin_digests(user):
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) c FROM daily_digests")
             total = cur.fetchone()['c']
-            cur.execute("""SELECT id, digest_date, summary, CAST(created_at AS CHAR) created_at
+            cur.execute("""SELECT id, CAST(digest_date AS CHAR) digest_date, summary, CAST(created_at AS CHAR) created_at
                 FROM daily_digests ORDER BY digest_date DESC LIMIT %s OFFSET %s""",
                         (size, (page - 1) * size))
             items = [dict(r) for r in cur.fetchall()]
