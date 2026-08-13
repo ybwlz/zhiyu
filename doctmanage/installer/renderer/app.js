@@ -95,6 +95,7 @@ function openTerms(type) {
       ? '<div class="t-sec">' + line + '</div>'
       : '<div class="t-line">' + line + '</div>')
     .join('')
+  $('termsBody').scrollTop = 0 // 每次打开都从顶部开始
   $('termsModal').classList.remove('hidden')
 }
 $('linkTerms').onclick = (e) => { e.preventDefault(); openTerms('terms') }
