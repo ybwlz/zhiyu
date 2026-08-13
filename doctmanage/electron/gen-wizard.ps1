@@ -3,7 +3,8 @@ Add-Type -AssemblyName System.Drawing
 $dir = "C:\Users\50534\Desktop\桌面整理\文件夹归档\项目代码\document\documentplatform\doctmanage\electron"
 
 function New-GradientBmp($w, $h, $title, $sub) {
-  $bmp = New-Object System.Drawing.Bitmap($w, $h)
+  # Inno Setup 要求 24bit BMP，用 Format24bppRgb 创建
+  $bmp = New-Object System.Drawing.Bitmap($w, $h, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
   $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit

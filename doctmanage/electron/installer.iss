@@ -25,6 +25,7 @@ SolidCompression=yes
 WizardStyle=modern
 WizardImageFile=..\electron\wizard-image.bmp
 WizardSmallImageFile=..\electron\wizard-small.bmp
+DisableDirPage=no
 ArchitecturesInstallIn64BitMode=x64compatible
 ; 未签名安装包，不写 SignedUninstaller
 CloseApplications=yes
