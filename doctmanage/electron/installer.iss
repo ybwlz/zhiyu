@@ -56,3 +56,14 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "启动知屿"; Flags: nowait postinstall skipifsilent
+
+[Code]
+// 向导窗口半透明（WS_EX_LAYERED，Win7+ 支持）
+procedure CurPageChanged(CurPageID: Integer);
+var
+  ex: LongInt;
+begin
+  ex := GetWindowLong(SetupForm.Handle, GWL_EXSTYLE);
+  SetWindowLong(SetupForm.Handle, GWL_EXSTYLE, ex or WS_EX_LAYERED);
+  SetLayeredWindowAttributes(SetupForm.Handle, 0, 238, LWA_ALPHA);
+end;
