@@ -93,6 +93,11 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
 }
+/* html 层背景跟随主题：透明滚动条轨道/边缘区域透出的是主题色，
+   而不是窗口底色（Electron 窗口 backgroundColor 为深色，否则右侧会出现黑条） */
+html {
+  background: var(--bg);
+}
 
 /* ============================================================
    个人知识库 · 多主题体系（全局生效）
@@ -209,13 +214,38 @@ html[data-theme="minimal"] {
 /* 平板/触屏：点击按钮/链接时不闪浏览器默认高亮（保留各组件自定义 hover/active 反馈） */
 button, a, [role='button'] { -webkit-tap-highlight-color: transparent; }
 
-/* ── Electron 桌面版：自定义深色标题栏适配 ── */
-html.desktop-electron body { padding-top: 40px; }
-html.desktop-electron .kb-navbar { top: 40px; }
-html.desktop-electron #titlebar-drag {
-  position: fixed; top: 0; left: 0; right: 0; height: 40px;
-  -webkit-app-region: drag; z-index: 2147483000;
+/* ── Electron 桌面版：导航栏即标题栏（容器可拖拽、按钮可点，与 - □ × 同一排） ── */
+/* 导航栏整体可拖拽，交互元素可点击；内容置顶，右侧让位窗口按钮区（- □ × 约 138px） */
+html.desktop-electron .kb-navbar {
+  top: 0;
+  -webkit-app-region: drag;
 }
+html.desktop-electron .kb-navbar .nav-inner,
+html.desktop-electron .edit-topbar {
+  padding-right: 138px;
+  box-sizing: border-box;
+}
+/* 导航栏内所有可交互/内容元素：不触发拖拽，正常点击 */
+html.desktop-electron .kb-navbar a,
+html.desktop-electron .kb-navbar button,
+html.desktop-electron .kb-navbar input,
+html.desktop-electron .kb-navbar .nav-link,
+html.desktop-electron .kb-navbar .nav-brand,
+html.desktop-electron .kb-navbar .nav-right,
+html.desktop-electron .kb-navbar .kb-theme-wrap,
+html.desktop-electron .kb-navbar .kb-theme-menu {
+  -webkit-app-region: no-drag;
+}
+/* 编辑页顶栏同标题栏 */
+html.desktop-electron .edit-topbar {
+  -webkit-app-region: drag;
+}
+html.desktop-electron .edit-topbar button,
+html.desktop-electron .edit-topbar input,
+html.desktop-electron .edit-topbar .vis-seg {
+  -webkit-app-region: no-drag;
+}
+html.desktop-electron body { padding-top: 0; }
 
 /* Electron 桌面版：不显示「下载桌面版」按钮（客户端无需下载自身） */
 html.desktop-electron .hero-dl-btn { display: none !important; }

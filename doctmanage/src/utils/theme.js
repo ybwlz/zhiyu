@@ -32,6 +32,13 @@ export function applyTheme(id) {
   localStorage.setItem(THEME_KEY, theme.id)
   localStorage.setItem(LEGACY_KEY, theme.dark ? 'dark' : 'light')
   themeState.id = theme.id
+  // Electron 桌面版：窗口标题栏（- □ ×）颜色跟随主题
+  if (window.desktop?.setTitleBarColor) {
+    const cs = getComputedStyle(document.documentElement)
+    const bg = (cs.getPropertyValue('--bg').trim() || '#070b16')
+    const sym = (cs.getPropertyValue('--text1').trim() || '#e8ecf8')
+    window.desktop.setTitleBarColor(bg, sym)
+  }
   return theme
 }
 

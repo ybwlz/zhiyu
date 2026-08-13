@@ -3,7 +3,7 @@
 //   - 静态文件：dist-electron 产物（module 脚本在 http 下正常执行）
 //   - /api、/uploads：代理到本地后端（http://localhost:5000）
 //   - /zhiyu/*：前端路由回落 index.html
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, shell, ipcMain } = require('electron')
 const http = require('http')
 const path = require('path')
 const fs = require('fs')
@@ -105,21 +105,28 @@ app.whenReady().then(() => {
       backgroundColor: '#070b16',
       // 自定义深色标题栏（跟随知屿星空主题，Windows 10+ 生效）
       titleBarStyle: 'hidden',
-      titleBarOverlay: {
-        color: '#070b16',
-        symbolColor: '#e8ecf8',
-        height: 40,
-      },
+      // 窗口按钮（- □ ×）由前端绘制（WindowControls），背景完全融入导航栏/主题
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
         spellcheck: false,
+        preload: require('path').join(__dirname, 'preload.cjs'),
       },
     })
     win.webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/.test(url)) shell.openExternal(url)
       return { action: 'deny' }
     })
+    // 前端主题切换 → 更新窗口底色（跟随星空/蓝天/简约主题）
+    ipcMain.on('set-titlebar', (e, { color }) => {
+      try {
+        if (color) win.setBackgroundColor(color)
+      } catch (err) { /* 非 Windows 平台忽略 */ }
+    })
+    // 前端绘制的窗口控制按钮（- □ ×）
+    ipcMain.on('window-minimize', () => win.minimize())
+    ipcMain.on('window-maximize', () => { if (win.isMaximized()) win.unmaximize(); else win.maximize() })
+    ipcMain.on('window-close', () => win.close())
     win.loadURL('http://127.0.0.1:' + port + '/')
   })
 })
