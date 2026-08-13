@@ -22,9 +22,21 @@
           <div class="stat-card"><div class="sc-icon">🤖</div><b>{{ stats.ai_usage ?? '-' }}</b><span>AI 使用次数</span></div>
           <div class="stat-card warn" @click="mod = 'audits'"><div class="sc-icon">🔍</div><b>{{ stats.audit_pending ?? '-' }}</b><span>待审笔记</span></div>
         </div>
-        <div class="trend-card" style="margin-bottom: 14px;">
-          <h3>💬 互动趋势（近 7 天）</h3>
-          <div ref="interactChartRef" class="echart-box"></div>
+        <div class="chart-pair" style="margin-bottom: 14px;">
+          <div class="trend-card wide">
+            <h3>💬 互动趋势（近 7 天）</h3>
+            <div ref="interactChartRef" class="echart-box tall"></div>
+          </div>
+          <div class="trend-card">
+            <h3>⚡ 快捷入口</h3>
+            <div class="quick-list">
+              <button class="quick-item" @click="mod = 'audits'">🔍 待审队列（{{ stats.audit_pending ?? 0 }}）</button>
+              <button class="quick-item" @click="mod = 'users'">👥 用户管理</button>
+              <button class="quick-item" @click="mod = 'docs'">📄 笔记管理</button>
+              <button class="quick-item" @click="mod = 'codes'">🎫 生成兑换码</button>
+              <button class="quick-item" @click="mod = 'notices'">📢 发通知</button>
+            </div>
+          </div>
         </div>
         <div class="chart-pair">
           <div class="trend-card wide">
@@ -37,16 +49,6 @@
           </div>
         </div>
         <div class="dash-bottom">
-          <div class="trend-card">
-            <h3>⚡ 快捷入口</h3>
-            <div class="quick-list">
-              <button class="quick-item" @click="mod = 'audits'">🔍 待审队列（{{ stats.audit_pending ?? 0 }}）</button>
-              <button class="quick-item" @click="mod = 'users'">👥 用户管理</button>
-              <button class="quick-item" @click="mod = 'docs'">📄 笔记管理</button>
-              <button class="quick-item" @click="mod = 'codes'">🎫 生成兑换码</button>
-              <button class="quick-item" @click="mod = 'notices'">📢 发通知</button>
-            </div>
-          </div>
           <div class="trend-card">
             <h3>🆕 最新注册</h3>
             <div v-for="u in userList.slice(0, 6)" :key="u.id" class="dash-row">
@@ -1113,8 +1115,8 @@ onUnmounted(() => {
 .quick-list { display: flex; flex-direction: column; gap: 6px; }
 .quick-item { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text1); font-size: 13.5px; cursor: pointer; text-align: left; }
 .quick-item:hover { background: color-mix(in srgb, var(--brand-1) 12%, transparent); border-color: color-mix(in srgb, var(--brand-1) 40%, transparent); }
-/* 仪表盘底部：快捷入口 / 最新注册 / 最新笔记 */
-.dash-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 14px; }
+/* 仪表盘底部：最新注册 / 最新笔记 */
+.dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
 /* 圆环图 */
 .echart-box { width: 100%; height: 240px; }
 .echart-box.tall { height: 280px; }
