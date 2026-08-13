@@ -310,6 +310,10 @@
           <button class="ap-btn" @click="sendNotice">发送通知</button>
         </div>
         <h3 class="ap-sec">📜 历史通知</h3>
+        <div class="filter-seg" style="margin-bottom: 12px;">
+          <button :class="{ on: noticeTab === 'notice' }" @click="noticeTab = 'notice'; loadNoticeHistory()">手动通知</button>
+          <button :class="{ on: noticeTab === 'digest' }" @click="noticeTab = 'digest'; loadNoticeHistory()">AI 每日摘要</button>
+        </div>
         <table class="ap-table">
           <thead><tr><th>时间</th><th>标题</th><th>内容摘要</th><th>发给</th></tr></thead>
           <tbody>
@@ -812,9 +816,10 @@ function confirmPick() {
   userPickModal.value = false
 }
 
+const noticeTab = ref('notice')
 const noticeHistory = ref([])
 async function loadNoticeHistory() {
-  try { noticeHistory.value = ((await api.get('/admin/notices/history', { params: { size: 20 } })).data?.items) || [] } catch (e) { /* 权限不足 */ }
+  try { noticeHistory.value = ((await api.get('/admin/notices/history', { params: { type: noticeTab.value, size: 20 } })).data?.items) || [] } catch (e) { /* 权限不足 */ }
 }
 
 const noticeTitle = ref('')

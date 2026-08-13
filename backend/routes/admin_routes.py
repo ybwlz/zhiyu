@@ -498,12 +498,28 @@ def admin_digests(user):
 @bp.route('/api/admin/notices/history', methods=['GET'])
 @require_perm('notices')
 def admin_notice_history(user):
-    """已发送通知的历史记录（含标题/内容摘要/目标人数）"""
+    """已发送通知的历史记录（type=notice 手动通知 / type=digest AI 每日摘要）"""
+    ntype = (request.args.get('type') or 'notice').strip()
     page = max(1, int(request.args.get('page') or 1))
     size = min(50, max(10, int(request.args.get('size') or 20)))
     conn = get_conn()
     try:
         with conn.cursor() as cur:
+            if ntype == 'digest':
+                # AI 每日摘要通知：每天发给所有用户，按日期聚合
+                cur.execute("SELECT COUNT(DISTINCT DATE(created_at)) c FROM notifications WHERE type='digest'")
+                total = cur.fetchone()['c']
+                cur.execute("""SELECT DATE(created_at) d, COUNT(*) c, MAX(extra) extra, MAX(created_at) mt
+                    FROM notifications WHERE type='digest'
+                    GROUP BY DATE(created_at) ORDER BY mt DESC LIMIT %s OFFSET %s""",
+                            (size, (page - 1) * size))
+                items = []
+                for r in cur.fetchall():
+                    items.append({
+                        'id': str(r['d']), 'title': '📅 AI 每日摘要', 'content': (r['extra'] or '')[:120],
+                        'target_id': f'x{r["c"]}', 'created_at': str(r['mt'] or r['d']),
+                    })
+                return jsonify({'total': total, 'page': page, 'items': items})
             cur.execute("SELECT COUNT(*) c FROM admin_logs WHERE action='notice'")
             total = cur.fetchone()['c']
             cur.execute("""SELECT l.id, l.admin_id, l.target_type, l.target_id, l.detail,
