@@ -246,10 +246,7 @@
         <h2 class="ap-title">📢 发送通知</h2>
         <div class="form-card">
           <div class="form-row">
-            <select v-model="noticeTarget" class="ap-input sel">
-              <option value="all">全站用户</option>
-              <option value="one">指定用户</option>
-            </select>
+            <VisibilitySelect v-model="noticeTarget" :options="noticeTargetOptions" class="ap-vis" />
             <div v-if="noticeTarget === 'one'" class="user-pick">
               <input v-model="noticeUserQ" class="ap-input" placeholder="搜索用户（用户名/昵称）" @input="searchUsers('notice')" @focus="userSelOpen.notice = true" @blur="setTimeout(() => userSelOpen.notice = false, 200)" />
               <div v-if="userSelOpen.notice && noticeUserResults.length" class="user-sel">
@@ -278,17 +275,14 @@
               <td>{{ m.id }}</td>
               <td>{{ m.nickname || m.username }}</td>
               <td><span class="role-tag" :class="m.role">{{ roleLabel(m.role) }}</span></td>
-              <td class="perm-cell">
+              <td>
                 <template v-if="m.role === 'admin'"><span class="ap-meta">全部权限</span></template>
                 <template v-else>
-                  <label v-for="p in permKeys" :key="p" class="perm-item">
-                    <input type="checkbox" :checked="m.perms?.includes(p)" @change="togglePerm(m, p)" />
-                    {{ permLabels[p] }}
-                  </label>
+                  <button class="ap-btn sm" @click="openPerm(m)">调整权限</button>
                 </template>
               </td>
               <td class="ops">
-                <button v-if="m.role === 'moderator'" class="ap-btn sm ghost" @click="setManager('user', m.id)">取消</button>
+                <button v-if="m.role === 'moderator'" class="ap-btn sm danger" @click="removeManager(m)">取消</button>
               </td>
             </tr>
           </tbody>
@@ -364,6 +358,23 @@
         </div>
       </div>
 
+      <!-- 权限设置弹窗 -->
+      <div v-if="permModal" class="modal-mask" @click.self="permModal = null">
+        <div class="modal small">
+          <div class="modal-head"><b>🛡️ {{ permModal.nickname || permModal.username }} · 权限设置</b><button class="modal-close" @click="permModal = null">✕</button></div>
+          <div class="modal-body">
+            <label v-for="p in permKeys" :key="p" class="perm-item big">
+              <input type="checkbox" :value="p" v-model="permModal.perms" />
+              <span>{{ permLabels[p] }}</span>
+            </label>
+          </div>
+          <div class="modal-foot">
+            <button class="ap-btn ghost" @click="permModal = null">取消</button>
+            <button class="ap-btn" @click="savePerm">保存</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 主题 toast -->
       <div class="ap-toasts">
         <TransitionGroup name="toast">
@@ -382,6 +393,7 @@ import { full as emoji } from 'markdown-it-emoji'
 import mdImgSize from '@/utils/mdImgSize.js'
 import api from '@/utils/api.js'
 import { useAuthStore } from '@/stores/auth.js'
+import VisibilitySelect from '@/components/VisibilitySelect.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -648,6 +660,10 @@ function copyAllCodes() {
 
 // ── 通知 ──
 const noticeTarget = ref('all')
+const noticeTargetOptions = [
+  { value: 'all', label: '全站用户' },
+  { value: 'one', label: '指定用户' },
+]
 const noticeUid = ref('')
 const noticeTitle = ref('')
 const noticeContent = ref('')
@@ -686,6 +702,28 @@ async function togglePerm(m, p) {
   const perms = new Set(m.perms || [])
   perms.has(p) ? perms.delete(p) : perms.add(p)
   try { await api.post('/admin/managers', { user_id: m.id, role: 'moderator', perms: [...perms] }); toast('权限已更新'); loadManagers() } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
+}
+// 权限设置弹窗
+const permModal = ref(null)
+function openPerm(m) {
+  permModal.value = { id: m.id, username: m.username, nickname: m.nickname, perms: [...(m.perms || [])] }
+}
+async function savePerm() {
+  try {
+    await api.post('/admin/managers', { user_id: permModal.value.id, role: 'moderator', perms: permModal.value.perms })
+    toast('权限已保存')
+    permModal.value = null
+    loadManagers()
+  } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
+}
+// 取消管理员（带确认弹窗）
+async function removeManager(m) {
+  if (!(await askConfirm({ title: '取消管理员', msg: `确认取消 ${m.nickname || m.username} 的辅助管理员身份？`, danger: true }))) return
+  try {
+    await api.post('/admin/managers', { user_id: m.id, role: 'user', perms: [] })
+    toast('已取消管理员')
+    loadManagers()
+  } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
 
 // ── AI 日志 ──
@@ -762,7 +800,9 @@ onMounted(async () => {
 .filter-seg button.on { background: color-mix(in srgb, var(--brand-1) 16%, transparent); color: var(--brand-1); font-weight: 600; }
 .ap-input { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text1); font-size: 13px; outline: none; min-width: 180px; }
 .ap-input.sel { min-width: 120px; }
-.ap-btn { padding: 8px 16px; border: none; border-radius: 9px; cursor: pointer; font-size: 13px; background: linear-gradient(120deg, var(--brand-1), var(--brand-2)); color: #fff; font-weight: 600; }
+.ap-btn { padding: 8px 16px; border: none; border-radius: 9px; cursor: pointer; font-size: 13px; background: var(--brand-1); color: #fff; font-weight: 600; transition: background .15s, transform .1s; }
+.ap-btn:hover { background: color-mix(in srgb, var(--brand-1) 82%, #000); }
+.ap-btn:active { transform: scale(.97); }
 .ap-btn.sm { padding: 5px 10px; font-size: 12px; }
 .ap-btn.danger { background: #e5484d; }
 .ap-btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text2); }
@@ -798,7 +838,7 @@ onMounted(async () => {
 .form-card h3 { font-size: 14px; margin: 0 0 12px; color: var(--text1); }
 .form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .form-row .ap-input { flex: 1; min-width: 140px; }
-.ap-input.ta { min-height: 90px; resize: vertical; width: 100%; }
+.ap-input.ta { min-height: 300px; resize: vertical; width: 100%; font-size: 14px; line-height: 1.7; }
 .ap-sec { font-size: 14px; margin: 16px 0 10px; color: var(--text1); }
 .mono { font-family: Consolas, monospace; letter-spacing: .5px; }
 .code-box { margin-top: 12px; padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--brand-1) 8%, transparent); border: 1px dashed color-mix(in srgb, var(--brand-1) 40%, transparent); }
@@ -809,6 +849,8 @@ onMounted(async () => {
 .perm-cell { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .perm-item { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text2); cursor: pointer; }
 .perm-item input { accent-color: var(--brand-1); }
+.perm-item.big { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; margin-bottom: 6px; font-size: 14px; color: var(--text1); background: var(--btn-bg); border: 1px solid var(--border); }
+.perm-item.big input { width: 16px; height: 16px; }
 /* 用户选择器（搜索下拉） */
 .user-pick { position: relative; flex: 1; min-width: 160px; }
 .user-pick .ap-input { width: 100%; box-sizing: border-box; }
