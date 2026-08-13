@@ -340,16 +340,8 @@ onMounted(() => {
     store.fetchDocByKey(key)
   } else if (!auth.isLogin) {
     // 未登录：阅览室不加载任何文档（左侧与正文均提示登录）
-  } else {
-    // 无 key（顶部导航进 /docs）：等列表加载后自动跳到第一篇，让 URL 带正确 key（AI 据此感知当前笔记）
-    docsP.then(() => {
-      if (!route.params.key) {
-        const docs = store.getData() || []
-        const first = docs[0]
-        if (first && first.public_id) router.replace('/docs/' + first.public_id)
-      }
-    })
   }
+  // 无 key（顶部导航进 /docs）：纯列表模式，不自动打开任何笔记（右侧显示占位提示）
 })
 
 onUnmounted(() => {
@@ -1100,7 +1092,7 @@ const nextDoc = computed(() => {
                   <button class="ai-pv-apply" type="button" @click="applyAiPreview">✓ 应用修改</button>
                 </div>
               </div>
-              <div v-if="docLoading" class="doc-loading">加载中…</div>
+              <div v-if="docLoading" class="doc-loading">加载中…</div>              <div v-else-if="!currentDoc" class="doc-empty">📖 从左侧列表选择一篇笔记开始阅读</div>
               <div v-else class="markdown-body" v-html="rendered" @click="onContentClick"></div>
               <!-- 附件：上传的文件（PDF/Office 等）可下载 -->
               <div v-if="currentDoc && currentDoc.attachment" class="doc-attachment">
@@ -2020,6 +2012,13 @@ const nextDoc = computed(() => {
   text-align: center;
   color: var(--text2);
   font-size: 14px;
+}
+.doc-empty {
+  padding: 120px 24px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 15px;
+  letter-spacing: .5px;
 }
 /* 未登录访问阅览室：不显示登录引导，直接空白（左侧与正文都空，正文显示未选中文档的占位文案） */
 .doc-card {
