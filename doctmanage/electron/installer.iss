@@ -23,8 +23,8 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-WizardImageFile=..\electron\wizard-image.jpg
-WizardSmallImageFile=..\electron\wizard-small.jpg
+WizardImageFile=..\electron\wizard-image.bmp
+WizardSmallImageFile=..\electron\wizard-small.bmp
 DisableDirPage=no
 ArchitecturesInstallIn64BitMode=x64compatible
 ; 未签名安装包，不写 SignedUninstaller
