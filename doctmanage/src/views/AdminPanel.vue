@@ -59,6 +59,7 @@
               <td class="ops">
                 <button v-if="!u.banned && u.role !== 'admin'" class="ap-btn sm danger" @click="banUser(u)">封禁</button>
                 <button v-if="u.banned" class="ap-btn sm" @click="unbanUser(u)">解封</button>
+                <button v-if="u.role !== 'admin'" class="ap-btn sm" @click="openCoinFor(u)">发币</button>
                 <button v-if="u.role !== 'admin'" class="ap-btn sm danger" @click="delUser(u)">删除</button>
                 <button v-if="u.role !== 'admin'" class="ap-btn sm" @click="openManager(u)">设管理员</button>
               </td>
@@ -247,10 +248,7 @@
           <div class="form-row">
             <VisibilitySelect v-model="noticeTarget" :options="noticeTargetOptions" class="ap-vis" />
             <div v-if="noticeTarget === 'one'" class="user-pick">
-              <input v-model="noticeUserQ" class="ap-input" placeholder="搜索用户添加（可多选）" @input="searchUsers('notice')" @focus="userSelOpen.notice = true" @blur="setTimeout(() => userSelOpen.notice = false, 200)" />
-              <div v-if="userSelOpen.notice && noticeUserResults.length" class="user-sel">
-                <div v-for="u in noticeUserResults" :key="u.id" class="user-sel-item" @mousedown.prevent="pickUser('notice', u)">{{ u.nickname || u.username }} · {{ u.username }}</div>
-              </div>
+              <button class="ap-btn" @click="openUserPick">选择用户（已选 {{ noticeSelList.length }}）</button>
               <div v-if="noticeSelList.length" class="user-picked-list">
                 <span v-for="s in noticeSelList" :key="s.id" class="user-picked">已选：{{ s.name }}<button class="up-clear" @click="noticeSelList = noticeSelList.filter(x => x.id !== s.id)">✕</button></span>
               </div>
@@ -355,6 +353,49 @@
           <div class="modal-foot">
             <button class="ap-btn ghost" @click="promptCancel">取消</button>
             <button class="ap-btn" @click="promptOk">确定</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 选择通知用户弹窗（列表直接勾选） -->
+      <div v-if="userPickModal" class="modal-mask" @click.self="userPickModal = false">
+        <div class="modal mid">
+          <div class="modal-head"><b>选择通知用户</b><button class="modal-close" @click="userPickModal = false">✕</button></div>
+          <div class="modal-body">
+            <input v-model="pickQ" class="ap-input w100" placeholder="搜索用户名/昵称（可选，不搜就翻列表）" @input="loadPickUsers(1)" />
+            <div class="pick-list">
+              <label v-for="u in pickUsers" :key="u.id" class="pick-item">
+                <input type="checkbox" :checked="pickAll.some(x => x.id === u.id)" @change="togglePick(u, $event.target.checked)" />
+                <span>{{ u.nickname || u.username }} · {{ u.username }}</span>
+              </label>
+              <div v-if="!pickUsers.length" class="empty-tip">暂无用户</div>
+            </div>
+            <div class="page-bar">
+              <button class="ap-btn sm" :disabled="pickPage <= 1" @click="loadPickUsers(pickPage - 1)">上一页</button>
+              <span>{{ pickPage }} / {{ Math.max(1, Math.ceil(pickTotal / 20)) }}</span>
+              <button class="ap-btn sm" :disabled="pickPage >= Math.max(1, Math.ceil(pickTotal / 20))" @click="loadPickUsers(pickPage + 1)">下一页</button>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="ap-btn ghost" @click="userPickModal = false">取消</button>
+            <button class="ap-btn" @click="confirmPick">确定（已选 {{ pickAll.length }}）</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 发币弹窗（用户管理里直接给某人发） -->
+      <div v-if="coinForModal" class="modal-mask" @click.self="coinForModal = null">
+        <div class="modal small">
+          <div class="modal-head"><b>🪙 给 {{ coinForModal.name }} 发知屿币</b><button class="modal-close" @click="coinForModal = null">✕</button></div>
+          <div class="modal-body">
+            <div class="form-row">
+              <input v-model.number="coinForModal.amount" class="ap-input" type="number" placeholder="数量（≥1）" />
+              <input v-model="coinForModal.note" class="ap-input" placeholder="留言备注（可选，会通知用户）" />
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="ap-btn ghost" @click="coinForModal = null">取消</button>
+            <button class="ap-btn" @click="submitCoinFor">发放</button>
           </div>
         </div>
       </div>
@@ -669,6 +710,39 @@ const noticeTargetOptions = [
   { value: 'one', label: '指定用户' },
 ]
 const noticeUid = ref('')
+// 通知：选择用户弹窗（列表直接勾选，搜索可选）
+const userPickModal = ref(false)
+const pickQ = ref('')
+const pickUsers = ref([])
+const pickTotal = ref(0)
+const pickPage = ref(1)
+const pickAll = ref([])
+async function loadPickUsers(page) {
+  pickPage.value = page || 1
+  try {
+    const r = (await api.get('/admin/users', { params: { q: pickQ.value, page: pickPage.value, size: 20 } })).data
+    pickUsers.value = r.items || []
+    pickTotal.value = r.total || 0
+  } catch (e) { pickUsers.value = [] }
+}
+function openUserPick() {
+  pickAll.value = [...noticeSelList.value]
+  pickQ.value = ''
+  userPickModal.value = true
+  loadPickUsers(1)
+}
+function togglePick(u, checked) {
+  if (checked) {
+    if (!pickAll.value.some(x => x.id === u.id)) pickAll.value.push({ id: u.id, name: u.nickname || u.username })
+  } else {
+    pickAll.value = pickAll.value.filter(x => x.id !== u.id)
+  }
+}
+function confirmPick() {
+  noticeSelList.value = [...pickAll.value]
+  userPickModal.value = false
+}
+
 const noticeTitle = ref('')
 const noticeContent = ref('')
 async function sendNotice() {
@@ -707,6 +781,22 @@ async function togglePerm(m, p) {
   perms.has(p) ? perms.delete(p) : perms.add(p)
   try { await api.post('/admin/managers', { user_id: m.id, role: 'moderator', perms: [...perms] }); toast('权限已更新'); loadManagers() } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
 }
+// 发币弹窗（用户管理行内直接发，不用搜人）
+const coinForModal = ref(null)
+function openCoinFor(u) {
+  coinForModal.value = { id: u.id, name: u.nickname || u.username, amount: 100, note: '' }
+}
+async function submitCoinFor() {
+  const m = coinForModal.value
+  if (!m || !m.amount || m.amount <= 0) { toast('请填写数量', 'err'); return }
+  try {
+    await api.post('/admin/coins/grant', { user_id: m.id, amount: m.amount, note: m.note })
+    toast(`已给 ${m.name} 发放 ${m.amount} 知屿币`)
+    coinForModal.value = null
+    loadCoins(1)
+  } catch (e) { toast(e.response?.data?.error || '操作失败', 'err') }
+}
+
 // 权限设置弹窗
 const permModal = ref(null)
 function openPerm(m) {
@@ -867,6 +957,12 @@ onMounted(async () => {
 .user-sel-item:hover { background: color-mix(in srgb, var(--brand-1) 14%, transparent); }
 .user-picked { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; color: var(--brand-1); background: color-mix(in srgb, var(--brand-1) 14%, transparent); padding: 4px 10px; border-radius: 999px; }
 .user-picked-list { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 选择用户弹窗列表 */
+.modal.mid { width: min(520px, 94vw); }
+.pick-list { margin-top: 12px; max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.pick-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px; font-size: 13.5px; color: var(--text1); cursor: pointer; }
+.pick-item:hover { background: color-mix(in srgb, var(--brand-1) 10%, transparent); }
+.pick-item input { width: 15px; height: 15px; accent-color: var(--brand-1); }
 .up-clear { border: none; background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
 .empty-tip { color: var(--text2); font-size: 13.5px; padding: 30px; text-align: center; }
 .audit-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
