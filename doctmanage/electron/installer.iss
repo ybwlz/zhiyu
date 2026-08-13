@@ -59,6 +59,15 @@ Filename: "{app}\{#MyAppExeName}"; Description: "启动知屿"; Flags: nowait po
 
 [Code]
 // 向导窗口半透明（WS_EX_LAYERED，Win7+ 支持）
+const
+  GWL_EXSTYLE = -20;
+  WS_EX_LAYERED = $80000;
+  LWA_ALPHA = $2;
+
+function GetWindowLong(hWnd: HWND; nIndex: Integer): LongInt; external 'GetWindowLongA@user32.dll stdcall';
+function SetWindowLong(hWnd: HWND; nIndex: Integer; dwNewLong: LongInt): LongInt; external 'SetWindowLongA@user32.dll stdcall';
+function SetLayeredWindowAttributes(hwnd: HWND; crKey: Cardinal; bAlpha: Byte; dwFlags: DWORD): Boolean; external 'SetLayeredWindowAttributes@user32.dll stdcall';
+
 procedure CurPageChanged(CurPageID: Integer);
 var
   ex: LongInt;
