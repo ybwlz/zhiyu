@@ -73,7 +73,24 @@ const catLabel = (k) => CAT[k] || k
 
 const versions = [
   {
-    version: '1.9.0', date: '2026-08-14', latest: true,
+    version: '1.10.0', date: '2026-08-14', latest: true,
+    summary: '安装器单文件化 + 全新毛玻璃卸载器：下载即装、卸载不再掉价。',
+    sections: {
+      new: [
+        { title: '全新毛玻璃卸载器', desc: '卸载入口改为 Electron 自绘窗口（星空背景 + 毛玻璃 + 自绘标题栏），与安装器同款风格；含挽留页（再想想 / 改用网页版 / 仍要卸载）与本地个人数据删除勾选。' },
+        { title: '安装器单文件化', desc: '自绘安装器改用 electron-builder 打成单文件 exe（约 160MB），双击即装无需解压；修复此前下载后双击无反应的问题。' },
+      ],
+      improved: [
+        { title: '卸载更彻底', desc: '卸载范围覆盖程序文件、桌面快捷方式、注册表卸载项、开机自启；可选同时删除本地个人数据（登录状态、主题设置）。' },
+        { title: '卸载入口零额外体积', desc: '卸载入口改为硬链接主程序 exe，不再额外复制一份 200MB 的卸载程序。' },
+      ],
+      fixed: [
+        { title: '下载安装包打不开', desc: '修复服务器分发残缺单 exe（缺 Electron 运行时）导致双击无响应的问题，改为真正的单文件安装包。' },
+      ],
+    },
+  },
+  {
+    version: '1.9.0', date: '2026-08-14', latest: false,
     summary: '桌面端体验大升级：全新自绘安装器、登录态持久、聊天可清空。',
     sections: {
       new: [

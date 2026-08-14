@@ -175,18 +175,19 @@ ipcMain.handle('install', async (e, payload) => {
       await setAutoStart(path.join(target, '知屿.exe'))
     }
 
-    // 6. 卸载入口：复制 Go 卸载器（resources/zhiyu-uninstaller.exe，2MB）→ <root>\知屿卸载.exe
+    // 6. 卸载入口：硬链接主程序 exe → 知屿卸载.exe（文件名含「卸载」→ 双击进 Electron 卸载模式，零额外体积）
     send('copy', 90, '创建卸载入口…')
     try {
-      const unExe = path.join(process.resourcesPath, 'zhiyu-uninstaller.exe')
-      if (fs.existsSync(unExe)) {
-        await fsp.copyFile(unExe, path.join(target, '知屿卸载.exe'))
-      } else {
-        // 兜底：复制主程序 exe（同程序，文件名含「卸载」进卸载模式）
-        const appExe = path.join(target, '知屿.exe')
-        if (fs.existsSync(appExe)) await fsp.copyFile(appExe, path.join(target, '知屿卸载.exe'))
+      const appExe = path.join(target, '知屿.exe')
+      const unExe = path.join(target, '知屿卸载.exe')
+      if (fs.existsSync(appExe)) {
+        try {
+          fs.linkSync(appExe, unExe)          // NTFS 硬链接：零额外体积，双击进卸载模式
+        } catch (e) {
+          await fsp.copyFile(appExe, unExe)    // 非 NTFS（U 盘等）兜底：复制
+        }
       }
-    } catch (e) { /* 复制失败不中断 */ }
+    } catch (e) { /* 失败不中断 */ }
 
     // 7. 注册卸载信息（控制面板「程序和功能」可卸载，指向 知屿卸载.exe）
     await registerUninstall(target, target, uninstallDir)

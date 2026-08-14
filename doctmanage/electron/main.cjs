@@ -8,7 +8,7 @@ const http = require('http')
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
-const { exec, execFile } = require('child_process')
+const { exec, execFile, execFileSync } = require('child_process')
 
 // 卸载模式：--uninstall 参数，或 exe 文件名含「卸载」（双击 知屿卸载.exe 直接进卸载确认）
 const isUninstallMode = process.argv.includes('--uninstall') || path.basename(process.execPath).includes('卸载')
@@ -109,6 +109,60 @@ if (!app.requestSingleInstanceLock()) {
   })
 
 app.whenReady().then(() => {
+  // ── 卸载模式：独立的毛玻璃卸载窗口（与安装器同款：星空背景 + backdrop-filter 毛玻璃 + 自绘标题栏） ──
+  if (isUninstallMode) {
+    const unwin = new BrowserWindow({
+      width: 860,
+      height: 600,
+      minWidth: 860,
+      minHeight: 600,
+      frame: false,               // 无边框（自绘标题栏）
+      transparent: true,          // 透明窗口（配合 CSS backdrop-filter 做毛玻璃）
+      backgroundColor: '#00000000',
+      resizable: false,
+      alwaysOnTop: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'uninstall-preload.cjs'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    })
+    unwin.loadFile(path.join(__dirname, 'uninstall', 'index.html'))
+    // 窗口控制
+    ipcMain.on('uninstall-minimize', () => unwin.minimize())
+    ipcMain.on('uninstall-close', () => unwin.close())
+    // 安装目录（卸载器与主程序同目录，删除范围即 exe 所在目录）
+    ipcMain.handle('uninstall-get-root', () => path.dirname(process.execPath))
+    // 挽留页「改用网页版」：外部浏览器打开
+    ipcMain.handle('uninstall-open-web', (_e, url) => { if (typeof url === 'string' && /^https?:/.test(url)) shell.openExternal(url); return true })
+    // 执行卸载：结束主进程 → 删快捷方式 → 删注册表 → 删开机自启（目录删除交给 finish 的延迟清理）
+    ipcMain.handle('uninstall-do', async (_e, { purgeUserData } = {}) => {
+      try { execFileSync('taskkill', ['/f', '/im', '知屿.exe'], { windowsHide: true }) } catch (e) { /* 主程序未运行则忽略 */ }
+      await new Promise(r => setTimeout(r, 400))
+      for (const dir of [path.join(os.homedir(), 'Desktop'), path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')]) {
+        try { const p = path.join(dir, '知屿.lnk'); if (fs.existsSync(p)) fs.rmSync(p, { force: true }) } catch (e) { /* 忽略 */ }
+      }
+      for (const k of ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\知屿', 'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\知屿']) {
+        try { execFileSync('reg', ['delete', k, '/f'], { windowsHide: true }) } catch (e) { /* 忽略 */ }
+      }
+      try { execFileSync('reg', ['delete', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', '知屿', '/f'], { windowsHide: true }) } catch (e) { /* 忽略 */ }
+      // 勾选「同时删除本地个人数据」：删主题配置（%APPDATA%\zhiyu）+ userData（登录态/缓存）
+      if (purgeUserData) {
+        try { fs.rmSync(path.join(app.getPath('appData'), 'zhiyu'), { recursive: true, force: true }) } catch (e) { /* 忽略 */ }
+        try { fs.rmSync(app.getPath('userData'), { recursive: true, force: true }) } catch (e) { /* 忽略 */ }
+      }
+      return { ok: true }
+    })
+    // 卸载收尾：后台延迟删除整个安装目录（含卸载器自身）后退出
+    ipcMain.on('uninstall-finish', () => {
+      const root = path.dirname(process.execPath)
+      const ps = `Start-Sleep -Seconds 2; Remove-Item -LiteralPath '${root}' -Recurse -Force -ErrorAction SilentlyContinue`
+      execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps], { detached: true, stdio: 'ignore' }).unref()
+      app.exit(0)
+    })
+    return
+  }
+
   const server = http.createServer((req, res) => {    const u = new URL(req.url, 'http://127.0.0.1')
     const p = decodeURIComponent(u.pathname)
 

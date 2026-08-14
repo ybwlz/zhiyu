@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卸载知屿</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-blur"></div>
+  <div class="bg-glow"></div>
+  <div class="stars"></div>
+
+  <!-- 自绘标题栏（与安装器同款） -->
+  <div class="titlebar">
+    <div class="tb-brand">卸载知屿</div>
+    <div class="tb-btns">
+      <button class="tb-btn" id="btnMin">─</button>
+      <button class="tb-btn close" id="btnClose">✕</button>
+    </div>
+  </div>
+
+  <main class="stage">
+    <!-- 卸载确认页 -->
+    <section class="page" id="pageConfirm">
+      <div class="un-hero">
+        <div class="logo">
+          <svg viewBox="0 0 64 64" width="40" height="40">
+            <path d="M31 7 C 37 7, 39 11, 34 16 A 10 10 0 0 0 34 36 A 16 16 0 0 0 34 58 A 16 16 0 0 0 34 26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 class="un-title">卸载知屿？</h1>
+        <p class="un-sub">将删除 <b id="rootDir"></b> 下的程序文件、桌面快捷方式与开机自启项。<br>你的云端笔记数据不受影响（保存在服务器）。</p>
+      </div>
+      <label class="opt-purge">
+        <input type="checkbox" id="optPurge" />
+        <span>同时删除本地个人数据（登录状态、主题设置）</span>
+      </label>
+      <div class="nav-row center">
+        <button class="btn-ghost" id="btnCancel">取消</button>
+        <button class="btn-danger" id="btnConfirm">继续卸载</button>
+      </div>
+    </section>
+
+    <!-- 挽留页 -->
+    <section class="page hidden" id="pageRetain">
+      <div class="un-hero">
+        <div class="logo">
+          <svg viewBox="0 0 64 64" width="40" height="40">
+            <path d="M31 7 C 37 7, 39 11, 34 16 A 10 10 0 0 0 34 36 A 16 16 0 0 0 34 58 A 16 16 0 0 0 34 26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 class="un-title">真的要离开吗？</h1>
+        <p class="un-sub">你的笔记都安全地保存在云端，卸载后随时重新安装、登录同一账号即可找回。<br>也可以直接用网页版，不卸载也能继续用。</p>
+      </div>
+      <div class="nav-row center">
+        <button class="btn-primary" id="btnRetainStay">再想想</button>
+        <button class="btn-retain-go" id="btnRetainGo">仍要卸载</button>
+      </div>
+      <div class="nav-row center">
+        <button class="btn-web" id="btnWeb">改用网页版 ↗</button>
+      </div>
+    </section>
+
+    <!-- 卸载进度页 -->
+    <section class="page hidden" id="pageProgress">
+      <h2 class="p-title">正在卸载</h2>
+      <div class="progress-wrap">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-txt" id="progressTxt">准备中…</div>
+        <div class="progress-pct" id="progressPct">0%</div>
+      </div>
+    </section>
+
+    <!-- 完成页 -->
+    <section class="page hidden" id="pageDone">
+      <div class="done-icon">✓</div>
+      <h2 class="un-title">卸载完成</h2>
+      <p class="done-desc">知屿 已从你的电脑移除。<br>云端笔记数据仍然保留，随时可重新安装。</p>
+      <div class="nav-row center">
+        <button class="btn-primary" id="btnFinish">完成</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

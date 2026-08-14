@@ -25,11 +25,11 @@ Copy-Item "$root\release\知屿-win32-x64" "$out\resources\知屿-win32-x64" -Re
 # 托盘图标（主程序 resources/icon.ico）
 Copy-Item "$inst\icon.ico" "$out\resources\icon.ico" -Force
 
-# 编译 Go 卸载器（2MB）放入 resources（安装时复制为 知屿卸载.exe）
-Write-Output '编译卸载器（Go 2MB）…'
-pushd "$root\uninstaller"
-go build -ldflags "-s -w -H windowsgui" -o "$out\resources\zhiyu-uninstaller.exe" .
-popd
+# 编译 Go 卸载器（已弃用：卸载入口改为硬链接主程序 exe → 知屿卸载.exe，进 Electron 卸载模式）
+# Write-Output '编译卸载器（Go 2MB）…'
+# pushd "$root\uninstaller"
+# go build -ldflags "-s -w -H windowsgui" -o "$out\resources\zhiyu-uninstaller.exe" .
+# popd
 
 # 4. exe 图标（rcedit）+ 改名
 Write-Output '设置图标…'
