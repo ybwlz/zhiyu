@@ -73,6 +73,7 @@ async fn proxy(req: Request<Body>, backend: &str, path: &str, query: Option<&str
                 | "proxy-connection"
                 | "te"
                 | "trailer"
+                | "accept-encoding"
         ) {
             continue;
         }
@@ -93,9 +94,16 @@ async fn proxy(req: Request<Body>, backend: &str, path: &str, query: Option<&str
                 Ok(b) => {
                     let mut builder = Response::builder().status(status);
                     for (name, value) in resp_headers {
-                        if let (Some(name), Ok(v)) = (name, value.to_str()) {
-                            builder = builder.header(name, v);
+                        let Some(name) = name else { continue };
+                        let n = name.as_str().to_ascii_lowercase();
+                        // 排除 hop-by-hop / 内容长度头，交由 axum 按 body 自动设置，避免 Content-Length 冲突
+                        if matches!(
+                            n.as_str(),
+                            "content-length" | "transfer-encoding" | "connection" | "keep-alive" | "upgrade" | "content-encoding"
+                        ) {
+                            continue;
                         }
+                        builder = builder.header(name, value);
                     }
                     builder
                         .body(Body::from(b.to_vec()))

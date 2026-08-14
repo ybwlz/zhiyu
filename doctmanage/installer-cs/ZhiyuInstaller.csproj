@@ -13,12 +13,14 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="icon.ico" />
+    <!-- 单文件：绿色版 zip 与 native dll 内嵌进 exe，双击即装（无外层 NSIS 二次压缩） -->
     <EmbeddedResource Include="zhiyu-green.zip" />
     <EmbeddedResource Include="native\*.dll" />
   </ItemGroup>
