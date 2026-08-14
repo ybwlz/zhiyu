@@ -41,6 +41,13 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 for _bp in (auth_bp, docs_bp, notes_bp, users_bp, social_bp, messages_bp, ai_bp, misc_bp, annotation_bp, admin_bp):
     app.register_blueprint(_bp)
 
+# 启动即初始化/迁移数据库：gunicorn 部署时也会执行（此前只在 __main__ 里跑，
+# 导致 gunicorn 部署时新表/新列不迁移）。init_db 幂等，失败仅告警不阻塞启动。
+try:
+    init_db()
+except Exception as _e:
+    print('[init_db] 数据库初始化/迁移失败：', _e)
+
 @app.after_request
 def add_header(response):
     # 基础安全响应头（防内容嗅探 / 点击劫持）
@@ -106,7 +113,6 @@ def agent_daily_summary():
             print('[Agent] 异常:', e)
 
 if __name__ == '__main__':
-    init_db()
     print("DB_USER =", DB_USER, "DB_HOST =", DB_HOST, "DB_NAME =", DB_NAME)
     # 启动 AI Agent 后台线程（每日摘要）
     threading.Thread(target=agent_daily_summary, daemon=True).start()

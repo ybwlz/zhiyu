@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 import os
 import secrets
 
-from config import FREE_AI_QUOTA
+from config import FREE_AI_QUOTA, UPLOAD_FOLDER
 from db import get_conn
 from auth import get_current_user, require_login
 from utils import DOC_SELECT
