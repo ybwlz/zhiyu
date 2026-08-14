@@ -29,7 +29,7 @@
         </svg>
       </div>
       <h2 class="dl-name">知屿 · Windows 客户端</h2>
-      <p class="dl-meta">版本 v1.2.0 · 2026-08-12</p>
+      <p class="dl-meta">版本 v1.10.0 · 2026-08-15</p>
       <div class="dl-btns">
         <a class="dl-btn" :href="setupUrl" download>
           ⬇ 下载安装版（推荐）
@@ -67,9 +67,9 @@
     <div class="dl-steps">
       <h3 class="dl-sec-title">📦 安装步骤</h3>
       <ol class="dl-steps-list">
-        <li>点击上方「下载安装版」，得到安装包 <b>知屿安装器.exe</b>（约 220MB，安装向导 + 内置卸载器）；</li>
-        <li>双击运行安装包，一路「下一步」即可（默认安装到 Program Files）；</li>
-        <li>安装完成后自动创建<b>桌面快捷方式</b>与<b>开始菜单</b>入口，双击「知屿」启动；</li>
+        <li>点击上方「下载安装版」，得到安装包 <b>知屿安装器.exe</b>（约 26MB，安装向导 + 内置卸载器）；</li>
+        <li>双击运行安装包，一路「下一步」即可（默认安装到本地用户目录 AppData\Local\知屿）；</li>
+        <li>安装完成后自动创建<b>桌面快捷方式</b>，双击「知屿」启动；</li>
         <li>若 Windows 提示「无法验证发布者」：点「更多信息」→「仍要运行」即可（未签名软件的默认提示，不影响使用）；</li>
         <li>用网页版同一账号登录，即可同步全部笔记；以后有新版，启动时自动提示、应用内一键更新。</li>
       </ol>
