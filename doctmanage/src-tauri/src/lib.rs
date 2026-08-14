@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
-    Manager,
+    Emitter, Manager,
 };
 
 const PORT: u16 = 51780;
@@ -20,7 +20,7 @@ const UPDATE_URL: &str = "http://182.254.209.123/downloads/version.json";
 // 隐藏下载按钮、把导航栏当标题栏）。Tauri 用 WebView2，UA 里没有 Electron，故这里补上，
 // 让前端零改动就按桌面版渲染（与 Electron 版行为完全一致）。
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
-(KHTML, like Gecko) zhiyu/1.2.0 Chrome/131.0.0.0 Electron/33.0.0 Safari/537.36";
+(KHTML, like Gecko) zhiyu/1.11.0 Chrome/131.0.0.0 Electron/33.0.0 Safari/537.36";
 
 // ── 后端地址 ──
 fn resolve_backend() -> String {
@@ -251,7 +251,14 @@ fn is_uninstall_mode() -> bool {
 
 #[tauri::command]
 fn uninstall_app(app: tauri::AppHandle) {
-    // 删注册表 + 快捷方式 + 延迟删整个目录
+    let app_emit = app.clone();
+    let emit = move |pct: u32, msg: &str| {
+        let _ = app_emit.emit("uninstall-progress", serde_json::json!({ "pct": pct, "msg": msg }));
+    };
+    emit(5, "正在结束知屿进程…");
+    let _ = std::process::Command::new("taskkill").args(["/f", "/im", "知屿.exe"]).output();
+    std::thread::sleep(std::time::Duration::from_millis(700));
+    emit(30, "正在删除桌面快捷方式…");
     let _ = std::process::Command::new("reg")
         .args(["delete", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\知屿", "/f"])
         .output();
@@ -261,11 +268,14 @@ fn uninstall_app(app: tauri::AppHandle) {
     let _ = std::process::Command::new("reg")
         .args(["delete", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run", "/v", "知屿", "/f"])
         .output();
+    emit(50, "正在清理注册表…");
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    emit(80, "正在删除程序文件…");
     if let Ok(exe) = std::env::current_exe() {
         if let Some(root) = exe.parent() {
             let root_s = root.to_string_lossy().to_string();
             let bat = format!(
-                "@echo off\r\nchcp 65001 >nul\r\ntimeout /t 3 /nobreak >nul\r\ntaskkill /f /im zhiyu.exe >nul 2>&1\r\ntimeout /t 2 /nobreak >nul\r\nrmdir /s /q \"{}\" >nul 2>&1\r\ndel \"%~f0\" >nul 2>&1\r\n",
+                "@echo off\r\nchcp 65001 >nul\r\ntimeout /t 3 /nobreak >nul\r\ndel \"%USERPROFILE%\\Desktop\\知屿.lnk\" >nul 2>&1\r\ndel \"%PUBLIC%\\Desktop\\知屿.lnk\" >nul 2>&1\r\nrmdir /s /q \"{}\" >nul 2>&1\r\ndel \"%~f0\" >nul 2>&1\r\n",
                 root_s
             );
             let tmp = std::env::temp_dir();
@@ -274,6 +284,8 @@ fn uninstall_app(app: tauri::AppHandle) {
             let _ = std::process::Command::new("cmd").args(["/c", &bp.to_string_lossy()]).spawn();
         }
     }
+    emit(100, "卸载完成");
+    std::thread::sleep(std::time::Duration::from_millis(1500));
     app.exit(0);
 }
 

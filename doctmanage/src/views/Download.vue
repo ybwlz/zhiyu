@@ -29,7 +29,7 @@
         </svg>
       </div>
       <h2 class="dl-name">知屿 · Windows 客户端</h2>
-      <p class="dl-meta">版本 v1.10.0 · 2026-08-15</p>
+      <p class="dl-meta">版本 v1.11.0 · 2026-08-15</p>
       <div class="dl-btns">
         <a class="dl-btn" :href="setupUrl" download>
           ⬇ 下载安装版（推荐）
