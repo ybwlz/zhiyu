@@ -15,16 +15,28 @@ const auth = useAuthStore()
 // 启动时用最新 /auth/me 刷新登录用户信息（后端字段有更新时，localStorage 旧缓存也能补上 public_id 等新字段）
 onMounted(() => { auth.fetchMe() })
 
-// ── 卸载模式（双击 知屿卸载.exe / --uninstall 启动）：弹出卸载确认 ──
+// ── 卸载模式（双击 知屿卸载.exe / --uninstall 启动）：进度条卸载 ──
 const showUninstall = ref(false)
+const uninstPct = ref(0)
+const uninstMsg = ref('准备卸载…')
+const uninstDone = ref(false)
 onMounted(async () => {
   if (window.desktop?.isUninstallMode) {
     try {
-      if (await window.desktop.isUninstallMode()) showUninstall.value = true
+      if (await window.desktop.isUninstallMode()) {
+        showUninstall.value = true
+        try {
+          await window.__TAURI__.event.listen('uninstall-progress', (e) => {
+            uninstPct.value = e.payload.pct
+            uninstMsg.value = e.payload.msg
+            if (e.payload.pct >= 100) uninstDone.value = true
+          })
+        } catch (err) { /* 忽略 */ }
+        window.desktop?.uninstallApp?.()
+      }
     } catch (e) { /* 忽略 */ }
   }
 })
-const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
 </script>
 
 <template>
@@ -44,16 +56,13 @@ const confirmUninstall = () => { window.desktop?.uninstallApp?.() }
   <WindowControls />
   <UpdateNotice />
 
-  <!-- 卸载确认弹窗（卸载模式启动时，与安装器卸载页同款风格） -->
-  <div v-if="showUninstall" class="uninstall-mask" @click.self="showUninstall = false">
+  <!-- 卸载进度（卸载模式启动时：进度条，与安装器同款） -->
+  <div v-if="showUninstall" class="uninstall-mask">
     <div class="uninstall-modal">
-      <div class="um-head"><b>卸载知屿？</b><button class="um-close" @click="showUninstall = false">✕</button></div>
+      <div class="um-head"><b>{{ uninstDone ? '卸载完成' : '正在卸载' }}</b></div>
       <div class="um-body">
-        <p>将删除安装目录下的程序文件、桌面快捷方式与开机自启项。<br>你的云端笔记数据不受影响（保存在服务器）。</p>
-      </div>
-      <div class="um-foot">
-        <button class="um-btn ghost" @click="showUninstall = false">取消</button>
-        <button class="um-btn danger" @click="confirmUninstall">确认卸载</button>
+        <div class="um-bar"><div class="um-fill" :style="{ width: uninstPct + '%' }"></div></div>
+        <p class="um-msg">{{ uninstMsg }}（{{ uninstPct }}%）</p>
       </div>
     </div>
   </div>
@@ -123,6 +132,9 @@ html[data-theme="minimal"] .uninstall-modal { background: #ffffff; }
   border-color: rgba(239, 68, 68, .35);
 }
 .um-btn.danger:hover { background: rgba(239, 68, 68, .28); }
+.um-bar { height: 14px; border-radius: 7px; background: rgba(255,255,255,.08); border: 1px solid var(--glass-border); overflow: hidden; margin: 14px 0 10px; }
+.um-fill { height: 100%; border-radius: 7px; background: linear-gradient(135deg, #3b82f6, #2563eb); transition: width .25s; }
+.um-msg { font-size: 13px; color: var(--text2); margin: 0; }
 
 /* 沉浸式阅读：隐藏全局导航 */
 body.immersive .kb-navbar {
