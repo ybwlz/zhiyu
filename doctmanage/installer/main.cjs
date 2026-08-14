@@ -195,7 +195,7 @@ ipcMain.handle('install', async (e, payload) => {
     send('copy', 95, '完成安装配置…')
     await new Promise(r => setTimeout(r, 300))
     send('done', 100, '安装完成')
-    return { ok: true, target: root }
+    return { ok: true, target }
   } catch (err) {
     send('error', 0, String(err && err.message || err))
     return { ok: false, error: String(err && err.message || err) }

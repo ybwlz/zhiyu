@@ -100,7 +100,8 @@ function createTray() {
 }
 
 // 单实例：二次启动（桌面图标/任务栏）激活已有窗口，固定端口下避免 EADDRINUSE
-if (!app.requestSingleInstanceLock()) {
+// 卸载模式跳过单实例锁：知屿卸载.exe 是主程序硬链接，若主程序在跑会被锁拦截导致卸载窗口弹不出
+if (!app.requestSingleInstanceLock() && !isUninstallMode) {
   app.quit()
 } else {
   app.on('second-instance', () => {
@@ -156,8 +157,21 @@ app.whenReady().then(() => {
     // 卸载收尾：后台延迟删除整个安装目录（含卸载器自身）后退出
     ipcMain.on('uninstall-finish', () => {
       const root = path.dirname(process.execPath)
-      const ps = `Start-Sleep -Seconds 2; Remove-Item -LiteralPath '${root}' -Recurse -Force -ErrorAction SilentlyContinue`
-      execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps], { detached: true, stdio: 'ignore' }).unref()
+      // 用 bat 脚本：等进程退出 → taskkill 兜底 → rmdir 删目录 → 自删，比 PowerShell 延迟删除更可靠
+      const batPath = path.join(os.tmpdir(), 'zhiyu-uninst-' + Date.now() + '.bat')
+      const bat = [
+        '@echo off',
+        'chcp 65001 >nul',
+        'timeout /t 3 /nobreak >nul',
+        'taskkill /f /im 知屿卸载.exe >nul 2>&1',
+        'taskkill /f /im 知屿.exe >nul 2>&1',
+        'timeout /t 2 /nobreak >nul',
+        `rmdir /s /q "${root}" >nul 2>&1`,
+        'del "%~f0" >nul 2>&1',
+        ''
+      ].join('\r\n')
+      fs.writeFileSync(batPath, '\ufeff' + bat)
+      exec(`cmd /c ""${batPath}""`, { detached: true, stdio: 'ignore' }).unref()
       app.exit(0)
     })
     return

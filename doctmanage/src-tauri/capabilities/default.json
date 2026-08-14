@@ -1,0 +1,31 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "知屿主窗口权限：窗口控制、托盘、自启、更新、卸载等（本地 + 远程 127.0.0.1:51780 前端）",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-close",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-unminimize",
+    "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
+    "core:window:allow-is-maximized",
+    "allow-app-version",
+    "allow-set-title-bar-color",
+    "allow-set-auto-launch",
+    "allow-get-auto-launch",
+    "allow-quit-app",
+    "allow-is-uninstall-mode",
+    "allow-uninstall-app",
+    "allow-check-update"
+  ],
+  "remote": {
+    "urls": ["http://127.0.0.1:51780/*"]
+  }
+}

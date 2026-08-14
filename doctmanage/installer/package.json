@@ -1,6 +1,6 @@
 {
   "name": "zhiyu-installer",
-  "version": "1.2.0",
+  "version": "1.10.0",
   "description": "知屿 自绘安装器（Electron）",
   "main": "main.cjs",
   "author": "知屿",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-packager . 知屿安装 --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico --extraResource=../../doctmanage/release/知屿-win32-x64 --extraResource=../../electron/icon.ico",
-    "dist:single": "electron-builder --win portable"
+    "dist:single": "electron-builder --win nsis"
   },
   "devDependencies": {
     "electron": "^43.4.0",
@@ -36,7 +36,7 @@
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
@@ -44,8 +44,13 @@
       ],
       "icon": "icon.ico"
     },
-    "portable": {
-      "artifactName": "知屿安装器.exe"
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "知屿安装器.exe",
+      "runAfterFinish": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false
     },
     "compression": "normal"
   }
