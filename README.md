@@ -11,7 +11,7 @@
 - 👥 **社交**：关注、好友、私信、群聊、评论、点赞、评分
 - 🪙 **知屿币**：积分体系 + 商城兑换 AI 次数
 - 🖌 **批注涂鸦**：笔记内的划线批注与手绘涂鸦
-- 🖥 **桌面版**：Electron Windows 客户端，本地渲染、云端同步、服务器可切换
+- 🖥 **桌面版**：Tauri Windows 客户端（主程序 34MB），本地渲染、云端同步、服务器可切换
 
 ## 🛠 技术栈
 
@@ -19,16 +19,17 @@
 |---|---|
 | 前端 | Vite + Vue 3 + Element Plus + Pinia + Vue Router |
 | 后端 | Python Flask + Gunicorn + MySQL (PyMySQL) |
-| 桌面 | Electron + electron-packager |
+| 桌面 | Tauri 2 + Rust；安装器/卸载器为 C++（Win32 + Direct2D，单文件 26MB） |
 | 其他 | Markdown-it（渲染）、MathJax（公式）、highlight.js（高亮）、DeepSeek API（AI） |
 
 ## 📁 目录结构
 
 ```
 ├── backend/            # Flask 后端（config/db/auth/utils + routes 蓝图）
-├── doctmanage/         # 前端（Vite + Vue）与 Electron 桌面版
+├── doctmanage/         # 前端（Vite + Vue）+ Tauri 桌面版 + C++ 安装器
 │   ├── src/            # 前端源码
-│   ├── electron/       # Electron 主进程（main.cjs）
+│   ├── src-tauri/      # Tauri 主程序（Rust，含 --uninstall 模式）
+│   ├── installer-cpp/  # C++ 安装器/卸载器（Win32 + Direct2D，单文件 26MB）
 │   └── public/         # 静态资源（含 MathJax 运行时）
 ├── docs/               # 文档
 └── .env.example        # 环境变量示例
@@ -58,7 +59,7 @@ npm run dev             # http://localhost:5173/zhiyu/
 
 ## 🖥 桌面版
 
-- 打包：`npm run pack:win`（electron-packager）
+- 打包：详见 `doctmanage/BUILD.md`（Tauri `cargo build --release` + C++ 安装器 `build.bat`）
 - 后端地址可配置：exe 同目录 `config.json` 写 `{"backend": "http://服务器地址"}`，
   默认已连接云端；环境变量 `ZHIYU_BACKEND` 优先级最高
 
