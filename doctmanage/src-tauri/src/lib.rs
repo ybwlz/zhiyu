@@ -6,6 +6,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
+use futures_util::StreamExt;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
@@ -90,27 +91,27 @@ async fn proxy(req: Request<Body>, backend: &str, path: &str, query: Option<&str
         Ok(r) => {
             let status = r.status();
             let resp_headers = r.headers().clone();
-            match r.bytes().await {
-                Ok(b) => {
-                    let mut builder = Response::builder().status(status);
-                    for (name, value) in resp_headers {
-                        let Some(name) = name else { continue };
-                        let n = name.as_str().to_ascii_lowercase();
-                        // 排除 hop-by-hop / 内容长度头，交由 axum 按 body 自动设置，避免 Content-Length 冲突
-                        if matches!(
-                            n.as_str(),
-                            "content-length" | "transfer-encoding" | "connection" | "keep-alive" | "upgrade" | "content-encoding"
-                        ) {
-                            continue;
-                        }
-                        builder = builder.header(name, value);
-                    }
-                    builder
-                        .body(Body::from(b.to_vec()))
-                        .unwrap_or_else(|_| Response::builder().status(500).body(Body::empty()).unwrap())
+            // 流式转发响应体（关键：SSE 逐字流式，不能 r.bytes() 整体缓冲，否则打字机失效）
+            let stream = r.bytes_stream().map(|chunk| {
+                chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+            });
+            let body = axum::body::Body::from_stream(stream);
+            let mut builder = Response::builder().status(status);
+            for (name, value) in resp_headers {
+                let Some(name) = name else { continue };
+                let n = name.as_str().to_ascii_lowercase();
+                // 排除 hop-by-hop / 内容长度头，交由 axum 按 body 自动设置，避免 Content-Length 冲突
+                if matches!(
+                    n.as_str(),
+                    "content-length" | "transfer-encoding" | "connection" | "keep-alive" | "upgrade" | "content-encoding"
+                ) {
+                    continue;
                 }
-                Err(_) => Response::builder().status(status).body(Body::empty()).unwrap(),
+                builder = builder.header(name, value);
             }
+            builder
+                .body(body)
+                .unwrap_or_else(|_| Response::builder().status(500).body(Body::empty()).unwrap())
         }
         Err(_) => Response::builder()
             .status(StatusCode::BAD_GATEWAY)

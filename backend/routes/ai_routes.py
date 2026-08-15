@@ -241,6 +241,23 @@ def run_ai_tool(name, args, user):
         return f'工具执行出错：{e}', False
     return f'未知工具：{name}', False
 
+def tool_label(name, args, result=''):
+    """生成工具调用 chip 的可读标签（前端显示 read: 《标题》）。"""
+    if name == 'read_note':
+        m = re.search(r'《(.+?)》', result or '')
+        return '《' + (m.group(1) if m else str(args.get('note_id') or args.get('public_id') or '')) + '》'
+    if name == 'search_note':
+        return '「' + str(args.get('keyword') or '') + '」'
+    if name in ('save_draft', 'write_note'):
+        return '《当前笔记》'
+    if name == 'navigate':
+        return str(args.get('to') or '')
+    if name == 'new_note':
+        return '《' + str(args.get('title') or '新笔记') + '》'
+    if name == 'send_message':
+        return str(args.get('to') or '')
+    return ''
+
 def log_ai_chat(user, page, note_id, question, system_prompt, answer, reasoning, tool_names, changed, err, delta_count, elapsed_ms):
     """记录一次 AI 对话的输入输出（用于复盘/优化 prompt）。纯旁路写入，失败不影响主流程。"""
     try:
@@ -411,7 +428,7 @@ def ai_chat(user=None):
                         'tools': AI_TOOLS_RESPONSES,
                         'tool_choice': 'auto',
                         'temperature': 0.7,
-                        'reasoning': {'effort': 'none'},  # 关闭思考：v4 思考极慢（默认 50s+），用户只要结果
+                        'reasoning': {'effort': 'low'},  # 轻量思考并流式展示（用户要看思考过程）
                         'stream': True,
                     }
                     req2 = urllib.request.Request(
@@ -422,7 +439,6 @@ def ai_chat(user=None):
                     )
                     tool_calls = []  # [{call_id, name, arguments}]
                     saw_reasoning = False
-                    round_text = ''  # 本轮正文：中间轮（有工具调用）不流式给用户，只流式最终轮
                     with urllib.request.urlopen(req2, timeout=180) as resp:
                         for raw in resp:
                             line = raw.decode('utf-8', errors='ignore').strip()
@@ -439,9 +455,9 @@ def ai_chat(user=None):
                             if ev == 'response.output_text.delta':
                                 d = re.sub(r'\\+([a-zA-Z])', r'\\\1', obj.get('delta') or '')
                                 answer_buf += d
-                                round_text += d
                                 delta_count += 1
-                                # 暂存不立即转发：等本轮结束判断是否最终轮（有工具调用就是中间计划文字，不显示）
+                                # 逐 token 流式（打字机）
+                                yield f"data: {json.dumps({'delta': d}, ensure_ascii=False)}\n\n"
                             elif ev == 'response.reasoning_text.delta':
                                 r = obj.get('delta') or ''
                                 if r:
@@ -473,9 +489,7 @@ def ai_chat(user=None):
                                 return
                             # response.completed / response.incomplete：本轮回流结束，落到下方统一收尾
                     if not tool_calls:
-                        # 无工具调用：最终回答（中间轮的计划文字不显示，这里一次性给出最终正文）
-                        if round_text:
-                            yield f"data: {json.dumps({'delta': round_text}, ensure_ascii=False)}\n\n"
+                        # 无工具调用：最终回答（内容已逐 token 转发完）
                         if saw_reasoning:
                             yield f"data: {json.dumps({'reasoning_done': True}, ensure_ascii=False)}\n\n"
                         yield f"data: {json.dumps({'done': True, 'changed': changed, 'incomplete': truncated, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]}, ensure_ascii=False)}\n\n"
@@ -494,12 +508,13 @@ def ai_chat(user=None):
                         if chg:
                             changed = True
                         input_items.append({'type': 'function_call_output', 'call_id': tc['call_id'], 'output': result})
+                        # 工具调用 chip：发给前端（read: 《标题》可折叠查看结果）
+                        yield f"data: {json.dumps({'tool_call': {'id': tc['call_id'], 'name': name, 'label': tool_label(name, args, result), 'detail': (result or '')[:1500]}}, ensure_ascii=False)}\n\n"
                         # 前端动作工具：把 action 事件推给前端执行（跳转 / 新建笔记）
                         if name == 'navigate':
                             yield f"data: {json.dumps({'action': {'type': 'navigate', 'to': str(args.get('to') or '/')}}, ensure_ascii=False)}\n\n"
                         elif name == 'new_note':
                             yield f"data: {json.dumps({'action': {'type': 'new_note', 'title': str(args.get('title') or ''), 'content': str(args.get('content') or ''), 'category': str(args.get('type') or '')}}, ensure_ascii=False)}\n\n"
-                    yield f"data: {json.dumps({'tool': name}, ensure_ascii=False)}\n\n"
                 else:
                     yield f"data: {json.dumps({'done': True, 'changed': changed, 'incomplete': truncated, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]}, ensure_ascii=False)}\n\n"
             except urllib.error.HTTPError as e:

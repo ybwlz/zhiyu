@@ -45,6 +45,16 @@
               </button>
               <div v-if="m.reasoningOpen" class="ai-reasoning-body">{{ m.reasoning }}</div>
             </div>
+            <div v-if="m.tools && m.tools.length" class="ai-tools">
+              <div v-for="(t, ti) in m.tools" :key="ti" class="ai-tool">
+                <button type="button" class="ai-tool-toggle" @click="t.open = !t.open">
+                  <span class="ai-tool-name">{{ toolName(t.name) }}</span>
+                  <span class="ai-tool-label">{{ t.label }}</span>
+                  <span class="ai-tool-arrow">{{ t.open ? '▾' : '▸' }}</span>
+                </button>
+                <div v-if="t.open" class="ai-tool-detail">{{ t.detail }}</div>
+              </div>
+            </div>
             <div class="ai-msg-bubble" v-if="m.html" v-html="m.content"></div>
             <div class="ai-msg-bubble" v-else-if="m.role === 'user'">{{ m.content }}</div>
             <div class="ai-msg-bubble" v-else-if="m.content && !m.stream" v-html="renderMd(m.content)"></div>
@@ -89,6 +99,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { kbConfig } from '@/constants/homeConfig.js'
 import api from '@/utils/api.js'
 import { useAuthStore } from '@/stores/auth.js'
+
+const toolNameMap = { read_note: 'read', search_note: 'search', save_draft: 'write', write_note: 'write', navigate: '跳转', new_note: 'new', send_message: '私信', web_search: 'web' }
+const toolName = (n) => toolNameMap[n] || n
 
 const open = defineModel('open', { default: false })
 // 面板位置：跟随工具球（球位置由事件 detail 携带）
@@ -245,7 +258,7 @@ const send = async () => {
   thinking.value = true
   scrollToBottom()
   // 流式回答（打字机）：reasoning（思考）+ content 都实时累加，气泡不提前空显示
-  const assistantMsg = { role: 'assistant', content: '', reasoning: '', stream: true, actions: [], reasoningOpen: false }
+  const assistantMsg = { role: 'assistant', content: '', reasoning: '', stream: true, actions: [], reasoningOpen: false, tools: [] }
   messages.value.push(assistantMsg)
   scrollToBottom()
   // 打字机节流：Vue 响应式是异步批处理，同一批到达的 delta 若直接 += 只触发一次渲染（正文“唰”地一次性出现）。
@@ -329,6 +342,10 @@ const send = async () => {
             } else if (obj.delta) {
               typeBuf += obj.delta
               startType()
+            } else if (obj.tool_call) {
+              // 工具调用 chip：read/write/跳转 等，默认收起，可展开看结果
+              assistantMsg.tools.push({ name: obj.tool_call.name, label: obj.tool_call.label, detail: obj.tool_call.detail, open: false })
+              scrollToBottom()
             } else if (obj.error) {
               assistantMsg.content += '\n\n😅 ' + obj.error
             } else if (obj.action) {
@@ -659,6 +676,23 @@ watch(open, (v) => { if (v) scrollToBottom() })
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
+}
+.ai-tools { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 8px; }
+.ai-tool { font-size: 12.5px; }
+.ai-tool-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg-soft); color: var(--text2); cursor: pointer; font-size: 12px;
+  transition: all .2s;
+}
+.ai-tool-toggle:hover { color: var(--brand-1); border-color: color-mix(in srgb, var(--brand-1) 45%, transparent); }
+.ai-tool-name { font-weight: 700; color: var(--brand-1); text-transform: lowercase; }
+.ai-tool-arrow { font-size: 10px; }
+.ai-tool-detail {
+  margin-top: 4px; padding: 8px 10px; border-left: 3px solid var(--border);
+  border-radius: 8px; background: var(--bg-soft); color: var(--text2);
+  font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  max-height: 160px; overflow-y: auto;
 }
 .ai-msg.assistant .ai-msg-bubble :deep(p) { margin: 0 0 8px; }
 .ai-msg.assistant .ai-msg-bubble :deep(p:last-child) { margin-bottom: 0; }
