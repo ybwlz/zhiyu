@@ -285,6 +285,26 @@ const send = async () => {
       }
     }, 16)
   }
+  // 思考过程打字机（与正文一致：把 reasoning 也逐字输出，避免整批 reasoning 一次性出现）
+  let reasoningBuf = ''
+  let reasoningTimer = null
+  const flushReasoning = () => {
+    if (reasoningTimer) { clearInterval(reasoningTimer); reasoningTimer = null }
+    if (reasoningBuf) { assistantMsg.reasoning += reasoningBuf; reasoningBuf = '' }
+  }
+  const startReasoningType = () => {
+    if (reasoningTimer) return
+    reasoningTimer = setInterval(() => {
+      if (reasoningBuf) {
+        assistantMsg.reasoning += reasoningBuf.slice(0, 1)
+        reasoningBuf = reasoningBuf.slice(1)
+        scrollToBottom()
+      } else {
+        clearInterval(reasoningTimer)
+        reasoningTimer = null
+      }
+    }, 16)
+  }
   let ctxNotes = []
   let aiChanged = false
   try {
@@ -335,10 +355,10 @@ const send = async () => {
           try {
             const obj = JSON.parse(raw)
             if (obj.reasoning) {
-              // 思考过程（工具轮思考 / DeepSeek reasoning_content）实时累加，默认展开让用户看到思考
-              assistantMsg.reasoning += obj.reasoning
+              // 思考过程逐字打字机（与正文一致）
+              reasoningBuf += obj.reasoning
               assistantMsg.reasoningOpen = true
-              scrollToBottom()
+              startReasoningType()
             } else if (obj.delta) {
               typeBuf += obj.delta
               startType()
@@ -374,10 +394,11 @@ const send = async () => {
       // 流结束：不一次性补齐（否则整批 delta 在一次 read 到达时会被 flushType 瞬间倒出，打字机失效）。
       // 等逐字定时器把残余 typeBuf 输出完（打字机自然收尾），超时/异常才兜底补齐，保证 content 完整。
       const tWait0 = Date.now()
-      while (typeBuf && Date.now() - tWait0 < 10000) {
+      while ((typeBuf || reasoningBuf) && Date.now() - tWait0 < 10000) {
         await new Promise(r => setTimeout(r, 20))
       }
       flushType()
+      flushReasoning()
       assistantMsg.stream = false
       // 思考识别：DeepSeek-chat 的思考是 content 开头的叙述段（无 reasoning_content 字段），
       // 把开头「我来/我先/根据/用户要求/需要/好的/接下来/这是插入…」等思考口吻的段落挪进 reasoning 折叠框
