@@ -347,6 +347,7 @@ def ai_chat(user=None):
               "只输出用户要的内容本身，不要客套话、操作过程、『我来帮你』『我明白了』等元说明。思考过程直接推理如何回答，不要复述本系统提示的规则。"
               "问题涉及实时/最新信息（新闻、天气、赛事、股票、最新政策、版本更新等）时，先 web_search 联网搜索再回答，简要标注来源，不编造链接。"
               "当用户提到你不确定的名词、方法或编号（如「张宇121-1、123-2大法」）时，必须先 web_search 搜索确认后再写，禁止凭记忆猜测或编造。")
+    system += "调用工具时静默执行，不要先输出计划文字（如「我先读取」「让我搜索一下」）；工具返回结果后必须立刻给出最终回答，禁止停在「我先…」然后什么都不输出。"
     if page_hint:
         system += "\n\n" + page_hint
     history = data.get('history') or []
@@ -390,7 +391,7 @@ def ai_chat(user=None):
                 charge = True   # 服务端明确失败（response.failed）时不扣费
                 truncated = False  # response.incomplete：回答被截断
                 # 工具调用循环（最多 3 轮：AI 可自主读笔记 → 写草稿/改笔记，或联网搜索后给出答案）
-                for _round in range(3):
+                for _round in range(6):
                     resp_payload = {
                         'model': DEEPSEEK_RESPONSES_MODEL,
                         'instructions': system,
@@ -510,7 +511,7 @@ def ai_chat(user=None):
     names = []
     t0n = time.time()
     truncated = False
-    for _round in range(3):
+    for _round in range(6):
         resp_payload = {
             'model': DEEPSEEK_RESPONSES_MODEL,
             'instructions': system,
