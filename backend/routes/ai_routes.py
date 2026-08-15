@@ -78,7 +78,7 @@ AI_TOOLS = [
     }},
     {'type': 'function', 'function': {
         'name': 'navigate',
-        'description': '跳转到站内页面。可用路径：/（首页）、/notes（笔记广场）、/docs（阅览室）、/notes/{public_id}（打开某篇笔记，public_id 由 search_note 返回，不要自己编）、/edit/{id}（编辑某篇笔记，仍用数字 id）、/edit（新建笔记）、/admin（书房）、/friends（好友）、/mall（知屿币商城）、/messages（消息）、/changelog（更新日志）、/guide（使用引导）、/user/{public_id}（个人主页，不编 id）。用户要求「帮我跳转到某页 / 打开某笔记 / 去 XX」时调用；若用户只给了笔记标题而你不知道 public_id，先调用 search_note 按标题搜索得到 public_id 后再跳转。',
+        'description': '跳转到站内页面。可用路径：/（首页）、/notes（笔记广场）、/docs（阅览室）、/notes/{public_id}（打开某篇笔记，public_id 由 search_note 返回，不要自己编）、/edit/{id}（编辑某篇笔记，仍用数字 id）、/edit（新建笔记）、/admin（书房）、/friends（好友）、/mall（知屿币商城）、/messages（消息）、/changelog（更新日志）、/guide（使用引导）、/user/{public_id}（个人主页，不编 id）。用户要求「帮我跳转到某页 / 打开某笔记 / 去 XX」时调用；若用户只给了笔记标题而你不知道 public_id，先调用 search_note 按标题搜索得到 public_id 后再跳转。注意：用户只是让你「参考/读取某篇笔记」时，用 read_note 后台读取即可，不要 navigate 跳转；只有用户明确说「打开/跳转/去」才 navigate。',
         'parameters': {'type': 'object', 'properties': {'to': {'type': 'string', 'description': '站内路径，如 /notes/55'}}, 'required': ['to']},
     }},
     {'type': 'function', 'function': {
@@ -422,6 +422,7 @@ def ai_chat(user=None):
                     )
                     tool_calls = []  # [{call_id, name, arguments}]
                     saw_reasoning = False
+                    round_text = ''  # 本轮正文：中间轮（有工具调用）不流式给用户，只流式最终轮
                     with urllib.request.urlopen(req2, timeout=180) as resp:
                         for raw in resp:
                             line = raw.decode('utf-8', errors='ignore').strip()
@@ -438,10 +439,9 @@ def ai_chat(user=None):
                             if ev == 'response.output_text.delta':
                                 d = re.sub(r'\\+([a-zA-Z])', r'\\\1', obj.get('delta') or '')
                                 answer_buf += d
+                                round_text += d
                                 delta_count += 1
-                                # 逐 token 转发（真流式打字机）。工具轮思考与最终轮正文都流式显示，
-                                # 前端在流式结束后用正则把开头思考段挪进 🧠 折叠框。
-                                yield f"data: {json.dumps({'delta': d}, ensure_ascii=False)}\n\n"
+                                # 暂存不立即转发：等本轮结束判断是否最终轮（有工具调用就是中间计划文字，不显示）
                             elif ev == 'response.reasoning_text.delta':
                                 r = obj.get('delta') or ''
                                 if r:
@@ -473,7 +473,9 @@ def ai_chat(user=None):
                                 return
                             # response.completed / response.incomplete：本轮回流结束，落到下方统一收尾
                     if not tool_calls:
-                        # 无工具调用：最终回答（内容已逐 token 转发完）
+                        # 无工具调用：最终回答（中间轮的计划文字不显示，这里一次性给出最终正文）
+                        if round_text:
+                            yield f"data: {json.dumps({'delta': round_text}, ensure_ascii=False)}\n\n"
                         if saw_reasoning:
                             yield f"data: {json.dumps({'reasoning_done': True}, ensure_ascii=False)}\n\n"
                         yield f"data: {json.dumps({'done': True, 'changed': changed, 'incomplete': truncated, 'context_notes': [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in ctx]}, ensure_ascii=False)}\n\n"
