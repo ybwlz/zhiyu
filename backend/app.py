@@ -71,7 +71,8 @@ def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 # ═══════════════ AI Agent：每日自动摘要（后台线程） ═══════════════
 def agent_daily_summary():
-    """每天 00:05 自动聚合昨日社区动态写入 daily_digests（更新日志页展示）"""
+    """每天 00:05 自动聚合昨日社区动态写入 daily_digests（更新日志页展示）。
+    gunicorn 多 worker 下靠 MySQL GET_LOCK 保证只执行一份。"""
     while True:
         try:
             now = datetime.now()
@@ -79,43 +80,53 @@ def agent_daily_summary():
             time.sleep(max(1, (next_run - now).total_seconds()))
             conn = get_conn()
             try:
-                with conn.cursor() as cur:
-                    cur.execute("""SELECT COUNT(*) AS c FROM docs
-                        WHERE updated_at >= CURDATE() - INTERVAL 1 DAY AND visibility='public'""")
-                    docs = cur.fetchone()['c']
-                    cur.execute("""SELECT COUNT(*) AS c FROM note_comments
-                        WHERE created_at >= CURDATE() - INTERVAL 1 DAY""")
-                    cmts = cur.fetchone()['c']
-                    cur.execute("""SELECT COUNT(*) AS c FROM users
-                        WHERE created_at >= CURDATE() - INTERVAL 1 DAY""")
-                    users = cur.fetchone()['c']
-                    cur.execute("""SELECT COUNT(*) AS c FROM note_likes
-                        WHERE created_at >= CURDATE() - INTERVAL 1 DAY""")
-                    likes = cur.fetchone()['c']
-                    summary = (f"昨日社区动态：新增/更新公开笔记 {docs} 篇、新评论 {cmts} 条、"
-                               f"新成员 {users} 人、点赞 {likes} 次。")
-                    cur.execute("""INSERT INTO daily_digests (digest_date, summary)
-                        VALUES (CURDATE(), %s) ON DUPLICATE KEY UPDATE summary=VALUES(summary)""", (summary,))
-                    # 群发每日摘要通知（每个用户一条，仅当天首次）
-                    cur.execute("SELECT COUNT(*) AS c FROM notifications WHERE type='digest' AND created_at >= CURDATE()")
-                    if cur.fetchone()['c'] == 0:
-                        cur.execute("SELECT id FROM users")
-                        uids = [r['id'] for r in cur.fetchall()]
-                        for uid in uids:
-                            cur.execute("INSERT INTO notifications (user_id, actor_id, type, doc_id, extra) VALUES (%s, 0, 'digest', NULL, %s)",
-                                        (uid, summary))
-                        print(f'[Agent] 每日摘要已群发 {len(uids)} 个用户')
-                conn.commit()
-                print(f'[Agent] 每日摘要已生成: {summary}')
+                with conn.cursor() as lk:
+                    lk.execute("SELECT GET_LOCK('zhiyu_daily_summary', 0)")
+                    got = lk.fetchone()[0]
+                if not got:
+                    continue  # 别的 worker 正在生成，本 worker 跳过
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("""SELECT COUNT(*) AS c FROM docs
+                            WHERE updated_at >= CURDATE() - INTERVAL 1 DAY AND visibility='public'""")
+                        docs = cur.fetchone()['c']
+                        cur.execute("""SELECT COUNT(*) AS c FROM note_comments
+                            WHERE created_at >= CURDATE() - INTERVAL 1 DAY""")
+                        cmts = cur.fetchone()['c']
+                        cur.execute("""SELECT COUNT(*) AS c FROM users
+                            WHERE created_at >= CURDATE() - INTERVAL 1 DAY""")
+                        users = cur.fetchone()['c']
+                        cur.execute("""SELECT COUNT(*) AS c FROM note_likes
+                            WHERE created_at >= CURDATE() - INTERVAL 1 DAY""")
+                        likes = cur.fetchone()['c']
+                        summary = (f"昨日社区动态：新增/更新公开笔记 {docs} 篇、新评论 {cmts} 条、"
+                                   f"新成员 {users} 人、点赞 {likes} 次。")
+                        cur.execute("""INSERT INTO daily_digests (digest_date, summary)
+                            VALUES (CURDATE(), %s) ON DUPLICATE KEY UPDATE summary=VALUES(summary)""", (summary,))
+                        # 群发每日摘要通知（每个用户一条，仅当天首次）
+                        cur.execute("SELECT COUNT(*) AS c FROM notifications WHERE type='digest' AND created_at >= CURDATE()")
+                        if cur.fetchone()['c'] == 0:
+                            cur.execute("SELECT id FROM users")
+                            uids = [r['id'] for r in cur.fetchall()]
+                            for uid in uids:
+                                cur.execute("INSERT INTO notifications (user_id, actor_id, type, doc_id, extra) VALUES (%s, 0, 'digest', NULL, %s)",
+                                            (uid, summary))
+                            print(f'[Agent] 每日摘要已群发 {len(uids)} 个用户')
+                    conn.commit()
+                    print(f'[Agent] 每日摘要已生成: {summary}')
+                finally:
+                    with conn.cursor() as lk:
+                        lk.execute("SELECT RELEASE_LOCK('zhiyu_daily_summary')")
             finally:
                 conn.close()
         except Exception as e:
             print('[Agent] 异常:', e)
 
+# 模块级启动每日摘要线程（必须在 __main__ 外：gunicorn 导入 app.py 时 __main__ 不执行，之前放里面导致生产从不启动）
+threading.Thread(target=agent_daily_summary, daemon=True).start()
+
 if __name__ == '__main__':
     print("DB_USER =", DB_USER, "DB_HOST =", DB_HOST, "DB_NAME =", DB_NAME)
-    # 启动 AI Agent 后台线程（每日摘要）
-    threading.Thread(target=agent_daily_summary, daemon=True).start()
     port = int(os.getenv('PORT', 5000))
     # debug 默认关闭（单进程、不自动重启、不清 token）：需要热重载时设 FLASK_DEBUG=1
     DEBUG = os.getenv('FLASK_DEBUG', '0') == '1'
