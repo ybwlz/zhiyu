@@ -50,7 +50,10 @@ AI_TOOLS = [
     {'type': 'function', 'function': {
         'name': 'read_note',
         'description': '读取一篇笔记的完整 Markdown 源码。修改笔记前若上下文里的内容不完整，可调用它获取全文。',
-        'parameters': {'type': 'object', 'properties': {'note_id': {'type': 'integer', 'description': '笔记 ID'}}, 'required': ['note_id']},
+        'parameters': {'type': 'object', 'properties': {
+            'note_id': {'type': 'integer', 'description': '笔记数字 ID（search_note 返回的「数字ID」）'},
+            'public_id': {'type': 'string', 'description': '笔记 public_id（没有数字 ID 时用它）'},
+        }},
     }},
     {'type': 'function', 'function': {
         'name': 'save_draft',
@@ -134,12 +137,21 @@ def run_ai_tool(name, args, user):
     """执行 AI 工具调用，返回 (结果文本, changed)。changed=True 表示笔记/草稿有变化，前端需刷新。"""
     try:
         if name == 'read_note':
-            nid = int(args.get('note_id') or 0)
+            nid = args.get('note_id')
+            pid = str(args.get('public_id') or args.get('id') or '')
             conn = get_conn()
             try:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT id, title, content FROM docs WHERE id=%s AND (visibility='public' OR user_id=%s)", (nid, user['id']))
-                    r = cur.fetchone()
+                    r = None
+                    if nid:
+                        try:
+                            cur.execute("SELECT id, title, content FROM docs WHERE id=%s AND (visibility='public' OR user_id=%s)", (int(nid), user['id']))
+                            r = cur.fetchone()
+                        except (TypeError, ValueError):
+                            pass
+                    if not r and pid:
+                        cur.execute("SELECT id, title, content FROM docs WHERE public_id=%s AND (visibility='public' OR user_id=%s)", (pid, user['id']))
+                        r = cur.fetchone()
             finally:
                 conn.close()
             if not r:
@@ -198,8 +210,8 @@ def run_ai_tool(name, args, user):
                 conn.close()
             if not rows:
                 return f'没有找到标题包含「{keyword}」的笔记', False
-            lines = [f"{r['public_id']}.《{r['title']}》（{r['type']}）" for r in rows]
-            return '按标题搜索到的笔记（用 public_id 拼 /notes/{public_id} 跳转）：\n' + '\n'.join(lines), False
+            lines = [f"数字ID={r['id']}，public_id={r['public_id']}，《{r['title']}》（{r['type']}）" for r in rows]
+            return '按标题搜索到的笔记（read_note 用「数字ID」，navigate 跳转用 /notes/{public_id}）：\n' + '\n'.join(lines), False
         if name == 'new_note':
             # 前端动作：由 sse_gen 转发 action 事件给前端打开新建笔记编辑器
             return '已通知前端打开新建笔记编辑器', False
