@@ -428,7 +428,7 @@ def ai_chat(user=None):
                         'tools': AI_TOOLS_RESPONSES,
                         'tool_choice': 'auto',
                         'temperature': 0.7,
-                        'reasoning': {'effort': 'low'},  # 轻量思考并流式展示（用户要看思考过程）
+                        'reasoning': {'effort': 'high'},  # 深度思考并流式展示（用户要好的结果，可接受等待）
                         'stream': True,
                     }
                     req2 = urllib.request.Request(

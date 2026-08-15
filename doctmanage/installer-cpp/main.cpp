@@ -882,7 +882,6 @@ int WINAPI wWinMain(HINSTANCE hInst,HINSTANCE,PWSTR,int){
     g_scale = dpi / 96.0f;
     WNDCLASSW wc={}; wc.lpfnWndProc=WndProc; wc.hInstance=hInst; wc.lpszClassName=L"ZhiyuInstallerCpp3"; wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);
     wc.hIcon=LoadIconW(hInst,MAKEINTRESOURCEW(1));
-    wc.hIconSm=(HICON)LoadImageW(hInst,MAKEINTRESOURCEW(1),IMAGE_ICON,16,16,LR_DEFAULTCOLOR);
     RegisterClassW(&wc);
     LoadState();
     // 卸载器模式：exe 文件名含"卸载" 或带 --uninstall → 直接进卸载页（点击即卸载，无需重开安装器）
