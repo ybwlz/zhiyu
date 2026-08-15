@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import katex from 'katex'
@@ -258,7 +258,7 @@ const send = async () => {
   thinking.value = true
   scrollToBottom()
   // 流式回答（打字机）：reasoning（思考）+ content 都实时累加，气泡不提前空显示
-  const assistantMsg = { role: 'assistant', content: '', reasoning: '', stream: true, actions: [], reasoningOpen: false, tools: [] }
+  const assistantMsg = reactive({ role: 'assistant', content: '', reasoning: '', stream: true, actions: [], reasoningOpen: false, tools: [] })
   messages.value.push(assistantMsg)
   scrollToBottom()
   // 打字机节流：Vue 响应式是异步批处理，同一批到达的 delta 若直接 += 只触发一次渲染（正文“唰”地一次性出现）。
