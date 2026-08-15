@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref, computed, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
@@ -200,6 +200,9 @@ const renderRight = () => {
     ensureAnnCanvases(rightEl.value)
   }
   window.dispatchEvent(new Event('zhiyu:doodle-reflow'))
+  // 修复：load() 末尾 / loadAnnData() 等处的 renderRight 会整体重建编辑区，把已内嵌的 AI diff 块抹掉，
+  // 导致顶部显示「N 处修改」但编辑器里看不到红绿 diff。这里在存在未接受的修改点时重新内嵌。
+  if (pendingAiBlocks().some(b => b.found)) nextTick(() => renderAiBlocksInline())
 }
 // 编辑区所有裸 <img>（非 img-zone）自动升级为可拉伸图片：包 span.img-zone + 8 个拉伸手柄，
 // 让粘贴/附件/复制的图片也有与「插入图片」一致的拉伸能力（光标与拖拽自动生效）
@@ -525,10 +528,79 @@ watch(content, () => { if (!editingRight && rightEl.value) renderRight() })
 const eqOpen = ref(false)
 const eqForm = ref('')
 let eqEditingEl = null
+// 删除一个 img-zone（图片）并把光标放到删除位置，避免光标悬空
+const removeImgZone = (zone) => {
+  const parent = zone.parentNode
+  const next = zone.nextSibling
+  zone.remove()
+  const r = document.createRange()
+  if (next) r.setStartBefore(next)
+  else if (parent) r.setStart(parent, parent.childNodes.length)
+  r.collapse(true)
+  const s = window.getSelection()
+  s.removeAllRanges(); s.addRange(r)
+  onEdit()
+}
+// 取选区「选中的整块图片」或「光标紧邻的图片」（dir: before=图片在光标前 / after=图片在光标后）
+const imgZoneAtCaret = (range) => {
+  if (!range || !rightEl.value) return null
+  const isZone = (n) => n && n.nodeType === 1 && n.classList && n.classList.contains('img-zone')
+  // 1) 选中了整块图片（Range.selectNode 后：start/end 同父元素，[startOffset, endOffset) 恰好夹住一个 img-zone）
+  if (!range.collapsed) {
+    const sc = range.startContainer, ec = range.endContainer
+    if (sc === ec && sc.nodeType === 1) {
+      const child = sc.childNodes[range.startOffset]
+      if (isZone(child) && range.endOffset === range.startOffset + 1) return { zone: child, dir: 'selected' }
+    }
+    return null
+  }
+  // 2) 光标紧邻图片
+  let sc = range.startContainer
+  let off = range.startOffset
+  if (sc.nodeType === 3) {
+    const parent = sc.parentElement
+    if (!parent) return null
+    if (off === 0) { const p = sc.previousSibling; if (isZone(p)) return { zone: p, dir: 'before' } }
+    if (off === sc.length) { const n = sc.nextSibling; if (isZone(n)) return { zone: n, dir: 'after' } }
+    return null
+  }
+  if (sc.nodeType !== 1) return null
+  const after = sc.childNodes[off]
+  if (isZone(after)) return { zone: after, dir: 'after' }
+  const before = sc.childNodes[off - 1]
+  if (isZone(before)) return { zone: before, dir: 'before' }
+  return null
+}
 const onEditorKeydown = (e) => {
   // 公式内部：允许选中/复制，禁止输入和删除（防止破坏 KaTeX 结构）
   if (e.target && e.target.closest && e.target.closest('eq-wrap')) {
     if (!e.ctrlKey && !e.metaKey && !e.altKey) e.preventDefault()
+    return
+  }
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount || !rightEl.value) return
+  const range = sel.getRangeAt(0)
+  if (!rightEl.value.contains(sel.anchorNode)) return
+  const hit = imgZoneAtCaret(range)
+  if (!hit) return
+  // ── 图片删除：选中整块或光标紧邻时，Delete/Backspace 删除图片 ──
+  if ((e.key === 'Backspace' || e.key === 'Delete') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (hit.dir === 'selected' || (e.key === 'Backspace' && hit.dir === 'before') || (e.key === 'Delete' && hit.dir === 'after')) {
+      e.preventDefault()
+      removeImgZone(hit.zone)
+    }
+    return
+  }
+  // ── 光标在图片后面按 Enter：在图片下方新起一行，光标落到其下 ──
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && hit.dir === 'before') {
+    e.preventDefault()
+    const br = document.createElement('br')
+    hit.zone.after(br)
+    const r = document.createRange()
+    r.setStartAfter(br)
+    r.collapse(true)
+    sel.removeAllRanges(); sel.addRange(r)
+    onEdit()
   }
 }
 // 指令定位插入点：识别「在 XX 后面/之后 添加…」，返回 content.value 中 XX 小节内容末尾的索引（-1 = 未定位到，用光标）
@@ -573,6 +645,19 @@ const onEditorClick = (e) => {
       blocks.querySelectorAll('.code-block-wrapper').forEach((b, i) => b.classList.toggle('active', i === idx))
     }
     return
+  }
+  // 点击图片本体（非缩放手柄）→ 选中整块，便于 Backspace/Delete 删除；手柄仍走拉伸
+  if (e.target instanceof Element) {
+    const zone = e.target.closest('.img-zone')
+    if (zone && !e.target.closest('.rz') && rightEl.value && rightEl.value.contains(zone)) {
+      e.preventDefault()
+      e.stopPropagation()
+      const sel = window.getSelection()
+      const range = document.createRange()
+      range.selectNode(zone)
+      sel.removeAllRanges(); sel.addRange(range)
+      return
+    }
   }
   // 批注由全局委托处理（capture 阶段已拦截），这里不再重复
   lastClickPos = { x: e.clientX, y: e.clientY }
@@ -1535,8 +1620,10 @@ const renderAiBlocksInline = () => {
   const blocks = pendingAiBlocks().filter(b => b.found)
   // 重建为纯原文（清掉上次插入的 diff 块，恢复被替换的文本）
   rightEl.value.innerHTML = renderMd(content.value)
+  upgradeImgs()
   bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText })
   ensureAnnCanvases(rightEl.value)
+  window.dispatchEvent(new Event('zhiyu:doodle-reflow'))
   const ctx = content.value || ''
   // 从后往前替换：先替换位置靠后的块，避免前面的块被替换成 diff 后，
   // 其内部渲染的 keep 行干扰后面块的锚点匹配（多块 target 相邻/重叠时只显示一个的问题）
@@ -1874,6 +1961,7 @@ onBeforeUnmount(() => {
             contenteditable="true"
             spellcheck="false"
             @input="onEdit"
+            @keydown="onEditorKeydown"
             @paste.prevent="onPaste"
             @click="onEditorClick"
             @contextmenu.prevent="onEditorCtx"

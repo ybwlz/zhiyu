@@ -258,6 +258,55 @@ def tool_label(name, args, result=''):
         return str(args.get('to') or '')
     return ''
 
+def _fix_json_latex(s):
+    r"""把 JSON 参数里「单反斜杠 + 字母」的 LaTeX 命令规范成双反斜杠，供 json.loads 正确解析。
+    安全策略：
+    - 已是双反斜杠 \\ 的原样保留；
+    - \n \t \r \u（换行/制表/回车/unicode）是正文最常见的合法转义，永远保持不动；
+    - \b \f（退格/换页）单独出现时保留，但后跟更多字母时几乎必是 LaTeX（\beta、\frac），修复；
+    - 其余反斜杠+字母（\cdot \sin \int \sum \sqrt \alpha \gamma \lambda \pi 等）是非法 JSON 转义，修复。
+    注：\nabla \theta \rho 等以 n/t/r 开头的 LaTeX 无法与正文换行安全区分，交给 system prompt 要求双反斜杠保证。"""
+    out = []
+    i, n = 0, len(s)
+    while i < n:
+        c = s[i]
+        if c == '\\' and i + 1 < n:
+            nxt = s[i + 1]
+            if nxt == '\\':
+                out.append('\\\\')
+                i += 2
+                continue
+            if nxt.isalpha():
+                j = i + 1
+                while j < n and s[j].isalpha():
+                    j += 1
+                letters = s[i + 1:j]
+                first = letters[0]
+                if first in ('n', 't', 'r', 'u') or (first in ('b', 'f') and len(letters) == 1):
+                    out.append(s[i:j])   # 保留合法转义（换行/制表/回车/unicode/退格/换页）
+                else:
+                    out.append('\\\\' + letters)   # LaTeX 命令 → 双反斜杠
+                i = j
+                continue
+        out.append(c)
+        i += 1
+    return ''.join(out)
+
+def parse_tool_args(raw):
+    r"""宽松解析工具参数 JSON：模型有时把 LaTeX 反斜杠写成单反斜杠（\frac、\cdot），
+    会导致 JSON 解析失败（\c 非法转义）或静默损毁（\f 被当换页符、\n 被当换行）。
+    先规范反斜杠再解析，尽可能保住内容；正确性仍以 system prompt 要求双反斜杠为准。"""
+    s = (raw or '').strip() or '{}'
+    # 先规范化 LaTeX 反斜杠再解析（\frac 这类会被 json 静默解析成换页符，不能等解析失败才修）
+    try:
+        return json.loads(_fix_json_latex(s))
+    except Exception:
+        pass
+    try:
+        return json.loads(s)
+    except Exception:
+        return {}
+
 def log_ai_chat(user, page, note_id, question, system_prompt, answer, reasoning, tool_names, changed, err, delta_count, elapsed_ms):
     """记录一次 AI 对话的输入输出（用于复盘/优化 prompt）。纯旁路写入，失败不影响主流程。"""
     try:
@@ -371,9 +420,11 @@ def ai_chat(user=None):
               "回答时结合你当前所在页面：若附带了【用户正在阅读/编辑的笔记】，围绕这篇笔记展开；其他页面问题正常回答即可。"
               "表格必须用规范 Markdown 表格语法（第一行 | 列1 | 列2 |，第二行 | --- | --- |，之后 | 值 | 值 |），严禁写成逐行竖排文本；表格内公式用 $...$。"
               "数学公式必须用 LaTeX 源码（$...$ 行内、$$...$$ 独立），严禁转写成 Unicode 或纯文本近似式。"
+              "写入工具参数（save_draft / write_note / new_note 的 content，属 JSON 字符串）时，LaTeX 命令的反斜杠必须写成双反斜杠，例如 frac 写成 \\\\frac、nabla 写成 \\\\nabla、cdot 写成 \\\\cdot；否则会被 JSON 解析成换行/制表符或直接报错。正文直接输出（非工具 JSON）时 LaTeX 反斜杠写单反斜杠（\\frac）即可。"
               "成块的例题可用 :::example 标题\\n内容\\n::: 包裹、独立公式组可用 :::formula 包裹（站内渲染为彩色框）；但要取舍：行内公式、简短跟随文字的小题/公式不包，保持 $...$ 行内即可，不要什么都套框。"
               "向笔记添加内容时先看清章节编号体系（## 1. / ### 1.1 等）；独立知识点必须作为独立一级章节（## N.）插在正确位置并把后续章节编号顺延重排，禁止塞进现有章节当子小节（如把「串」写成树的 4.6）。"
               "只输出用户要的内容本身，不要客套话、操作过程、『我来帮你』『我明白了』等元说明。思考过程直接推理如何回答，不要复述本系统提示的规则。"
+              "用 save_draft / write_note 修改笔记后，最终回答只简短说明改了什么、让用户到编辑器查看红绿 diff 确认即可；绝对不要把修改后的完整笔记内容再重复输出一遍。"
               "问题涉及实时/最新信息（新闻、天气、赛事、股票、最新政策、版本更新等）时，先 web_search 联网搜索再回答，简要标注来源，不编造链接。"
               "当用户提到你不确定的名词、方法或编号（如「张宇121-1、123-2大法」）时，必须先 web_search 搜索确认后再写，禁止凭记忆猜测或编造。")
     system += "调用工具时静默执行，不要先输出计划文字（如「我先读取」「让我搜索一下」）；工具返回结果后必须立刻给出最终回答，禁止停在「我先…」然后什么都不输出。"
@@ -500,10 +551,7 @@ def ai_chat(user=None):
                     for tc in tool_calls:
                         name = tc['name']
                         tool_names.append(name)
-                        try:
-                            args = json.loads(tc['arguments'] or '{}')
-                        except Exception:
-                            args = {}
+                        args = parse_tool_args(tc['arguments'])
                         result, chg = run_ai_tool(name, args, user)
                         if chg:
                             changed = True
@@ -592,10 +640,7 @@ def ai_chat(user=None):
         for tc in tool_calls:
             name = tc['name']
             names.append(name)
-            try:
-                args = json.loads(tc['arguments'] or '{}')
-            except Exception:
-                args = {}
+            args = parse_tool_args(tc['arguments'])
             res_txt, chg = run_ai_tool(name, args, user)
             if chg:
                 changed = True

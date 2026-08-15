@@ -476,6 +476,10 @@ const onAiInsert = async (e) => {
   } catch (err) {}
   router.push('/edit/' + docId.value + '?from=note')
 }
+// 全局 AI 助手「去编辑页查看修改」→ 跳当前笔记的编辑页（编辑页会自动加载 AI 草稿并弹红绿 diff）
+const onAiGotoCurrentEdit = () => {
+  if (docId.value) router.push('/edit/' + docId.value + '?from=note')
+}
 const load = async () => {
   loading.value = true
   try {
@@ -521,6 +525,7 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('zhiyu:ai-comment', onAiComment)
   window.addEventListener('zhiyu:ai-insert', onAiInsert)
+  window.addEventListener('zhiyu:ai-goto-current-edit', onAiGotoCurrentEdit)
   document.addEventListener('selectionchange', onSelChange)
   document.addEventListener('click', onCodeGroupClick)
 })
@@ -528,6 +533,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScroll)
   window.removeEventListener('zhiyu:ai-comment', onAiComment)
   window.removeEventListener('zhiyu:ai-insert', onAiInsert)
+  window.removeEventListener('zhiyu:ai-goto-current-edit', onAiGotoCurrentEdit)
   document.removeEventListener('selectionchange', onSelChange)
   document.removeEventListener('click', onCodeGroupClick)
   document.body.classList.remove('immersive')

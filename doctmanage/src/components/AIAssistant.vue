@@ -139,8 +139,8 @@ const auth = useAuthStore()
 const pageInfo = computed(() => {
   const p = route.path
   if (p.startsWith('/edit')) return { kind: 'editor', isNew: !route.params.id, note_id: route.params.id ? Number(route.params.id) : null }
-  if (p.startsWith('/notes/')) return { kind: 'note-reader', note_key: route.params.key }
-  if (p.startsWith('/docs')) return { kind: 'docs-reader', note_key: route.params.key || undefined }
+  if (p.startsWith('/notes/')) return { kind: 'note-reader', note_key: route.params.key, note_slug: route.params.key }
+  if (p.startsWith('/docs')) return { kind: 'docs-reader', note_key: route.params.key || undefined, note_slug: route.params.key || undefined }
   if (p === '/notes') return { kind: 'notes-square' }
   return { kind: 'other' }
 })
@@ -326,6 +326,7 @@ const send = async () => {
         page: pageInfo.value.kind,
         note_id: pageInfo.value.note_id || undefined,
         note_slug: pageInfo.value.note_slug || undefined,
+        note_key: pageInfo.value.note_key || undefined,
         draft_content: draftContent,
         history: messages.value.slice(-7, -1).filter(m => !m.stream && m.role !== 'sys').map(m => ({ role: m.role, content: m.content })),
       }),

@@ -413,6 +413,11 @@ export default {
       const auth = useAuthStore()
       if (!auth.isLogin) { ElMessage.warning('请先登录再保存涂鸦'); return }
       if (!this.strokes.length) { ElMessage.info('还没有画内容，先涂几笔再保存'); return }
+      // 新建笔记（尚未保存，docId 为 NaN/空）时无法把涂鸦挂到笔记上：先保存笔记再手绘
+      if (!this._tgtCanvas && !(Number.isFinite(this.docId) && this.docId > 0)) {
+        ElMessage.warning('请先保存笔记，再保存手绘')
+        return
+      }
       // 批注框手绘：把笔迹交给编辑页，合并进批注内容
       if (this._tgtCanvas) {
         window.dispatchEvent(new CustomEvent('zhiyu:ann-doodle-save', { detail: { canvas: this._tgtCanvas, strokes: this.strokes } }))

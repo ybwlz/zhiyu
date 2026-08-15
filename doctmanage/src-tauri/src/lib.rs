@@ -414,7 +414,10 @@ pub fn run() {
             // 应用图标：用 256×256 PNG（从 icon.ico 提取），保证窗口/托盘图标清晰。
             // default_window_icon() 从多帧 ICO 里取的可能只有小尺寸帧，导致任务栏图标发糊。
             let app_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon-256.png")).ok();
-            let mut tray_builder = TrayIconBuilder::new().menu(&menu);
+            let mut tray_builder = TrayIconBuilder::new()
+                .menu(&menu)
+                // 明确：左键单击 = 显示窗口（Click 事件），右键 = 弹出菜单；避免个别平台默认把左键也弹菜单
+                .show_menu_on_left_click(false);
             if let Some(ic) = &app_icon {
                 tray_builder = tray_builder.icon(ic.clone());
             }
