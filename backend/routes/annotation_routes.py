@@ -7,22 +7,36 @@ import secrets
 
 from config import UPLOAD_FOLDER
 from db import get_conn
-from auth import require_login
+from auth import require_login, get_current_user
 from shared import fetch_doc_visible
 
 bp = Blueprint('annotations', __name__)
 
 @bp.route('/api/notes/<int:doc_id>/annotations', methods=['GET'])
-@require_login
-def note_annotations_get(doc_id, user=None):
-    """我的批注列表（个人学习批注，仅本人可见）"""
+def note_annotations_get(doc_id):
+    """批注/手绘列表。公开笔记：批注层随笔记公开（返回笔记作者的手绘/批注，人人可见，未登录也能看）；
+    私密笔记：仅本人可见。"""
+    user = get_current_user()
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""SELECT id, strokes, canvas_w, canvas_h, kind, para_idx, sel_text, note_text, img_path,
-                                  CAST(created_at AS CHAR) AS created_at
-                FROM note_annotations WHERE doc_id=%s AND user_id=%s ORDER BY created_at ASC""",
-                (doc_id, user['id']))
+            cur.execute("SELECT user_id, visibility FROM docs WHERE id=%s", (doc_id,))
+            d = cur.fetchone()
+            if not d:
+                return jsonify({'error': 'not_found'}), 404
+            if d.get('visibility') == 'public':
+                # 公开笔记：批注/手绘 = 笔记作者的那一层，随笔记一起公开
+                cur.execute("""SELECT id, strokes, canvas_w, canvas_h, kind, para_idx, sel_text, note_text, img_path,
+                                      CAST(created_at AS CHAR) AS created_at
+                    FROM note_annotations WHERE doc_id=%s AND user_id=%s ORDER BY created_at ASC""",
+                    (doc_id, d['user_id']))
+            else:
+                if not user:
+                    return jsonify({'error': 'unauthorized'}), 401
+                cur.execute("""SELECT id, strokes, canvas_w, canvas_h, kind, para_idx, sel_text, note_text, img_path,
+                                      CAST(created_at AS CHAR) AS created_at
+                    FROM note_annotations WHERE doc_id=%s AND user_id=%s ORDER BY created_at ASC""",
+                    (doc_id, user['id']))
             rows = cur.fetchall()
     finally:
         conn.close()
@@ -40,6 +54,9 @@ def note_annotations_save(doc_id, user=None):
     row, err = fetch_doc_visible(doc_id=doc_id)
     if err:
         return err
+    if row.get('user_id') != user['id']:
+        # 只有笔记作者能添加批注/手绘（否则会混进公开笔记的手绘层）
+        return jsonify({'error': '只能在自己的笔记上添加批注/手绘'}), 403
     data = request.get_json(silent=True) or {}
     kind = (data.get('kind') or 'doodle')[:12]
     conn = get_conn()
