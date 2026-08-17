@@ -494,7 +494,8 @@ export default {
       if (!cv) return
       const ctx = cv.getContext('2d')
       ctx.clearRect(0, 0, cv.width, cv.height)
-      ctx.globalAlpha = 0.5
+      // 与增量绘制（drawPendingStroke）保持一致的满不透明度：画的时候是什么颜色，保存后就是什么颜色
+      // （之前这里 globalAlpha=0.5，导致「保存前黑色、保存后变淡」）
       // 批注块手绘：画该批注块已有的笔迹（按原保存尺寸等比缩放）+ 本批新笔迹；不画全页 savedStrokes
       if (this._tgtCanvas) {
         const s = this.annBaseWH.w ? cv.width / this.annBaseWH.w : 1
@@ -506,7 +507,6 @@ export default {
         for (const s of this.savedStrokes) this.drawStroke(ctx, s, sx, sy)
         for (const s of this.strokes) this.drawStroke(ctx, s, 1, 1)
       }
-      ctx.globalAlpha = 1
       // 全量重绘后当前笔画已完整上屏：增量计数同步到当前长度，后续绘制从这继续
       if (this.curStroke) this.renderedPointCount = this.curStroke.points.length
     },
