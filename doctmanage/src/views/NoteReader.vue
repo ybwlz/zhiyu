@@ -718,6 +718,13 @@ const loadAnnData = async () => {
     bindAnnotations(document.querySelector('.reader-card .markdown-body'), annMap.value, { editable: false })
   } catch (e) { /* 忽略 */ }
 }
+// 保险：批注数据一更新就重新绑定（防正文重渲染/数据加载的竞态导致批注没填上）
+watch(annMap, () => {
+  nextTick(() => {
+    const root = document.querySelector('.reader-card .markdown-body')
+    if (root) bindAnnotations(root, annMap.value, { editable: false })
+  })
+}, { deep: true })
 const aiSummary = async () => {
   if (!requireLogin()) return
   summaryOpen.value = true
