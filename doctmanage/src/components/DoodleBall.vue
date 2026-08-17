@@ -85,6 +85,8 @@ export default {
       savedStrokes: [],                 // 本笔记已保存的涂鸦（显示用）
       savedAnnId: null,                 // 已保存涂鸦记录的 id（用于删除）
       savedWH: { w: 0, h: 0 },
+      annBaseStrokes: [],               // 批注块已有的笔迹（独立会话，不混用全页手绘状态）
+      annBaseWH: { w: 0, h: 0 },
       panelPos: null,                   // 面板位置（跟随工具球）
       dragOff: null,                     // 面板拖拽偏移
       drawing: false,
@@ -132,6 +134,13 @@ export default {
       // 批注框手绘：目标为批注框内的 canvas（复用同一套画笔）；否则是全页/卡片手绘
       this._tgtCanvas = (d && d.target && d.target.tagName === 'CANVAS') ? d.target : null
       this._tgt = null
+      // 批注框会话：载入该批注块已有的笔迹，新笔迹叠加其上（不再借用全页手绘的 savedStrokes）
+      if (this._tgtCanvas) {
+        this.annBaseStrokes = Array.isArray(d && d.strokes) ? d.strokes : []
+        this.annBaseWH = { w: (d && d.canvas_w) || 0, h: (d && d.canvas_h) || 0 }
+        // 打开批注会话时清空本批未保存笔迹，从该块已有笔迹基础上重新开始
+        if (this.open) { this.strokes = []; this.renderedPointCount = 0 }
+      }
       if (this.open) {
         this.$nextTick(() => {
           if (d) {
@@ -306,7 +315,12 @@ export default {
     annPos(e) {
       const cv = this.cv
       const rect = cv.getBoundingClientRect()
-      return { x: (e.clientX - rect.left) * (cv.width / rect.width), y: (e.clientY - rect.top) * (cv.height / rect.height) }
+      let x = (e.clientX - rect.left) * (cv.width / rect.width)
+      let y = (e.clientY - rect.top) * (cv.height / rect.height)
+      // 批注块手绘严格裁剪到画布（=批注可视边框）内：pointer capture 移出框外也不落笔到框外
+      x = Math.max(0, Math.min(cv.width, x))
+      y = Math.max(0, Math.min(cv.height, y))
+      return { x, y }
     },
     onDown(e) {
       if (!this.open) return
@@ -414,10 +428,17 @@ export default {
       const ctx = cv.getContext('2d')
       ctx.clearRect(0, 0, cv.width, cv.height)
       ctx.globalAlpha = 0.5
-      const sx = this.savedWH.w ? cv.width / this.savedWH.w : 1
-      const sy = this.savedWH.h ? cv.height / this.savedWH.h : 1
-      for (const s of this.savedStrokes) this.drawStroke(ctx, s, sx, sy)
-      for (const s of this.strokes) this.drawStroke(ctx, s, 1, 1)
+      // 批注块手绘：画该批注块已有的笔迹（按原保存尺寸等比缩放）+ 本批新笔迹；不画全页 savedStrokes
+      if (this._tgtCanvas) {
+        const s = this.annBaseWH.w ? cv.width / this.annBaseWH.w : 1
+        for (const st of this.annBaseStrokes) this.drawStroke(ctx, st, s, s)
+        for (const st of this.strokes) this.drawStroke(ctx, st, 1, 1)
+      } else {
+        const sx = this.savedWH.w ? cv.width / this.savedWH.w : 1
+        const sy = this.savedWH.h ? cv.height / this.savedWH.h : 1
+        for (const s of this.savedStrokes) this.drawStroke(ctx, s, sx, sy)
+        for (const s of this.strokes) this.drawStroke(ctx, s, 1, 1)
+      }
       ctx.globalAlpha = 1
     },
     undo() { this.strokes.pop(); this.redraw() },

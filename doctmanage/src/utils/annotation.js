@@ -5,6 +5,7 @@
 // 批注框 = 一张自由白纸：手绘笔迹 canvas 垫底（z-index 低），文字 contenteditable 在上层，
 // 两者共存一框；回车换行由浏览器原生处理，框随内容长高，不拦截。
 import container from 'markdown-it-container'
+import { normalizeBlock } from './documentBlocks.js'
 
 const CN = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'
 
@@ -27,7 +28,7 @@ export function setupAnnotation(md) {
           return '<div class="ann-block" data-ann-id="' + id + '">'
             + '<div class="ann-badge" data-ann-toggle></div>'
             + '<textarea class="ann-body" rows="3" spellcheck="false" placeholder="输入批注内容…"></textarea>'
-            + '<div class="ann-foot"><button class="ann-del" data-ann-del>🗑 删除批注</button></div>'
+            + '<div class="ann-foot"><button class="ann-mv" data-ann-mv="up" title="上移">↑</button><button class="ann-mv" data-ann-mv="down" title="下移">↓</button><button class="ann-img" data-ann-img>🖼 图片</button><button class="ann-del" data-ann-del>🗑 删除批注</button></div>'
             + '</div>'
         }
         // 旧格式：内容渲染进 div（兼容）
@@ -143,10 +144,16 @@ export function bindAnnotations(root, annMap, opts = {}) {
   if (!root) return
   const blocks = root.querySelectorAll('.ann-block')
   blocks.forEach((b, i) => {
+    // 阅读页（非编辑模式）：批注默认展开，读者直接看到文字/图片/手绘，而不是只剩一个 ① 徽章
+    if (!opts.editable) {
+      b.classList.add('open')
+      const foot = b.querySelector('.ann-foot')
+      if (foot) foot.style.display = 'none'   // 只读展示：不显示 ↑↓/图片/删除按钮
+    }
     const badge = b.querySelector('.ann-badge')
     const body = b.querySelector('.ann-body')
     const id = b.getAttribute('data-ann-id') || ''
-    const rec = annMap && id ? annMap[id] : null
+    const rec = annMap && id ? normalizeBlock({ ...annMap[id], id }) : null
     const isTextarea = !!(body && body.tagName === 'TEXTAREA')
     if (body) {
       if (isTextarea) {
@@ -157,12 +164,17 @@ export function bindAnnotations(root, annMap, opts = {}) {
         if (opts.editable && !body._annBound) {
           body._annBound = true
           let t = null
+          let resizeFrame = 0
           body.addEventListener('input', () => {
-            // 连续输入/回车期间零布局：不读 scrollHeight、不碰高度——连点回车完全不卡
-            // 停止 200ms 后一次性增高 + 防抖局部保存
+            // 连续回车时按帧合并布局读写：不会每个 input 都强制重排，但下一帧就能长高。
+            if (!resizeFrame) {
+              resizeFrame = requestAnimationFrame(() => {
+                resizeFrame = 0
+                autosizeAnnBody(body)
+              })
+            }
             clearTimeout(t)
             t = setTimeout(() => {
-              autosizeAnnBody(body)
               if (opts.onInput) opts.onInput(id, body.value)
             }, 200)
           })
@@ -184,6 +196,16 @@ export function bindAnnotations(root, annMap, opts = {}) {
       if (rec && rec.strokes && rec.strokes.length) {
         const cv = ensureDoodleCanvas(b, rec.canvas_w || 100, rec.canvas_h || 100)
         requestAnimationFrame(() => drawStrokes(cv, rec.strokes, rec.canvas_w || 100, rec.canvas_h || 100))
+      }
+      if (rec && rec.img_path) {
+        let img = b.querySelector('.ann-image')
+        if (!img) {
+          img = document.createElement('img')
+          img.className = 'ann-image'
+          img.alt = '批注图片'
+          body.insertAdjacentElement('afterend', img)
+        }
+        img.src = '/uploads/' + String(rec.img_path).replace(/^\/+/, '')
       }
     }
     if (badge) {
@@ -215,6 +237,22 @@ export function bindAnnotations(root, annMap, opts = {}) {
       }
     }
     const del = b.querySelector('.ann-del')
+    const imgBtn = b.querySelector('.ann-img')
+    if (imgBtn) {
+      if (!opts.editable || !opts.onImage) {
+        imgBtn.style.display = 'none'
+      } else if (!imgBtn._annBound) {
+        imgBtn._annBound = true
+        imgBtn.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation()
+          const input = document.createElement('input')
+          input.type = 'file'; input.accept = 'image/*'; input.style.display = 'none'
+          input.onchange = () => { const file = input.files && input.files[0]; if (file) opts.onImage(id, file, b) }
+          document.body.appendChild(input); input.click()
+          setTimeout(() => input.remove(), 0)
+        }
+      }
+    }
     if (del) {
       if (!opts.editable) {
         // 阅读页（非编辑模式）不显示删除按钮——批注是只读展示
@@ -229,6 +267,21 @@ export function bindAnnotations(root, annMap, opts = {}) {
           if (_opts.onDel) _opts.onDel(b, idx)
           else b.remove()
         }
+      }
+    }
+    // 批注块移动（编辑模式）：↑ 上移 / ↓ 下移，交换它在正文中的位置
+    const mvBtns = b.querySelectorAll('.ann-mv')
+    if (mvBtns.length) {
+      if (!opts.editable || !opts.onMove) {
+        mvBtns.forEach((btn) => { btn.style.display = 'none' })
+      } else {
+        mvBtns.forEach((btn) => {
+          btn.onclick = (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            opts.onMove(id, btn.getAttribute('data-ann-mv') || 'up')
+          }
+        })
       }
     }
     // 整个批注框可点击：收起态点任意处展开；展开态点击非文字区把光标移回框内（防 Delete/回车落到框外）

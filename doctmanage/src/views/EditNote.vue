@@ -192,11 +192,35 @@ const renderMd = (src) => {
   })
   return html
 }
+// 将 Markdown 新渲染出的同 ID 块替换为当前活动节点，保留 textarea/canvas/光标和事件。
+const reuseLiveAnnotationBlocks = (root, liveBlocks) => {
+  if (!root || !liveBlocks || !liveBlocks.size) return
+  root.querySelectorAll('.ann-block[data-ann-id]').forEach((fresh) => {
+    const id = fresh.getAttribute('data-ann-id')
+    const live = id && liveBlocks.get(id)
+    if (live) fresh.replaceWith(live)
+  })
+}
+
+const captureLiveAnnotationBlocks = (root) => {
+  const liveBlocks = new Map()
+  if (!root) return liveBlocks
+  root.querySelectorAll('.ann-block[data-ann-id]').forEach((b) => {
+    const id = b.getAttribute('data-ann-id')
+    if (id) liveBlocks.set(id, b)
+  })
+  return liveBlocks
+}
+
 const renderRight = () => {
   if (rightEl.value) {
+    // Markdown 只负责布局和锚点；已有块节点（textarea/canvas/光标/事件）必须复用，
+    // 不能因为正文一次重渲染就销毁整个批注/手绘工作区。
+    const liveBlocks = captureLiveAnnotationBlocks(rightEl.value)
     rightEl.value.innerHTML = renderMd(content.value)
+    reuseLiveAnnotationBlocks(rightEl.value, liveBlocks)
     upgradeImgs() // 普通图片（粘贴/附件/markdown 引用）也包成可拉伸的 img-zone
-    bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText })
+    bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText, onImage: saveAnnImage, onMove: moveAnnotation })
     ensureAnnCanvases(rightEl.value)
   }
   window.dispatchEvent(new Event('zhiyu:doodle-reflow'))
@@ -377,7 +401,7 @@ const loadAnnData = async () => {
     const res = await api.get('/notes/' + docId.value + '/annotations')
     const m = {}
     for (const r of res.data || []) {
-      if (r.kind === 'note') m[r.id] = { note_text: r.note_text || '', strokes: Array.isArray(r.strokes) ? r.strokes : [], canvas_w: r.canvas_w || 0, canvas_h: r.canvas_h || 0 }
+    if (r.kind === 'note') m[r.id] = { note_text: r.note_text || '', strokes: Array.isArray(r.strokes) ? r.strokes : [], canvas_w: r.canvas_w || 0, canvas_h: r.canvas_h || 0, img_path: r.img_path || '' }
     }
     annMap.value = m
     renderRight()
@@ -387,8 +411,81 @@ const loadAnnData = async () => {
 const saveAnnText = async (id, text) => {
   try { await api.put('/annotations/' + id, { note_text: text }) } catch (e) { /* 忽略 */ }
 }
+// 保存笔记时统一 flush 批注文字：防抖可能还没触发（打完字 200ms 内点保存），避免批注文字丢失
+const flushAnnText = async () => {
+  if (!rightEl.value) return
+  const blocks = rightEl.value.querySelectorAll('.ann-block[data-ann-id]')
+  const puts = []
+  blocks.forEach((b) => {
+    const id = b.getAttribute('data-ann-id')
+    const body = b.querySelector('.ann-body')
+    if (id && body && body.tagName === 'TEXTAREA') {
+      puts.push(api.put('/annotations/' + id, { note_text: body.value }).catch(() => {}))
+    }
+  })
+  await Promise.all(puts)
+}
 const saveAnnDoodle = async (id, strokes, w, h) => {
   try { await api.put('/annotations/' + id, { strokes, canvas_w: w, canvas_h: h }) } catch (e) { /* 忽略 */ }
+}
+const saveAnnImage = async (id, file, block) => {
+  try {
+    const dataUrl = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file) })
+    const res = await api.post('/annotations/upload-img', { img: dataUrl })
+    const path = res.data && res.data.path
+    if (!path) throw new Error('empty image path')
+    await api.put('/annotations/' + id, { img_path: path })
+    if (annMap.value[id]) annMap.value[id].img_path = path
+    let img = block.querySelector('.ann-image')
+    if (!img) { img = document.createElement('img'); img.className = 'ann-image'; block.querySelector('.ann-body')?.insertAdjacentElement('afterend', img) }
+    img.src = '/uploads/' + path
+    img.alt = '批注图片'
+    ElMessage.success('图片已加入批注')
+  } catch (e) { ElMessage.error('批注图片上传失败') }
+}
+// 批注块移动：把 :::annotation <id> 锚点与其相邻正文块交换位置（↑ 上移 / ↓ 下移）
+const moveAnnotation = (id, dir) => {
+  const t = content.value || ''
+  const lines = t.split('\n')
+  const targetId = String(id)
+  let startIdx = -1
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^:::\s*annotation\s+(\S+)/)
+    if (m && m[1] === targetId) { startIdx = i; break }
+  }
+  if (startIdx === -1) { ElMessage.warning('找不到该批注位置，可能已变化'); return }
+  // 找 `:::` 结束行
+  let endIdx = startIdx
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (lines[i].trim() === ':::') { endIdx = i; break }
+  }
+  if (endIdx === startIdx) { ElMessage.warning('批注格式异常，无法移动'); return }
+  const ann = lines.slice(startIdx, endIdx + 1)
+  let rebuilt = null
+  if (dir === 'up') {
+    // 上一个相邻内容块（跳过空行）
+    let p = startIdx - 1
+    while (p >= 0 && lines[p].trim() === '') p--
+    if (p < 0) { ElMessage.info('批注已经在最前面'); return }
+    let blockStart = p
+    while (blockStart > 0 && lines[blockStart - 1].trim() !== '') blockStart--
+    const block = lines.slice(blockStart, p + 1)
+    rebuilt = [...lines.slice(0, blockStart), ...ann, ...lines.slice(p + 1, startIdx), ...block, ...lines.slice(endIdx + 1)]
+  } else {
+    let p = endIdx + 1
+    while (p < lines.length && lines[p].trim() === '') p++
+    if (p >= lines.length) { ElMessage.info('批注已经在最后'); return }
+    let blockEnd = p
+    while (blockEnd < lines.length - 1 && lines[blockEnd + 1].trim() !== '') blockEnd++
+    const block = lines.slice(p, blockEnd + 1)
+    rebuilt = [...lines.slice(0, startIdx), ...block, ...lines.slice(endIdx + 1, p), ...ann, ...lines.slice(blockEnd + 1)]
+  }
+  if (rebuilt) {
+    const nt = rebuilt.join('\n')
+    if (nt === t) return
+    content.value = nt   // watch(content) 会自动重渲染（含批注块复用）
+    ElMessage.success(dir === 'up' ? '批注已上移' : '批注已下移')
+  }
 }
 // 删除批注：删记录 + 移除块
 const delAnn = async (b, idx) => {
@@ -399,7 +496,7 @@ const delAnn = async (b, idx) => {
   }
   b.remove()
   if (rightEl.value) {
-    bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText })
+    bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText, onImage: saveAnnImage, onMove: moveAnnotation })
     onEdit()
   }
 }
@@ -483,7 +580,7 @@ const insertAnnotation = async () => {
     rightEl.value.appendChild(el)
   }
   annMap.value[String(aid)] = { note_text: '', strokes: [], canvas_w: 0, canvas_h: 0 }
-  bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText })
+  bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText, onImage: saveAnnImage })
   onEdit()
   // 聚焦到批注内容区，直接输入（textarea 用 setSelectionRange）
   body.focus()
@@ -1017,21 +1114,31 @@ const openDoodle = (e) => {
       const dpr = window.devicePixelRatio || 1
       const w = Math.max(1, Math.round(r.width * dpr))
       const h = Math.max(1, Math.round(r.height * dpr))
+      const id = target.getAttribute('data-ann-id')
+      const rec = id ? annMap.value[id] : null
       if (cv.width !== w || cv.height !== h) {
         cv.width = w
         cv.height = h
-        const id = target.getAttribute('data-ann-id')
-        const rec = id ? annMap.value[id] : null
         if (rec && rec.strokes && rec.strokes.length) drawStrokes(cv, rec.strokes, rec.canvas_w || 100, rec.canvas_h || 100)
       }
-      window.dispatchEvent(new CustomEvent('zhiyu:toggle-doodle', { detail: { target: cv, x: r.left + r.width / 2, y: r.top } }))
+      // 把该批注块已有的笔迹会话一并交给 DoodleBall，让它在新会话里继续叠加，
+      // 而不是用「全页手绘」的 savedStrokes 状态去覆盖批注画布（那是断触/笔迹消失的根因）。
+      window.dispatchEvent(new CustomEvent('zhiyu:toggle-doodle', {
+        detail: {
+          target: cv,
+          strokes: (rec && rec.strokes) || [],
+          canvas_w: (rec && rec.canvas_w) || cv.width,
+          canvas_h: (rec && rec.canvas_h) || cv.height,
+          x: r.left + r.width / 2, y: r.top,
+        },
+      }))
     }
     return
   }
   window.dispatchEvent(new CustomEvent('zhiyu:toggle-doodle', { detail: { x: e.clientX, y: e.clientY } }))
 }
 
-// 工具球完成批注框手绘：把笔迹存到该批注记录（局部保存，不碰正文），并画到垫底画布持久显示
+// 工具球完成批注框手绘：把笔迹合并进该批注记录（局部保存，不碰正文），并画到垫底画布持久显示
 const onAnnDoodleSave = async (ev) => {
   const d = ev.detail || {}
   const cv = d.canvas
@@ -1042,14 +1149,20 @@ const onAnnDoodleSave = async (ev) => {
   const id = block.getAttribute('data-ann-id')
   if (!id) return
   try {
-    // 坐标是像素基准（DoodleBall 用 cv.width/rect.width 换算），保存像素尺寸供等比重画
-    await api.put('/annotations/' + id, { strokes, canvas_w: cv.width, canvas_h: cv.height })
-    if (annMap.value[id]) {
-      annMap.value[id].strokes = strokes
-      annMap.value[id].canvas_w = cv.width
-      annMap.value[id].canvas_h = cv.height
-    }
-    requestAnimationFrame(() => drawStrokes(cv, strokes, cv.width, cv.height))
+    const rec = annMap.value[id] || {}
+    const oldStrokes = Array.isArray(rec.strokes) ? rec.strokes : []
+    const oldW = rec.canvas_w || cv.width
+    // 与 drawStrokes 一致：按宽度等比缩放，把旧笔迹换算到当前画布坐标系，与新笔迹合并（累积不覆盖旧笔迹）
+    const s = oldW ? cv.width / oldW : 1
+    const scaledOld = oldStrokes.map(st => ({
+      ...st,
+      points: Array.isArray(st.points) ? st.points.map(p => ({ x: (p.x || 0) * s, y: (p.y || 0) * s })) : [],
+      width: (st.width || 3) * s,
+    }))
+    const merged = [...scaledOld, ...strokes]
+    await api.put('/annotations/' + id, { strokes: merged, canvas_w: cv.width, canvas_h: cv.height })
+    annMap.value[id] = { ...rec, strokes: merged, canvas_w: cv.width, canvas_h: cv.height }
+    requestAnimationFrame(() => drawStrokes(cv, merged, cv.width, cv.height))
     ElMessage.success('手绘已保存到批注')
   } catch (err) { ElMessage.error('手绘保存失败') }
 }
@@ -1254,6 +1367,8 @@ const save = async (opts = {}) => {
   busy.value = true
   try {
     if (isEdit.value) {
+      // 统一保存：批注文字先落库（防抖没跑完的补上），再保存正文
+      await flushAnnText()
       await api.put(`/docs/${docId.value}`, { type: type.value, title: title.value, content: content.value, visibility: visibility.value })
       ElMessage.success('已保存')
       clearDraft()
@@ -1618,10 +1733,12 @@ const mergeAiBlocks = (newBlocks) => {
 const renderAiBlocksInline = () => {
   if (!rightEl.value) return
   const blocks = pendingAiBlocks().filter(b => b.found)
+  const liveBlocks = captureLiveAnnotationBlocks(rightEl.value)
   // 重建为纯原文（清掉上次插入的 diff 块，恢复被替换的文本）
   rightEl.value.innerHTML = renderMd(content.value)
+  reuseLiveAnnotationBlocks(rightEl.value, liveBlocks)
   upgradeImgs()
-  bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText })
+  bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText, onImage: saveAnnImage })
   ensureAnnCanvases(rightEl.value)
   window.dispatchEvent(new Event('zhiyu:doodle-reflow'))
   const ctx = content.value || ''
@@ -1850,7 +1967,7 @@ onMounted(() => {
   }
   load()
   bindAnnGlobal({ onDel: delAnn })
-  bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText })
+  bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText, onImage: saveAnnImage })
   loadAnnData()
   document.addEventListener('click', closeSymbolPanel)
   window.addEventListener('zhiyu:ai-insert', onAiInsert)

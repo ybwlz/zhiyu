@@ -74,7 +74,7 @@ const loadAnnData = async () => {
     const res = await api.get('/notes/' + doc.id + '/annotations')
     const m = {}
     for (const r of res.data || []) {
-      if (r.kind === 'note') m[r.id] = { note_text: r.note_text || '', strokes: Array.isArray(r.strokes) ? r.strokes : [], canvas_w: r.canvas_w || 0, canvas_h: r.canvas_h || 0 }
+      if (r.kind === 'note') m[r.id] = { note_text: r.note_text || '', strokes: Array.isArray(r.strokes) ? r.strokes : [], canvas_w: r.canvas_w || 0, canvas_h: r.canvas_h || 0, img_path: r.img_path || '' }
     }
     annMap.value = m
     const root = document.querySelector('.doc-card .markdown-body')
@@ -2185,6 +2185,12 @@ const nextDoc = computed(() => {
   background: transparent !important;
   color: inherit !important;
   padding: 0 !important;
+}
+/* 阅览室正文图片：等比缩放适应卡片宽度，防止大图撑破版面 */
+.doc-card .markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
 }
 /* 代码高亮配色：跟随主题变量（星空/深色=亮色系，浅色=鲜艳深色系），覆盖 hljs 默认暗淡配色 */
 .doc-card .markdown-body .hljs-keyword, .doc-card .markdown-body .hljs-literal, .doc-card .markdown-body .hljs-selector-tag { color: var(--code-kw) !important; }

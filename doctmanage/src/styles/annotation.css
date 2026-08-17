@@ -25,13 +25,14 @@
   position: relative;
   margin: 4px 0;            /* ① 已移入框内左上，不再需要左侧留位 */
   padding: 8px 10px;
-  background: #eef0f3;
-  border: 1px solid rgba(0, 0, 0, .08);
-  border-radius: 6px;
+  background: color-mix(in srgb, #fff8c9 72%, var(--card-bg, #fff));
+  border: 1px solid color-mix(in srgb, #d7b84b 38%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 5px 18px rgba(115, 91, 24, .10);
   overflow: hidden;            /* 框内手绘笔迹被框裁剪，不穿出 */
   z-index: 6;                  /* 高于全页手绘画布(z5)：全页笔迹被批注框盖住 */
 }
-html[data-theme="starlight"] .ann-block.open { background: #2a3142; border-color: rgba(255, 255, 255, .08); }
+html[data-theme="starlight"] .ann-block.open { background: color-mix(in srgb, #5d5329 38%, #2a3142); border-color: rgba(255, 224, 117, .18); box-shadow: 0 5px 18px rgba(0, 0, 0, .22); }
 .ann-block.open .ann-badge {
   position: absolute; top: 6px; left: 6px; right: auto;
   z-index: 4;
@@ -92,7 +93,7 @@ html[data-theme="starlight"] .ann-canvas { background: rgba(0, 0, 0, .2); }
   pointer-events: none;
   border-radius: 5px;
 }
-.ann-doodle.active { pointer-events: auto; cursor: crosshair; height: 100%; }  /* 手绘激活时铺满整个批注框：全框可画、指针全框变形 */
+.ann-doodle.active { pointer-events: auto; cursor: crosshair; height: 100%; touch-action: none; }  /* 手绘激活时铺满整个批注框：全框可画、指针全框变形；touch-action:none 锁手势防断触 */
 /* 手绘激活时，让上层文字让位（事件穿透到画布），鼠标才显示手绘标；完成绘制后自动恢复 */
 .ann-doodle.active ~ .ann-body { pointer-events: none; }
 .ann-block.open .ann-body {
@@ -116,10 +117,17 @@ html[data-theme="starlight"] .ann-canvas { background: rgba(0, 0, 0, .2); }
 /* 批注框收起时隐藏手绘画布，避免笔迹溢出到框外 */
 .ann-block:not(.open) .ann-doodle { display: none; }
 .ann-block.open .ann-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
-.ann-block.open .ann-del {
+.ann-block.open .ann-img,
+.ann-block.open .ann-del,
+.ann-block.open .ann-mv {
   border: none; background: none; cursor: pointer;
   font-size: 12px; color: var(--text2); padding: 3px 8px; border-radius: 6px;
 }
+.ann-block.open .ann-img { color: var(--text2); cursor: pointer; margin-right: 4px; }
+.ann-block.open .ann-img:hover { color: var(--brand-1); }
+.ann-block.open .ann-mv { padding: 3px 6px; line-height: 1; }
+.ann-block.open .ann-mv:hover { color: var(--brand-1); background: color-mix(in srgb, var(--brand-1) 10%, transparent); }
+.ann-image { display: block; position: relative; z-index: 2; max-width: 100%; height: auto; margin: 8px 0 4px 30px; border-radius: 6px; }
 .ann-block.open .ann-del:hover { color: #ef4444; background: color-mix(in srgb, #ef4444 10%, transparent); }
 .ann-body { display: none; }
 .ann-body[contenteditable]:empty::before {

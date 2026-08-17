@@ -712,7 +712,7 @@ const loadAnnData = async () => {
     const res = await api.get('/notes/' + docId.value + '/annotations')
     const m = {}
     for (const r of res.data || []) {
-      if (r.kind === 'note') m[r.id] = { note_text: r.note_text || '', strokes: Array.isArray(r.strokes) ? r.strokes : [], canvas_w: r.canvas_w || 0, canvas_h: r.canvas_h || 0 }
+      if (r.kind === 'note') m[r.id] = { note_text: r.note_text || '', strokes: Array.isArray(r.strokes) ? r.strokes : [], canvas_w: r.canvas_w || 0, canvas_h: r.canvas_h || 0, img_path: r.img_path || '' }
     }
     annMap.value = m
     bindAnnotations(document.querySelector('.reader-card .markdown-body'), annMap.value, { editable: false })
@@ -1183,7 +1183,7 @@ const sendFriendReq = async () => {
 .markdown-body :deep(pre code) { background: transparent; padding: 0; }
 .markdown-body :deep(table) { border-collapse: collapse; margin: 14px 0; width: 100%; }
 .markdown-body :deep(th), .markdown-body :deep(td) { border: 1px solid var(--border); padding: 8px 12px; }
-.markdown-body :deep(img) { max-width: 100%; border-radius: 10px; }
+.markdown-body :deep(img) { max-width: 100%; height: auto; border-radius: 10px; }
 .markdown-body :deep(blockquote) { border-left: 3px solid var(--brand-1); margin: 14px 0; padding: 6px 16px; color: var(--text2); background: color-mix(in srgb, var(--brand-1) 6%, transparent); border-radius: 0 10px 10px 0; }
 
 .summary-panel {

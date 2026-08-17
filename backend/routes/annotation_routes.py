@@ -126,6 +126,8 @@ def note_annotations_update(aid, user=None):
     sets, vals = [], []
     if 'note_text' in data:
         sets.append('note_text=%s'); vals.append(str(data.get('note_text') or '')[:5000])
+    if 'img_path' in data:
+        sets.append('img_path=%s'); vals.append(str(data.get('img_path') or '')[:255] or None)
     if 'strokes' in data:
         strokes = data.get('strokes')
         if not isinstance(strokes, list):

@@ -416,6 +416,8 @@ pub fn run() {
             let app_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon-256.png")).ok();
             let mut tray_builder = TrayIconBuilder::new()
                 .menu(&menu)
+                // 悬停托盘图标时显示应用名（之前没有任何提示，用户以为托盘没显示「知屿」）
+                .tooltip("知屿")
                 // 明确：左键单击 = 显示窗口（Click 事件），右键 = 弹出菜单；避免个别平台默认把左键也弹菜单
                 .show_menu_on_left_click(false);
             if let Some(ic) = &app_icon {
@@ -434,7 +436,8 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { .. } = event {
+                    // 只有左键单击才显示窗口；右键交给系统弹菜单（否则右键会同时触发打开窗口）
+                    if let TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
                         let app = tray.app_handle();
                         if let Some(w) = app.get_webview_window("main") {
                             let _ = w.unminimize();
