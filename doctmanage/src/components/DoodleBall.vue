@@ -5,7 +5,7 @@
   <div class="dball-wrap">
     <Transition name="dball">
       <div v-if="open" ref="panel" class="dball-panel" :style="panelPos" @pointerdown.stop>
-        <div class="dball-panel-head" @mousedown="dragStart" title="按住拖动">
+        <div class="dball-panel-head" @pointerdown="dragStart" title="按住拖动">
           <span class="dball-tip">{{ tipText }}</span>
           <button class="dball-close" @click="closePanel" data-tip="收起">✕</button>
         </div>
@@ -89,6 +89,7 @@ export default {
       dragOff: null,                     // 面板拖拽偏移
       drawing: false,
       curStroke: null,
+      renderedPointCount: 0,
       rafId: null,
     }
   },
@@ -189,13 +190,17 @@ export default {
     },
     // 面板可拖拽移动（按住头部拖动）
     dragStart(e) {
+      if (e.target && e.target.closest && e.target.closest('button')) return
       e.preventDefault()
       const panel = this.$refs.panel
       if (!panel) return
+      if (e.pointerId != null && e.currentTarget.setPointerCapture) {
+        try { e.currentTarget.setPointerCapture(e.pointerId) } catch (_) { /* 兼容旧浏览器 */ }
+      }
       const rect = panel.getBoundingClientRect()
       this.dragOff = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-      window.addEventListener('mousemove', this.dragMove)
-      window.addEventListener('mouseup', this.dragEnd)
+      window.addEventListener('pointermove', this.dragMove)
+      window.addEventListener('pointerup', this.dragEnd)
     },
     dragMove(e) {
       if (!this.dragOff) return
@@ -203,8 +208,8 @@ export default {
     },
     dragEnd() {
       this.dragOff = null
-      window.removeEventListener('mousemove', this.dragMove)
-      window.removeEventListener('mouseup', this.dragEnd)
+      window.removeEventListener('pointermove', this.dragMove)
+      window.removeEventListener('pointerup', this.dragEnd)
     },
     // 删除已保存的涂鸦（上次保存的笔迹）
     async delSaved() {
@@ -274,7 +279,6 @@ export default {
       cv.addEventListener('pointerdown', this.onDown)
       cv.addEventListener('pointermove', this.onMove)
       cv.addEventListener('pointerup', this.onUp)
-      cv.addEventListener('pointerleave', this.onUp)
     },
     unbindCvEvents() {
       const cv = this.cv
@@ -282,7 +286,6 @@ export default {
       cv.removeEventListener('pointerdown', this.onDown)
       cv.removeEventListener('pointermove', this.onMove)
       cv.removeEventListener('pointerup', this.onUp)
-      cv.removeEventListener('pointerleave', this.onUp)
       cv._doodleBound = false
     },
     detachCanvas() {
@@ -308,6 +311,9 @@ export default {
     onDown(e) {
       if (!this.open) return
       e.preventDefault()
+      if (e.pointerId != null && this.cv.setPointerCapture) {
+        try { this.cv.setPointerCapture(e.pointerId) } catch (_) { /* 兼容旧浏览器 */ }
+      }
       this.drawing = true
       const p = this.annPos(e)
       this.curStroke = { points: [p], color: this.tool === 'eraser' ? 'erase' : this.color, width: this.width }
@@ -316,22 +322,23 @@ export default {
     onMove(e) {
       if (!this.drawing || !this.curStroke) return
       e.preventDefault()
-      const p = this.annPos(e)
       const pts = this.curStroke.points
-      const last = pts[pts.length - 1]
-      // 快速移动时在两点间插值补点，保证笔迹连续不断点
-      if (last) {
-        const dx = p.x - last.x
-        const dy = p.y - last.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist > 4) {
-          const steps = Math.ceil(dist / 4)
-          for (let i = 1; i < steps; i++) {
-            pts.push({ x: last.x + dx * i / steps, y: last.y + dy * i / steps })
+      const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e]
+      for (const pointEvent of events) {
+        const p = this.annPos(pointEvent)
+        const last = pts[pts.length - 1]
+        // 快速移动时插值补点，保证笔迹连续不断点
+        if (last) {
+          const dx = p.x - last.x
+          const dy = p.y - last.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist > 3) {
+            const steps = Math.ceil(dist / 3)
+            for (let i = 1; i < steps; i++) pts.push({ x: last.x + dx * i / steps, y: last.y + dy * i / steps })
           }
         }
+        pts.push(p)
       }
-      pts.push(p)
       if (!this.rafId) {
         this.rafId = requestAnimationFrame(() => {
           this.rafId = null
@@ -339,7 +346,37 @@ export default {
         })
       }
     },
-    onUp() { this.drawing = false; this.curStroke = null },
+    onUp(e) {
+      if (e && e.pointerId != null && this.cv && this.cv.releasePointerCapture) {
+        try { this.cv.releasePointerCapture(e.pointerId) } catch (_) { /* 已释放 */ }
+      }
+      this.drawing = false
+      this.curStroke = null
+    },
+    drawPendingStroke() {
+      if (!this.curStroke || !this.cv) return
+      const pts = this.curStroke.points
+      const ctx = this.cv.getContext('2d')
+      ctx.save()
+      if (this.curStroke.color === 'erase') {
+        ctx.globalCompositeOperation = 'destination-out'
+        ctx.strokeStyle = 'rgba(0,0,0,1)'
+      } else ctx.strokeStyle = this.curStroke.color
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = this.curStroke.width
+      for (let i = Math.max(1, this.renderedPointCount); i < pts.length; i++) {
+        ctx.beginPath()
+        ctx.moveTo(pts[i - 1].x, pts[i - 1].y)
+        ctx.lineTo(pts[i].x, pts[i].y)
+        ctx.stroke()
+      }
+      if (pts.length === 1 && this.renderedPointCount === 1) {
+        ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, this.curStroke.width / 2, 0, Math.PI * 2); ctx.fill()
+      }
+      ctx.restore()
+      this.renderedPointCount = pts.length
+    },
     // 平滑笔迹：二次贝塞尔（中点平滑）；橡皮用 destination-out 真擦除像素
     drawStroke(ctx, s, kx, ky) {
       const pts = s.points
@@ -461,7 +498,7 @@ export default {
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
   display: flex; flex-direction: column; gap: 8px;
 }
-.dball-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: move; user-select: none; }
+.dball-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: move; user-select: none; touch-action: none; }
 .dball-tip { font-size: 12px; color: var(--text2); line-height: 1.5; flex: 1; }
 .dball-close {
   border: none; background: none; cursor: pointer;
@@ -544,6 +581,8 @@ export default {
 .dball-canvas.active {
   pointer-events: auto;
   cursor: crosshair;
+  /* 涂鸦开启时锁定浏览器手势，避免触控笔第一段被当成下拉刷新而取消。 */
+  touch-action: none;
 }
 .dball-enter-active, .dball-leave-active { transition: opacity .18s ease, transform .18s ease; }
 .dball-enter-from, .dball-leave-to { opacity: 0; transform: translateY(8px); }
