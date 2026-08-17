@@ -411,6 +411,62 @@ const loadAnnData = async () => {
 const saveAnnText = async (id, text) => {
   try { await api.put('/annotations/' + id, { note_text: text }) } catch (e) { /* 忽略 */ }
 }
+// ── 批注撤销/重做（Ctrl+Z / Ctrl+Y）：快照正文锚点 + 批注记录，保存笔记时清空 ──
+const annUndoStack = []
+const annRedoStack = []
+const snapshotAnn = () => ({
+  content: content.value,
+  annMap: JSON.parse(JSON.stringify(annMap.value || {})),
+})
+const pushAnnUndo = () => {
+  annUndoStack.push(snapshotAnn())
+  if (annUndoStack.length > 50) annUndoStack.shift()
+  annRedoStack.length = 0   // 新操作清空重做栈
+}
+const applyAnnSnapshot = async (snap) => {
+  annMap.value = JSON.parse(JSON.stringify(snap.annMap || {}))
+  content.value = snap.content || ''   // 触发 watch 重渲染（含批注块复用）
+  // 同步后端：恢复的记录全部 PUT（删除/新增产生的孤儿记录由保存时的清理兜底）
+  const puts = Object.entries(annMap.value).map(([id, rec]) =>
+    api.put('/annotations/' + id, {
+      note_text: rec.note_text || '',
+      strokes: Array.isArray(rec.strokes) ? rec.strokes : [],
+      canvas_w: rec.canvas_w || 0,
+      canvas_h: rec.canvas_h || 0,
+      img_path: rec.img_path || '',
+    }).catch(() => {})
+  )
+  await Promise.all(puts)
+}
+const doAnnUndo = async () => {
+  if (!annUndoStack.length) return
+  const snap = annUndoStack.pop()
+  annRedoStack.push(snapshotAnn())
+  await applyAnnSnapshot(snap)
+  ElMessage.info('已撤销批注操作')
+}
+const doAnnRedo = async () => {
+  if (!annRedoStack.length) return
+  const snap = annRedoStack.pop()
+  annUndoStack.push(snapshotAnn())
+  await applyAnnSnapshot(snap)
+  ElMessage.info('已重做批注操作')
+}
+// 保存后清理孤儿批注记录（被删除且正文已无锚点；刚插入还在 annMap 里的不算）——保存是撤销栈边界
+const cleanupOrphanAnns = async () => {
+  try {
+    const keep = new Set()
+    const re = /:::annotation\s+([^\s]+)/g
+    let m
+    while ((m = re.exec(content.value || ''))) keep.add(m[1])
+    Object.keys(annMap.value || {}).forEach(id => keep.add(String(id)))   // 正在编辑的批注不清理
+    const res = await api.get('/notes/' + docId.value + '/annotations')
+    const deletes = (res.data || [])
+      .filter(r => r.kind === 'note' && !keep.has(String(r.id)))
+      .map(r => api.delete('/annotations/' + r.id).catch(() => {}))
+    await Promise.all(deletes)
+  } catch (e) { /* 忽略 */ }
+}
 // 保存笔记时统一 flush 批注文字：防抖可能还没触发（打完字 200ms 内点保存），避免批注文字丢失
 const flushAnnText = async () => {
   if (!rightEl.value) return
@@ -429,6 +485,7 @@ const saveAnnDoodle = async (id, strokes, w, h) => {
   try { await api.put('/annotations/' + id, { strokes, canvas_w: w, canvas_h: h }) } catch (e) { /* 忽略 */ }
 }
 const saveAnnImage = async (id, file, block) => {
+  pushAnnUndo()
   try {
     const dataUrl = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file) })
     const res = await api.post('/annotations/upload-img', { img: dataUrl })
@@ -445,6 +502,7 @@ const saveAnnImage = async (id, file, block) => {
 }
 // 批注块移动：把 :::annotation <id> 锚点与其相邻正文块交换位置（↑ 上移 / ↓ 下移）
 const moveAnnotation = (id, dir) => {
+  pushAnnUndo()
   const t = content.value || ''
   const lines = t.split('\n')
   const targetId = String(id)
@@ -487,21 +545,25 @@ const moveAnnotation = (id, dir) => {
     ElMessage.success(dir === 'up' ? '批注已上移' : '批注已下移')
   }
 }
-// 删除批注：删记录 + 移除块
+// 删除批注：移除锚点 + 记录（后端记录保留，供 Ctrl+Z 撤销恢复；孤儿记录由保存时清理）
 const delAnn = async (b, idx) => {
   const id = b.getAttribute('data-ann-id')
-  if (id) {
-    delete annMap.value[id]
-    try { await api.delete('/annotations/' + id) } catch (e) { /* 忽略 */ }
-  }
+  pushAnnUndo()
+  if (id) delete annMap.value[id]
   b.remove()
+  if (id) {
+    // 直接从 markdown 删除该批注锚点（不依赖 onEdit 防抖，保证撤销快照准确）
+    const re = new RegExp('\\n{0,2}:::annotation\\s+' + id + '\\s*\\n[^\\n]*:::[^\\n]*\\n?')
+    const nt = (content.value || '').replace(re, '\n')
+    if (nt !== content.value) content.value = nt
+  }
   if (rightEl.value) {
     bindAnnotations(rightEl.value, annMap.value, { editable: true, onInput: saveAnnText, onImage: saveAnnImage, onMove: moveAnnotation })
-    onEdit()
   }
 }
 // 插入批注：光标处插入批注块（可展开收起、可删除，保存为 :::annotation 容器）
 const insertAnnotation = async () => {
+  pushAnnUndo()
   // 批注框内不允许再插批注（防套娃）
   const sel0 = window.getSelection()
   let n0 = sel0 && sel0.anchorNode
@@ -673,6 +735,19 @@ const onEditorKeydown = (e) => {
   if (e.target && e.target.closest && e.target.closest('eq-wrap')) {
     if (!e.ctrlKey && !e.metaKey && !e.altKey) e.preventDefault()
     return
+  }
+  // ── 批注撤销/重做 Ctrl+Z / Ctrl+Y ──
+  // 规则：焦点在文字编辑处（正文 contenteditable / 批注 textarea / 输入框）走原生撤销；
+  // 焦点在按钮等非文字区（如刚点完批注移动/删除）时，优先撤销批注操作。
+  if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    const k = (e.key || '').toLowerCase()
+    const ae = document.activeElement
+    const inTextEdit = ae && ((ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT') || ae.isContentEditable)
+    if (k === 'z') {
+      if (!inTextEdit && annUndoStack.length) { e.preventDefault(); doAnnUndo(); return }
+    } else if (k === 'y') {
+      if (!inTextEdit && annRedoStack.length) { e.preventDefault(); doAnnRedo(); return }
+    }
   }
   const sel = window.getSelection()
   if (!sel || !sel.rangeCount || !rightEl.value) return
@@ -1148,6 +1223,7 @@ const onAnnDoodleSave = async (ev) => {
   if (!block) return
   const id = block.getAttribute('data-ann-id')
   if (!id) return
+  pushAnnUndo()
   try {
     const rec = annMap.value[id] || {}
     const oldStrokes = Array.isArray(rec.strokes) ? rec.strokes : []
@@ -1370,6 +1446,10 @@ const save = async (opts = {}) => {
       // 统一保存：批注文字先落库（防抖没跑完的补上），再保存正文
       await flushAnnText()
       await api.put(`/docs/${docId.value}`, { type: type.value, title: title.value, content: content.value, visibility: visibility.value })
+      // 保存是撤销栈边界：清理孤儿批注记录 + 清空撤销/重做栈
+      await cleanupOrphanAnns()
+      annUndoStack.length = 0
+      annRedoStack.length = 0
       ElMessage.success('已保存')
       clearDraft()
     } else {

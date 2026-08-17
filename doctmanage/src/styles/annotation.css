@@ -93,7 +93,7 @@ html[data-theme="starlight"] .ann-canvas { background: rgba(0, 0, 0, .2); }
   pointer-events: none;
   border-radius: 5px;
 }
-.ann-doodle.active { pointer-events: auto; cursor: crosshair; height: 100%; touch-action: none; }  /* 手绘激活时铺满整个批注框：全框可画、指针全框变形；touch-action:none 锁手势防断触 */
+.ann-doodle.active { pointer-events: auto; cursor: crosshair; height: 100%; }  /* 手绘激活时铺满整个批注框：全框可画、指针全框变形；touch-action 由 DoodleBall 按「手指也绘制」开关控制 */
 /* 手绘激活时，让上层文字让位（事件穿透到画布），鼠标才显示手绘标；完成绘制后自动恢复 */
 .ann-doodle.active ~ .ann-body { pointer-events: none; }
 .ann-block.open .ann-body {

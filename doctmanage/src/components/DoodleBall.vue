@@ -48,6 +48,11 @@
           <button class="dball-tool" @click="clearAll">🧽 清空</button>
           <button v-if="savedStrokes.length && !strokes.length" class="dball-tool del" data-tip="删除已保存的手绘（需先清空本批）" @click="delSaved">🗑️ 删已存</button>
         </div>
+        <!-- 手指是否也绘制：默认关，触控笔/鼠标书写、手指滚动页面；开启后手指也能画 -->
+        <label class="dball-finger">
+          <input type="checkbox" v-model="fingerDraw" @change="onFingerDrawChange" />
+          👆 手指也绘制
+        </label>
         <button class="dball-save" @click="save">{{ saveText }}</button>
       </div>
     </Transition>
@@ -92,6 +97,7 @@ export default {
       drawing: false,
       curStroke: null,
       renderedPointCount: 0,
+      fingerDraw: false,                // 手指是否也参与绘制（默认关：触控笔/鼠标画，手指用于滚动）
       rafId: null,
     }
   },
@@ -158,12 +164,22 @@ export default {
       }
     },
     closePanel() { this.open = false; this.setCanvasInteractive(false) },
+    // 触控策略：手指默认用于滚动（pan-y），开启「手指也绘制」或使用触控笔时才锁手势（none）
+    applyTouchAction() {
+      const cv = this._tgtCanvas || this.$refs.cvRef
+      if (!cv) return
+      cv.style.touchAction = this.open ? (this.fingerDraw ? 'none' : 'pan-y') : 'none'
+    },
+    onFingerDrawChange() {
+      this.applyTouchAction()
+    },
     setCanvasInteractive(on) {
       const cv = this._tgtCanvas || this.$refs.cvRef
       if (!cv) return
       cv.style.pointerEvents = on ? 'auto' : 'none'
       // 关键：完成后必须移除 .active——否则 CSS 的 `.active ~ .ann-body { pointer-events:none }` 一直生效，文字区点不进去
       cv.classList.toggle('active', on)
+      this.applyTouchAction()
     },
     // 编辑区重建（renderRight）后 canvas 被销毁，有笔迹时重新挂载
     onReflow() {
@@ -255,6 +271,7 @@ export default {
         this.cv = this._tgtCanvas
         this.cv.classList.add('active')
         this.cv.style.pointerEvents = this.open ? 'auto' : 'none'
+        this.applyTouchAction()
         this.bindCvEvents()
         this.redraw()
         return
@@ -277,6 +294,7 @@ export default {
       cv.style.zIndex = '5'
       cv.style.pointerEvents = this.open ? 'auto' : 'none'
       this.cv = cv
+      this.applyTouchAction()
       this.bindCvEvents()
       this.redraw()
     },
@@ -324,11 +342,16 @@ export default {
     },
     onDown(e) {
       if (!this.open) return
+      // 触控笔(pen)/鼠标(mouse) 书写；手指(touch) 默认只用于滚动/平移，除非打开「手指也绘制」
+      if (e.pointerType === 'touch' && !this.fingerDraw) return
       e.preventDefault()
+      // 锁定当前手势为绘制：pan-y 默认下，落笔瞬间切 none，避免笔迹被浏览器当成滚动取消
+      if (this.cv) this.cv.style.touchAction = 'none'
       if (e.pointerId != null && this.cv.setPointerCapture) {
         try { this.cv.setPointerCapture(e.pointerId) } catch (_) { /* 兼容旧浏览器 */ }
       }
       this.drawing = true
+      this.renderedPointCount = 0   // 新笔画：增量绘制从第 0 点开始
       const p = this.annPos(e)
       this.curStroke = { points: [p], color: this.tool === 'eraser' ? 'erase' : this.color, width: this.width }
       this.strokes.push(this.curStroke)
@@ -356,7 +379,8 @@ export default {
       if (!this.rafId) {
         this.rafId = requestAnimationFrame(() => {
           this.rafId = null
-          this.redraw()
+          // 增量绘制：只画本笔新增线段，不全量清屏重画（笔迹/点数多了不卡）
+          this.drawPendingStroke()
         })
       }
     },
@@ -366,6 +390,7 @@ export default {
       }
       this.drawing = false
       this.curStroke = null
+      this.applyTouchAction()   // 恢复 pan-y / none（按手指绘制开关），下一笔手势重新判定
     },
     drawPendingStroke() {
       if (!this.curStroke || !this.cv) return
@@ -385,7 +410,8 @@ export default {
         ctx.lineTo(pts[i].x, pts[i].y)
         ctx.stroke()
       }
-      if (pts.length === 1 && this.renderedPointCount === 1) {
+      // 单点落笔（还没移动）：画一个圆点
+      if (pts.length === 1 && this.renderedPointCount === 0) {
         ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, this.curStroke.width / 2, 0, Math.PI * 2); ctx.fill()
       }
       ctx.restore()
@@ -440,6 +466,8 @@ export default {
         for (const s of this.strokes) this.drawStroke(ctx, s, 1, 1)
       }
       ctx.globalAlpha = 1
+      // 全量重绘后当前笔画已完整上屏：增量计数同步到当前长度，后续绘制从这继续
+      if (this.curStroke) this.renderedPointCount = this.curStroke.points.length
     },
     undo() { this.strokes.pop(); this.redraw() },
     clearAll() { this.strokes = []; this.redraw() },
@@ -593,17 +621,22 @@ export default {
   background: linear-gradient(120deg, var(--brand-1), var(--brand-2));
   color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer;
 }
+.dball-finger {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text2); cursor: pointer;
+  padding: 4px 2px; user-select: none;
+}
+.dball-finger input { accent-color: var(--brand-1); width: 15px; height: 15px; cursor: pointer; }
 .dball-canvas {
   position: absolute;
   z-index: 5;
   border-radius: 22px;
   pointer-events: none;
+  touch-action: none;   /* 默认值；打开后由 JS 按「手指也绘制」开关设为 pan-y/none */
 }
 .dball-canvas.active {
   pointer-events: auto;
   cursor: crosshair;
-  /* 涂鸦开启时锁定浏览器手势，避免触控笔第一段被当成下拉刷新而取消。 */
-  touch-action: none;
 }
 .dball-enter-active, .dball-leave-active { transition: opacity .18s ease, transform .18s ease; }
 .dball-enter-from, .dball-leave-to { opacity: 0; transform: translateY(8px); }
