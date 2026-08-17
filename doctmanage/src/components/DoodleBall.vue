@@ -98,6 +98,8 @@ export default {
       curStroke: null,
       renderedPointCount: 0,
       fingerDraw: false,                // 手指是否也参与绘制（默认关：触控笔/鼠标画，手指用于滚动）
+      fsActive: false,                  // 手指手动滚动模式（touch-action:none 禁了原生滚动，自己滚）
+      fsLast: null,
       rafId: null,
     }
   },
@@ -164,14 +166,17 @@ export default {
       }
     },
     closePanel() { this.open = false; this.setCanvasInteractive(false) },
-    // 触控策略：手指默认用于滚动（pan-y），开启「手指也绘制」或使用触控笔时才锁手势（none）
+    // 触控策略：画布始终 touch-action:none —— 触控笔/鼠标/手指绘制都 100% 可靠，
+    // 手掌误触不会触发页面滚动（之前 pan-y 会把笔迹当滚动取消，导致时灵时不灵、笔手不分）。
+    // 手指默认进入「手动滚动」模式（见 onDown/scrollByPointer），不绘制；
+    // 开启「手指也绘制」后手指直接作画。
     applyTouchAction() {
       const cv = this._tgtCanvas || this.$refs.cvRef
       if (!cv) return
-      cv.style.touchAction = this.open ? (this.fingerDraw ? 'none' : 'pan-y') : 'none'
+      cv.style.touchAction = 'none'
     },
     onFingerDrawChange() {
-      this.applyTouchAction()
+      // 手指开关只决定手指是否绘制；touch-action 始终 none，无需切换
     },
     setCanvasInteractive(on) {
       const cv = this._tgtCanvas || this.$refs.cvRef
@@ -306,6 +311,8 @@ export default {
       cv.addEventListener('pointerdown', this.onDown)
       cv.addEventListener('pointermove', this.onMove)
       cv.addEventListener('pointerup', this.onUp)
+      // 浏览器取消手势（系统拦截/手掌重识别）时优雅收尾：已画的部分保留，不丢笔迹
+      cv.addEventListener('pointercancel', this.onUp)
     },
     unbindCvEvents() {
       const cv = this.cv
@@ -313,6 +320,7 @@ export default {
       cv.removeEventListener('pointerdown', this.onDown)
       cv.removeEventListener('pointermove', this.onMove)
       cv.removeEventListener('pointerup', this.onUp)
+      cv.removeEventListener('pointercancel', this.onUp)
       cv._doodleBound = false
     },
     detachCanvas() {
@@ -342,11 +350,18 @@ export default {
     },
     onDown(e) {
       if (!this.open) return
-      // 触控笔(pen)/鼠标(mouse) 书写；手指(touch) 默认只用于滚动/平移，除非打开「手指也绘制」
-      if (e.pointerType === 'touch' && !this.fingerDraw) return
+      // 手指(touch)：默认不绘制 → 进入手动滚动模式（画布 touch-action:none 禁了原生滚动，这里自己滚）。
+      // 某些设备/浏览器把触控笔误报成 touch：带笔倾角(tilt)特征时仍按笔处理，避免笔不画。
+      const penLike = e.pointerType === 'pen' || e.tiltX !== 0 || e.tiltY !== 0
+      if (e.pointerType === 'touch' && !penLike && !this.fingerDraw) {
+        this.fsActive = true
+        this.fsLast = { x: e.clientX, y: e.clientY }
+        if (e.pointerId != null && this.cv && this.cv.setPointerCapture) {
+          try { this.cv.setPointerCapture(e.pointerId) } catch (_) { /* 兼容旧浏览器 */ }
+        }
+        return
+      }
       e.preventDefault()
-      // 锁定当前手势为绘制：pan-y 默认下，落笔瞬间切 none，避免笔迹被浏览器当成滚动取消
-      if (this.cv) this.cv.style.touchAction = 'none'
       if (e.pointerId != null && this.cv.setPointerCapture) {
         try { this.cv.setPointerCapture(e.pointerId) } catch (_) { /* 兼容旧浏览器 */ }
       }
@@ -357,6 +372,14 @@ export default {
       this.strokes.push(this.curStroke)
     },
     onMove(e) {
+      // 手指手动滚动：跟手滚动最近的滚动容器（页面或卡片）
+      if (this.fsActive) {
+        const dx = e.clientX - this.fsLast.x
+        const dy = e.clientY - this.fsLast.y
+        this.fsLast = { x: e.clientX, y: e.clientY }
+        this.scrollByPointer(dx, dy)
+        return
+      }
       if (!this.drawing || !this.curStroke) return
       e.preventDefault()
       const pts = this.curStroke.points
@@ -390,7 +413,25 @@ export default {
       }
       this.drawing = false
       this.curStroke = null
-      this.applyTouchAction()   // 恢复 pan-y / none（按手指绘制开关），下一笔手势重新判定
+      this.fsActive = false
+      this.fsLast = null
+      this.applyTouchAction()   // 恢复 touch-action:none，下一笔手势重新判定
+    },
+    // 手动滚动：沿祖先链找最近的滚动容器，手指跟手滚动；找不到则滚页面
+    scrollByPointer(dx, dy) {
+      const root = this._tgtCanvas
+        ? (this._tgtCanvas.closest('.ann-block') || this._tgtCanvas.parentElement)
+        : (this.cv ? this.cv.parentElement : null)
+      let node = root
+      while (node && node !== document.body && node !== document.documentElement) {
+        if (node.scrollHeight > node.clientHeight + 4 || node.scrollWidth > node.clientWidth + 4) {
+          node.scrollTop -= dy
+          node.scrollLeft -= dx
+          return
+        }
+        node = node.parentElement
+      }
+      window.scrollBy(-dx, -dy)
     },
     drawPendingStroke() {
       if (!this.curStroke || !this.cv) return
